@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "kometi",
+    "name": "Kometi App",
     "slug": "kometi",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -28,7 +28,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#0A84FF",
           "android": {
             "image": "./assets/images/splash-icon.png",
             "imageWidth": 76
