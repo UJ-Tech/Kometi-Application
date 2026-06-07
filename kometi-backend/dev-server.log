@@ -1,0 +1,200 @@
+
+> kometi-backend@1.0.0 dev
+> ts-node-dev --respawn --transpile-only src/server.ts
+
+[INFO] 15:56:08 ts-node-dev ver. 2.0.0 (using ts-node ver. 10.9.2, typescript ver. 5.9.3)
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 23:25:40 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.validator.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 23:26:01 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.service.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 23:26:15 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.controller.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 23:26:20 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.router.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+prisma:error 
+Invalid `prisma.user.findFirst()` invocation in
+C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.service.ts:104:44
+
+  101 }
+  102 
+  103 static async registerUser(phone: string, name: string, email: string, password: string) {
+→ 104   const existingUser = await prisma.user.findFirst(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+[INFO] 10:07:23 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\server.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 10:09:16 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.service.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 10:09:24 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\middleware\auth.middleware.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+prisma:error 
+Invalid `prisma.user.findFirst()` invocation in
+C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.service.ts:198:46
+
+  195 
+  196 static async registerUser(phone: string, name: string, email: string, password: string) {
+  197   try {
+→ 198     const existingUser = await prisma.user.findFirst(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+prisma:error 
+Invalid `prisma.user.findUnique()` invocation in
+C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\middleware\auth.middleware.ts:39:32
+
+  36 
+  37 let user;
+  38 try {
+→ 39   user = await prisma.user.findUnique(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+prisma:error 
+Invalid `prisma.user.update()` invocation in
+C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.service.ts:312:25
+
+  309 static async setMpin(userId: string, mpin: string) {
+  310   const hashedMpin = await bcrypt.hash(mpin, 10);
+  311   try {
+→ 312     await prisma.user.update(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+prisma:error 
+Invalid `prisma.user.findFirst()` invocation in
+C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.service.ts:157:38
+
+  154 
+  155 static async login(email: string, phone: string, password: string) {
+  156   try {
+→ 157     const user = await prisma.user.findFirst(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+[INFO] 10:12:42 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\config\database.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 10:56:33 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.service.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 10:57:02 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.service.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 12:36:40 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\config\env.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5001
+=============================================
+[INFO] 16:45:39 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\config\env.ts has been modified
+[INFO] 17:05:27 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\config\env.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 17:09:15 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.service.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 17:09:22 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\config\env.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 17:14:21 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\config\env.ts has been modified
+[INFO] 11:33:32 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\server.ts has been modified
+[ERROR] 11:33:40 Error: listen EADDRINUSE: address already in use :::5000
+[INFO] 11:34:09 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\committees\committees.service.ts has been modified
+[ERROR] 11:34:11 Error: listen EADDRINUSE: address already in use :::5000
+[INFO] 11:34:17 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\admin\admin.controller.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 11:35:24 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\committees\committees.service.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 16:20:34 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.validator.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 16:20:44 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.service.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 16:21:06 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.controller.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 16:21:18 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.router.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 16:21:43 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.router.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 16:23:05 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\committees\committees.service.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 16:23:32 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\committees\committees.service.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 16:23:49 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\committees\committees.controller.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 16:24:16 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\committees\committees.validator.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================
+[INFO] 16:24:43 Restarting: C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\committees\committees.router.ts has been modified
+=============================================
+🚀 Kometi Server running in development mode
+📍 Endpoint: http://localhost:5000
+=============================================

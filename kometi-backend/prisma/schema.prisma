@@ -1,0 +1,408 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ──────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  ACCOUNTANT
+  AGENT
+  ORGANIZER
+  MEMBER
+}
+
+enum KYCStatus {
+  PENDING
+  SUBMITTED
+  VERIFIED
+  REJECTED
+}
+
+enum CommitteeStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum CommitteeType {
+  FIXED_WINNER       // Rotation by draw/lot
+  AUCTION            // Highest bidder wins pot
+  FIXED_ORDER        // Pre-defined winner order
+}
+
+enum InstallmentStatus {
+  PENDING
+  PAID
+  OVERDUE
+  PARTIAL
+  WAIVED
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  BANK_TRANSFER
+  WALLET
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+}
+
+enum TransactionCategory {
+  INSTALLMENT_PAYMENT
+  COMMITTEE_PAYOUT
+  WALLET_TOPUP
+  WALLET_TRANSFER
+  PENALTY
+  REFUND
+  ADJUSTMENT
+  COMMISSION
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+enum NotificationType {
+  INSTALLMENT_DUE
+  INSTALLMENT_PAID
+  COMMITTEE_PAYOUT
+  COMMITTEE_START
+  KYC_UPDATE
+  WALLET_CREDIT
+  WALLET_DEBIT
+}
+
+// ─── MODELS ─────────────────────────────────────────────
+
+model User {
+  id              String    @id @default(cuid())
+  phone           String    @unique
+  name            String
+  email           String?   @unique
+  passwordHash    String?
+  pin             String?                        // 6-digit hashed MPIN
+  role            UserRole  @default(MEMBER)
+  isActive        Boolean   @default(true)
+  kycStatus       KYCStatus @default(PENDING)
+  profileImageUrl String?
+  deviceTokens    String[]                       // FCM tokens for push
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  kycDocument     KYCDocument?
+  wallet          Wallet?
+  memberOf        CommitteeMember[]
+  organizedCommittees Committee[] @relation("OrganizerCommittees")
+  installmentsPaid  Installment[]
+  transactions    Transaction[]
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+  refreshTokens   RefreshToken[]
+  bids            Bid[]
+  joinRequests    JoinRequest[]
+  reviewedJoinRequests JoinRequest[] @relation("ReviewedBy")
+
+  @@index([phone])
+  @@map("users")
+}
+
+model KYCDocument {
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  aadhaarNum   String?                   // Masked: XXXX-XXXX-1234
+  panNum       String?                   // Masked: XXXXXX1234X
+  aadhaarUrl   String?                   // S3 signed URL
+  panUrl       String?
+  selfieUrl    String?
+  status       KYCStatus @default(PENDING)
+  rejectedReason String?
+  verifiedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("kyc_documents")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Committee {
+  id              String          @id @default(cuid())
+  name            String
+  description     String?
+  organizerId     String
+  inviteCode      String          @unique            // 8-char unique code for members to join
+  type            CommitteeType   @default(FIXED_WINNER)
+  status          CommitteeStatus @default(DRAFT)
+  totalSlots      Int                              // e.g. 12 members
+  filledSlots     Int             @default(0)
+  installmentAmountPaise BigInt                   // Amount in paise (avoid float)
+  cycleDurationDays Int                            // e.g. 30 (monthly)
+  startDate       DateTime?
+  endDate         DateTime?
+  nextDueDate     DateTime?
+  currentCycleNo  Int             @default(0)
+  penaltyRatePct  Decimal         @default(0)      // e.g. 2.5%
+  gracePeriodDays Int             @default(3)
+  commissionRatePct Decimal        @default(5.0)    // Default 5%
+  maxDiscountPct    Decimal        @default(30.0)   // Default 30%
+  rules           Json?                            // Custom rules blob
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  organizer       User            @relation("OrganizerCommittees", fields: [organizerId], references: [id])
+  members         CommitteeMember[]
+  installments    Installment[]
+  payoutCycles    PayoutCycle[]
+  auditLogs       AuditLog[]
+  bids            Bid[]
+  joinRequests    JoinRequest[]
+
+  @@index([organizerId, status])
+  @@index([inviteCode])
+  @@map("committees")
+}
+
+model CommitteeMember {
+  id            String    @id @default(cuid())
+  committeeId   String
+  userId        String
+  slotNumber    Int                              // 1-based slot in the committee
+  joinedAt      DateTime  @default(now())
+  isActive      Boolean   @default(true)
+  hasReceivedPayout Boolean @default(false)
+  payoutOrder   Int?                            // For FIXED_ORDER type
+
+  committee     Committee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id])
+  installments  Installment[]
+  bids          Bid[]
+
+  @@unique([committeeId, userId])
+  @@unique([committeeId, slotNumber])
+  @@index([committeeId])
+  @@map("committee_members")
+}
+
+model Installment {
+  id                 String            @id @default(cuid())
+  committeeId        String
+  memberId           String            // CommitteeMember.id
+  userId             String
+  cycleNo            Int
+  amountDuePaise     BigInt
+  amountPaidPaise    BigInt            @default(0)
+  penaltyPaise       BigInt            @default(0)
+  status             InstallmentStatus @default(PENDING)
+  dueDate            DateTime
+  paidAt             DateTime?
+  paymentMethod      PaymentMethod?
+  paymentReference   String?           // UPI txn ID / receipt no
+  collectedById      String?           // Who collected (organizer/agent)
+  notes              String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  committee          Committee         @relation(fields: [committeeId], references: [id])
+  committeeMember    CommitteeMember   @relation(fields: [memberId], references: [id])
+  paidByUser         User              @relation(fields: [userId], references: [id])
+  transaction        Transaction?
+
+  @@unique([committeeId, memberId, cycleNo])
+  @@index([committeeId, status])
+  @@index([userId, status])
+  @@index([dueDate, status])
+  @@map("installments")
+}
+
+model PayoutCycle {
+  id            String    @id @default(cuid())
+  committeeId   String
+  cycleNo       Int
+  winnerId      String                  // CommitteeMember.userId
+  winnerSlot    Int
+  payoutAmtPaise BigInt
+  bidAmountPaise BigInt?                // For AUCTION type
+  lockedMembers Json?                   // Array of member IDs eligible at draw time (LOTTERY)
+  receiptNumber String?   @unique       // Auto-generated receipt number (LOTTERY)
+  payoutDate    DateTime?
+  isCompleted   Boolean   @default(false)
+  transactionId String?   @unique
+  createdAt     DateTime  @default(now())
+
+  committee     Committee @relation(fields: [committeeId], references: [id])
+
+  @@unique([committeeId, cycleNo])
+  @@map("payout_cycles")
+}
+
+model Wallet {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  balancePaise    BigInt    @default(0)
+  reservedPaise   BigInt    @default(0)  // Holds for pending txns
+  currency        String    @default("INR")
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions    Transaction[]
+
+  @@map("wallets")
+}
+
+model Transaction {
+  id              String              @id @default(cuid())
+  walletId        String
+  userId          String
+  type            TransactionType
+  category        TransactionCategory
+  status          TransactionStatus   @default(PENDING)
+  amountPaise     BigInt
+  balanceBefore   BigInt              // Snapshot for audit
+  balanceAfter    BigInt
+  description     String
+  referenceId     String?             // installmentId / payoutCycleId
+  referenceType   String?             // "Installment" | "PayoutCycle"
+  paymentMethod   PaymentMethod?
+  externalTxnId  String?             // UPI/Bank reference
+  installmentId   String?             @unique
+  failureReason   String?
+  metadata        Json?
+  idempotencyKey  String              @unique  // Prevent duplicate txns
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  wallet          Wallet              @relation(fields: [walletId], references: [id])
+  user            User                @relation(fields: [userId], references: [id])
+  installment     Installment?        @relation(fields: [installmentId], references: [id])
+
+  @@index([walletId, createdAt])
+  @@index([userId, status])
+  @@index([idempotencyKey])
+  @@map("transactions")
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String
+  type        NotificationType
+  title       String
+  body        String
+  isRead      Boolean          @default(false)
+  metadata    Json?
+  createdAt   DateTime         @default(now())
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  actorId     String
+  entity      String    // "Committee" | "Installment" | "Wallet" etc.
+  entityId    String
+  action      String    // "CREATE" | "UPDATE" | "DELETE" | "PAY"
+  diff        Json?     // Before/after snapshot
+  ipAddress   String?
+  userAgent   String?
+  committeeId String?
+  createdAt   DateTime  @default(now())
+
+  actor       User      @relation(fields: [actorId], references: [id])
+  committee   Committee? @relation(fields: [committeeId], references: [id])
+
+  @@index([actorId, createdAt])
+  @@index([entityId, entity])
+  @@map("audit_logs")
+}
+
+model OTPVerification {
+  id        String   @id @default(cuid())
+  phone     String
+  otp       String                // bcrypt hashed
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+  @@map("otp_verifications")
+}
+
+model Bid {
+  id              String          @id @default(cuid())
+  committeeId     String
+  cycleNo         Int
+  memberId        String
+  userId          String
+  bidAmountPaise  BigInt
+  createdAt       DateTime        @default(now())
+
+  committee       Committee       @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  committeeMember CommitteeMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([committeeId, cycleNo, userId])
+  @@map("bids")
+}
+
+enum JoinRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model JoinRequest {
+  id            String            @id @default(cuid())
+  committeeId   String
+  userId        String
+  status        JoinRequestStatus @default(PENDING)
+  reviewedById  String?           // Organizer who approved/rejected
+  reviewedAt    DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  committee     Committee         @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy    User?             @relation("ReviewedBy", fields: [reviewedById], references: [id])
+
+  @@unique([committeeId, userId])
+  @@index([committeeId, status])
+  @@index([userId])
+  @@map("join_requests")
+}

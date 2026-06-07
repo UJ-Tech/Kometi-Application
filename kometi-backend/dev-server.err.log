@@ -1,0 +1,82 @@
+[Error] POST /api/v1/auth/register: PrismaClientInitializationError: 
+Invalid `prisma.user.findFirst()` invocation in
+C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.service.ts:104:44
+
+  101 }
+  102 
+  103 static async registerUser(phone: string, name: string, email: string, password: string) {
+→ 104   const existingUser = await prisma.user.findFirst(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+    at $n.handleRequestError (C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\node_modules\@prisma\client\runtime\library.js:121:7615)
+    at $n.handleAndLogRequestError (C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at l (C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\node_modules\@prisma\client\runtime\library.js:130:9633)
+    at Function.registerUser (C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.service.ts:104:26)
+    at register (C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\modules\auth\auth.controller.ts:41:22) {
+  clientVersion: '5.22.0',
+  errorCode: undefined
+}
+[Error] POST /api/v1/auth/register: SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+    at JSON.parse (<anonymous>)
+    at parse (C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\node_modules\body-parser\lib\types\json.js:92:19)
+    at C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\node_modules\body-parser\lib\read.js:128:18
+    at AsyncResource.runInAsyncScope (node:async_hooks:214:14)
+    at invokeCallback (C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\node_modules\raw-body\index.js:238:16)
+    at done (C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\node_modules\raw-body\index.js:227:7)
+    at IncomingMessage.onEnd (C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\node_modules\raw-body\index.js:287:7)
+    at IncomingMessage.emit (node:events:518:28)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  expose: true,
+  statusCode: 400,
+  status: 400,
+  body: '{\\',
+  type: 'entity.parse.failed'
+}
+❌ Invalid environment variables configuration:
+{
+  "_errors": [],
+  "SUPABASE_URL": {
+    "_errors": [
+      "Required"
+    ]
+  },
+  "SUPABASE_ANON_KEY": {
+    "_errors": [
+      "Required"
+    ]
+  }
+}
+❌ Invalid environment variables configuration:
+{
+  "_errors": [],
+  "DATABASE_URL": {
+    "_errors": [
+      "Required"
+    ]
+  }
+}
+Error: listen EADDRINUSE: address already in use :::5000
+    at Server.setupListenHandle [as _listen2] (node:net:1940:16)
+    at listenInCluster (node:net:1997:12)
+    at Server.listen (node:net:2102:7)
+    at Object.<anonymous> (C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\server.ts:50:12)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1730:14)
+    at Module._compile (C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\node_modules\source-map-support\source-map-support.js:568:25)
+    at Module.m._compile (C:\Users\tusha\AppData\Local\Temp\ts-node-dev-hook-2855307106434761.js:69:33)
+    at node:internal/modules/cjs/loader:1895:10
+    at require.extensions..jsx.require.extensions..js (C:\Users\tusha\AppData\Local\Temp\ts-node-dev-hook-2855307106434761.js:114:20)
+    at require.extensions.<computed> (C:\Users\tusha\AppData\Local\Temp\ts-node-dev-hook-2855307106434761.js:71:20)
+Error: listen EADDRINUSE: address already in use :::5000
+    at Server.setupListenHandle [as _listen2] (node:net:1940:16)
+    at listenInCluster (node:net:1997:12)
+    at Server.listen (node:net:2102:7)
+    at Object.<anonymous> (C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\src\server.ts:50:12)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1730:14)
+    at Module._compile (C:\Users\tusha\Documents\MY-Projects\Kometi-Application\kometi-backend\node_modules\source-map-support\source-map-support.js:568:25)
+    at Module.m._compile (C:\Users\tusha\AppData\Local\Temp\ts-node-dev-hook-2855307106434761.js:69:33)
+    at node:internal/modules/cjs/loader:1895:10
+    at require.extensions..jsx.require.extensions..js (C:\Users\tusha\AppData\Local\Temp\ts-node-dev-hook-2855307106434761.js:114:20)
+    at require.extensions.<computed> (C:\Users\tusha\AppData\Local\Temp\ts-node-dev-hook-2855307106434761.js:71:20)
