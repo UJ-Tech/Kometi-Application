@@ -51,7 +51,7 @@ export const verifyMpinSchema = z.object({
 
 export const setRoleSchema = z.object({
   body: z.object({
-    role: z.literal("MEMBER", { required_error: "Role is required" }),
+    role: z.enum(["MEMBER", "ORGANIZER"], { required_error: "Role is required" }),
   }),
 });
 

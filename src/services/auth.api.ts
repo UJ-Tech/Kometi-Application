@@ -8,7 +8,7 @@ export interface LoginPayload      { email: string; phone: string; password: str
 export interface RegisterPayload   { phone: string; name: string; email: string; password: string }
 export interface SetMPINPayload    { mpin: string }
 export interface VerifyMPINPayload { mpin: string }
-export interface SetRolePayload    { role: "MEMBER" }
+export interface SetRolePayload    { role: "MEMBER" | "ORGANIZER" }
 export interface ChangePasswordPayload { currentPassword: string; newPassword: string }
 export interface LogoutPayload { refreshToken?: string | null }
 

@@ -351,7 +351,7 @@ export class AuthService {
     }
   }
 
-  static async setUserRole(userId: string, role: "MEMBER") {
+  static async setUserRole(userId: string, role: "MEMBER" | "ORGANIZER") {
     try {
       const { data, error } = await supabase
         .from("users")

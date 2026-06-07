@@ -1,5 +1,5 @@
 // src/app/(auth)/role-select.tsx
-// Role selection — committee membership onboarding
+// Role selection — choose between Committee Member or Organizer
 
 import React, { useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
@@ -13,11 +13,14 @@ import { authApi } from "../../services/auth.api";
 import { useAuthStore } from "../../stores/auth.store";
 import { COLORS, FONT_SIZE, SPACING, GRADIENTS } from "../../constants/theme";
 
+type RoleOption = "MEMBER" | "ORGANIZER";
+
 export default function RoleSelectScreen() {
   const router   = useRouter();
   const insets   = useSafeAreaInsets();
   const setUser  = useAuthStore((s) => s.setUser);
 
+  const [selectedRole, setSelectedRole] = useState<RoleOption>("MEMBER");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -25,16 +28,38 @@ export default function RoleSelectScreen() {
     setIsLoading(true);
     setError("");
     try {
-      const res = await authApi.setRole({ role: "MEMBER" });
+      const res = await authApi.setRole({ role: selectedRole });
       const updatedUser = res.data.data;
       setUser(updatedUser);
-      router.push({ pathname: "/(auth)/join-committee" } as any);
+
+      if (selectedRole === "ORGANIZER") {
+        router.replace({ pathname: "/(app)/dashboard" } as any);
+      } else {
+        router.push({ pathname: "/(auth)/join-committee" } as any);
+      }
     } catch (e: any) {
       setError(e.message ?? "Failed to set role. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
+
+  const roles: { value: RoleOption; icon: string; title: string; description: string; gradient: readonly [string, string] }[] = [
+    {
+      value: "MEMBER",
+      icon: "people-outline",
+      title: "Committee Member",
+      description: "Join an existing committee using an invite code. Pay installments and receive payouts.",
+      gradient: ["rgba(245,158,11,0.25)", "rgba(245,158,11,0.08)"] as const,
+    },
+    {
+      value: "ORGANIZER",
+      icon: "star-outline",
+      title: "Organizer",
+      description: "Create and manage your own chit committees. Invite members, collect installments, and distribute payouts.",
+      gradient: ["rgba(111,94,255,0.25)", "rgba(111,94,255,0.08)"] as const,
+    },
+  ];
 
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.surface.bg }}>
@@ -56,34 +81,64 @@ export default function RoleSelectScreen() {
           </View>
           <Text style={styles.title}>Welcome to{"\n"}Kometi!</Text>
           <Text style={styles.subtitle}>
-            Join a chit committee using an invite code. Pay installments and receive payouts.
+            Select how you want to use Kometi. You can change this later from settings.
           </Text>
         </View>
 
-        <View style={styles.card}>
-          <LinearGradient
-            colors={["rgba(245,158,11,0.25)", "rgba(245,158,11,0.08)"]}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={styles.cardIconActiveGold}>
-            <Ionicons name="person-outline" size={28} color={COLORS.gold[400]} />
-          </View>
-          <Text style={styles.cardTitleActiveGold}>
-            Committee Member
-          </Text>
-          <Text style={styles.cardDesc}>
-            Join an existing committee using an invite code. Pay installments and receive payouts.
-          </Text>
-          <View style={styles.checkBadge}>
-            <Ionicons name="checkmark-circle" size={18} color={COLORS.gold[400]} />
-          </View>
-        </View>
+        {roles.map((role) => {
+          const isSelected = selectedRole === role.value;
+          return (
+            <TouchableOpacity
+              key={role.value}
+              onPress={() => setSelectedRole(role.value)}
+              activeOpacity={0.7}
+              style={[
+                styles.card,
+                isSelected && styles.cardSelected,
+                isSelected && role.value === "ORGANIZER" && styles.cardSelectedOrganizer,
+              ]}
+            >
+              {isSelected && (
+                <LinearGradient
+                  colors={role.gradient}
+                  style={StyleSheet.absoluteFill}
+                />
+              )}
+              <View style={[
+                styles.cardIcon,
+                isSelected && role.value === "ORGANIZER" ? styles.cardIconOrganizer : styles.cardIconMember,
+              ]}>
+                <Ionicons
+                  name={role.icon as any}
+                  size={28}
+                  color={isSelected ? (role.value === "ORGANIZER" ? COLORS.brandPrimary : COLORS.gold[400]) : "#71717a"}
+                />
+              </View>
+              <Text style={[
+                styles.cardTitle,
+                isSelected && (role.value === "ORGANIZER" ? styles.cardTitleOrganizer : styles.cardTitleMember),
+              ]}>
+                {role.title}
+              </Text>
+              <Text style={styles.cardDesc}>{role.description}</Text>
+              {isSelected && (
+                <View style={styles.checkBadge}>
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={18}
+                    color={role.value === "ORGANIZER" ? COLORS.brandPrimary : COLORS.gold[400]}
+                  />
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <Button
-          label="Continue as Member"
-          variant="gold"
+          label={selectedRole === "ORGANIZER" ? "Continue as Organizer" : "Continue as Member"}
+          variant={selectedRole === "ORGANIZER" ? "primary" : "gold"}
           size="lg"
           isLoading={isLoading}
           onPress={handleContinue}
@@ -95,7 +150,7 @@ export default function RoleSelectScreen() {
 
 const styles = StyleSheet.create({
   blob: { position: "absolute", top: -40, left: -60, width: 220, height: 220, borderRadius: 110 },
-  content: { flex: 1, paddingHorizontal: SPACING[6], gap: SPACING[6], paddingTop: SPACING[4] },
+  content: { flex: 1, paddingHorizontal: SPACING[6], gap: SPACING[5], paddingTop: SPACING[4] },
   top: { gap: SPACING[3] },
   iconCircle: {
     width: 64, height: 64, borderRadius: 20, overflow: "hidden",
@@ -105,16 +160,29 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: FONT_SIZE.base, color: COLORS.text.secondary, lineHeight: 22 },
   card: {
     position: "relative", borderRadius: 16, padding: SPACING[5],
-    borderWidth: 1.5, borderColor: COLORS.gold[500],
+    borderWidth: 1.5, borderColor: "transparent",
     overflow: "hidden",
   },
-  cardIconActiveGold: {
+  cardSelected: {
+    borderColor: COLORS.gold[500],
+  },
+  cardSelectedOrganizer: {
+    borderColor: COLORS.brandPrimary,
+  },
+  cardIcon: {
     width: 48, height: 48, borderRadius: 14,
-    backgroundColor: "rgba(245,158,11,0.15)",
     alignItems: "center", justifyContent: "center",
     marginBottom: SPACING[3],
   },
-  cardTitleActiveGold: { fontSize: FONT_SIZE.lg, fontWeight: "700", color: COLORS.gold[300], marginBottom: SPACING[1] },
+  cardIconMember: {
+    backgroundColor: "rgba(245,158,11,0.15)",
+  },
+  cardIconOrganizer: {
+    backgroundColor: "rgba(111,94,255,0.15)",
+  },
+  cardTitle: { fontSize: FONT_SIZE.lg, fontWeight: "700", color: COLORS.text.secondary, marginBottom: SPACING[1] },
+  cardTitleMember: { color: COLORS.gold[300] },
+  cardTitleOrganizer: { color: COLORS.brandPrimary },
   cardDesc: { fontSize: FONT_SIZE.sm, color: COLORS.text.secondary, lineHeight: 20 },
   checkBadge: { position: "absolute", top: SPACING[4], right: SPACING[4] },
   error: { fontSize: FONT_SIZE.sm, color: COLORS.danger.light, textAlign: "center" },
