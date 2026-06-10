@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useMemberStore } from "../../../stores/member.store";
 import { useAuthStore } from "../../../stores/auth.store";
+import { useCommitteeStore } from "../../../stores/committee.store";
 import { membersApi } from "../../../services/members.api";
 import { COLORS } from "../../../constants/theme";
 import Input from "../../../components/ui/Input";
@@ -14,20 +15,22 @@ import Avatar from "../../../components/ui/Avatar";
 import Badge, { kycVariant } from "../../../components/ui/Badge";
 import EmptyState from "../../../components/ui/EmptyState";
 import ScreenHeader from "../../../components/shared/ScreenHeader";
-import { canVerifyKYC, canViewMembers } from "../../../utils/rbac";
+import { canVerifyKYC, canViewMembers, canCreateCommittee } from "../../../utils/rbac";
 
 export default function Members() {
   const router = useRouter();
   const { members, isLoading, searchQuery, setSearchQuery, fetchMembers } = useMemberStore();
   const currentUser = useAuthStore((s) => s.user);
+  const committees = useCommitteeStore((s) => s.committees);
+  const hasCommittee = committees.length > 0;
   const [refreshing, setRefreshing] = useState(false);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!canViewMembers(currentUser?.role)) {
+    if (!canViewMembers(currentUser?.role, hasCommittee)) {
       router.replace("/dashboard");
     }
-  }, [currentUser?.role, router]);
+  }, [currentUser?.role, hasCommittee, router]);
 
   const loadData = async () => {
     setRefreshing(true);
@@ -87,7 +90,7 @@ export default function Members() {
       m.phone.includes(searchQuery)
   );
 
-  if (!canViewMembers(currentUser?.role)) {
+  if (!canViewMembers(currentUser?.role, hasCommittee)) {
     return null;
   }
 
@@ -95,7 +98,7 @@ export default function Members() {
     <View className="flex-1 bg-surface-950 px-4">
       <ScreenHeader
         title="Members"
-        subtitle="Manage and view all chit participants"
+        subtitle={currentUser?.role === "ADMIN" ? "Manage all chit participants" : "View members of your chits"}
         transparent
       />
 
@@ -131,9 +134,9 @@ export default function Members() {
             <EmptyState
               icon="people-outline"
               title="No members found"
-              description="Invite your first member to join your committees."
-              actionLabel="Add Member"
-              onAction={() => console.log("Add Member")}
+              description={canCreateCommittee(currentUser?.role) ? "Invite your first member to join your committees." : "No members found in the system."}
+              actionLabel={canCreateCommittee(currentUser?.role) ? "Add Member" : undefined}
+              onAction={canCreateCommittee(currentUser?.role) ? () => console.log("Add Member") : undefined}
             />
           ) : null
         }

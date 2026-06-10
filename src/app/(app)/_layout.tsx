@@ -7,6 +7,7 @@ import { ActivityIndicator, Platform, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../constants/theme";
 import { useAuthStore } from "../../stores/auth.store";
+import { useCommitteeStore } from "../../stores/committee.store";
 import { canViewMembers } from "../../utils/rbac";
 
 export default function AppLayout() {
@@ -14,6 +15,8 @@ export default function AppLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isLoading = useAuthStore((s) => s.isLoading);
   const userRole = useAuthStore((s) => s.user?.role);
+  const committees = useCommitteeStore((s) => s.committees);
+  const hasCommittee = committees.length > 0;
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -98,7 +101,7 @@ export default function AppLayout() {
         name="members/index"
         options={{
           title: "Members",
-          href: canViewMembers(userRole) ? undefined : null,
+          href: canViewMembers(userRole, hasCommittee) ? undefined : null,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "person-add" : "person-add-outline"} size={22} color={color} />
           ),

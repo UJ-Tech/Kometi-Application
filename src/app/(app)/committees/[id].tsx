@@ -27,6 +27,7 @@ import Button from "../../../components/ui/Button";
 export default function CommitteeDetail() {
   const rawId = useLocalSearchParams<{ id: string }>().id;
   const id = Array.isArray(rawId) ? rawId[0] : rawId;
+  const isValidId = id && id !== "undefined" && id !== "null";
   const router = useRouter();
   const currentUser = useAuthStore((s) => s.user);
 
@@ -88,7 +89,7 @@ export default function CommitteeDetail() {
   };
 
   useEffect(() => {
-    if (id) {
+    if (isValidId) {
       loadCommittee();
     }
   }, [id]);
@@ -125,10 +126,25 @@ export default function CommitteeDetail() {
     }
   }, [committee?.id, committee?.status]);
 
-  if (!id) {
+  if (!isValidId) {
     return (
-      <View className="flex-1 bg-surface-950 items-center justify-center">
-        <ActivityIndicator size="large" color={COLORS.brandPrimary} />
+      <View className="flex-1 bg-surface-950 items-center justify-center px-6">
+        <View className="w-20 h-20 rounded-full bg-surface-card items-center justify-center mb-5 border border-brand-primary/10">
+          <Ionicons name="alert-circle-outline" size={36} color="#71717a" />
+        </View>
+        <Text className="text-white font-bold text-lg text-center mb-2">
+          Committee Not Found
+        </Text>
+        <Text className="text-neutral-500 text-sm text-center mb-6 leading-5">
+          The committee you're looking for doesn't exist or the link is invalid.
+        </Text>
+        <TouchableOpacity
+          onPress={() => router.replace("/committees")}
+          className="bg-brand-500 px-6 py-3 rounded-xl"
+          activeOpacity={0.8}
+        >
+          <Text className="text-white font-bold text-sm">Back to Chits</Text>
+        </TouchableOpacity>
       </View>
     );
   }

@@ -35,8 +35,40 @@ export class AdminService {
 
     if (activeError) throw activeError;
 
-    // 4. Profit Overview & Monthly Analytics
-    // Fetch completed payout cycles and their committees to calculate commission profit
+    // 4. Total Committees by Status
+    const { data: committeesByStatus } = await supabase
+      .from("committees")
+      .select("status");
+
+    const committeeStats = { DRAFT: 0, ACTIVE: 0, COMPLETED: 0, CANCELLED: 0 };
+    (committeesByStatus || []).forEach((c: any) => {
+      if (committeeStats.hasOwnProperty(c.status)) {
+        committeeStats[c.status as keyof typeof committeeStats]++;
+      }
+    });
+
+    // 5. Total Users by Role
+    const { data: usersByRole } = await supabase
+      .from("users")
+      .select("role");
+
+    const userStats: Record<string, number> = {};
+    (usersByRole || []).forEach((u: any) => {
+      userStats[u.role] = (userStats[u.role] || 0) + 1;
+    });
+    const totalUsersCount = (usersByRole || []).length;
+
+    // 6. Total Installments by Status
+    const { data: installmentsByStatus } = await supabase
+      .from("installments")
+      .select("status");
+
+    const installmentStats: Record<string, number> = {};
+    (installmentsByStatus || []).forEach((i: any) => {
+      installmentStats[i.status] = (installmentStats[i.status] || 0) + 1;
+    });
+
+    // 7. Profit Overview & Monthly Analytics
     const { data: payoutCycles, error: payoutError } = await supabase
       .from("payout_cycles")
       .select("*, committee:committees(*)")
@@ -55,18 +87,16 @@ export class AdminService {
       }
     });
 
-    // 5. Monthly Analytics (Last 6 months)
+    // 8. Monthly Analytics (Last 6 months)
     const monthlyAnalyticsMap = new Map<string, { collection: number; profit: number }>();
 
-    // Initialise last 6 months
     for (let i = 5; i >= 0; i--) {
       const d = new Date();
       d.setMonth(d.getMonth() - i);
-      const monthKey = d.toLocaleString("en-IN", { month: "short", year: "2-digit" }); // e.g. "May-26"
+      const monthKey = d.toLocaleString("en-IN", { month: "short", year: "2-digit" });
       monthlyAnalyticsMap.set(monthKey, { collection: 0, profit: 0 });
     }
 
-    // Populate Collections by Month
     const { data: allPaidInstallments, error: allPaidErr } = await supabase
       .from("installments")
       .select("amountPaidPaise, paidAt")
@@ -85,7 +115,6 @@ export class AdminService {
       });
     }
 
-    // Populate Profits by Month
     (payoutCycles || []).forEach((cycle: any) => {
       const comm = cycle.committee;
       if (comm && cycle.payoutDate) {
@@ -95,7 +124,6 @@ export class AdminService {
           const totalPot = Number(comm.installmentAmountPaise) * comm.totalSlots;
           const commRate = Number(comm.commissionRatePct || 5.0);
           const commission = (totalPot * commRate) / 100;
-
           const current = monthlyAnalyticsMap.get(monthKey)!;
           current.profit += commission;
           monthlyAnalyticsMap.set(monthKey, current);
@@ -109,17 +137,48 @@ export class AdminService {
       profitPaise: data.profit,
     }));
 
+    // 9. Recent Transactions (last 20)
+    const { data: recentTransactions } = await supabase
+      .from("transactions")
+      .select("*, user:users(name, phone)")
+      .order("createdAt", { ascending: false })
+      .limit(20);
+
+    // 10. All Committees (for admin overview)
+    const { data: allCommittees } = await supabase
+      .from("committees")
+      .select("id, name, type, status, totalSlots, filledSlots, installmentAmountPaise, organizer:users!organizerId(name, phone)")
+      .order("createdAt", { ascending: false });
+
+    // 11. Wallets summary
+    const { data: wallets } = await supabase
+      .from("wallets")
+      .select("id, userId, balancePaise, user:users(name, phone, role)")
+      .order("balancePaise", { ascending: false });
+
+    const totalWalletBalancePaise = (wallets || []).reduce(
+      (sum, w) => sum + Number(w.balancePaise),
+      0
+    );
+
     return {
       totalCollectionPaise,
       pendingPaymentsPaise,
       activeCommitteesCount: activeCommitteesCount || 0,
       profitOverviewPaise,
       monthlyAnalytics,
+      totalUsersCount,
+      userStats,
+      committeeStats,
+      installmentStats,
+      recentTransactions: recentTransactions || [],
+      allCommittees: allCommittees || [],
+      wallets: wallets || [],
+      totalWalletBalancePaise,
     };
   }
 
   static async updateUserRole(userId: string, newRole: string) {
-    // Validate role
     const validRoles = ["ADMIN", "MANAGER", "ACCOUNTANT", "AGENT", "ORGANIZER", "MEMBER"];
     if (!validRoles.includes(newRole)) {
       throw new Error(`Invalid user role: ${newRole}`);

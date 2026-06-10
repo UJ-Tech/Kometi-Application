@@ -13,7 +13,7 @@ import { useInstallmentStore } from "../../../stores/installment.store";
 import { authApi } from "../../../services/auth.api";
 import { tokenStorage } from "../../../utils/storage";
 import { formatINR } from "../../../utils/currency";
-import { canAccessOrganizerDashboard, canCreateCommittee, canViewMembers } from "../../../utils/rbac";
+import { canAccessAdminPanel, canCreateCommittee, canViewMembers } from "../../../utils/rbac";
 import { COLORS } from "../../../constants/theme";
 import Card from "../../../components/ui/Card";
 import Avatar from "../../../components/ui/Avatar";
@@ -70,7 +70,7 @@ export default function Dashboard() {
     }
   };
 
-  const canOpenAdminPanel = canAccessOrganizerDashboard(user?.role);
+  const canOpenAdminPanel = canAccessAdminPanel(user?.role);
   const canOpenCommitteeCreation = canCreateCommittee(user?.role);
   const canOpenMembers = canViewMembers(user?.role);
 
