@@ -1,11 +1,10 @@
 // src/stores/committee.store.ts
 import { create } from "zustand";
-import type { Committee, CommitteeDetail, CommitteeStatus, CommitteeType, PaginationMeta } from "../types";
+import type { Committee, CommitteeDetail, CommitteeStatus, PaginationMeta } from "../types";
 import { committeesApi } from "../services/committees.api";
 
 interface CommitteeFilters {
   status?: CommitteeStatus;
-  type?:   CommitteeType;
 }
 
 interface CommitteeState {

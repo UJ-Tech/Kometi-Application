@@ -9,12 +9,6 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-    CREATE TYPE "CommitteeType" AS ENUM ('FIXED_WINNER', 'AUCTION', 'FIXED_ORDER');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
-
-DO $$ BEGIN
     CREATE TYPE "JoinRequestStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
 EXCEPTION
     WHEN duplicate_object THEN null;
@@ -27,7 +21,6 @@ CREATE TABLE IF NOT EXISTS "committees" (
     "description" TEXT,
     "organizerId" TEXT NOT NULL,
     "inviteCode" TEXT NOT NULL,
-    "type" "CommitteeType" NOT NULL DEFAULT 'FIXED_WINNER',
     "status" "CommitteeStatus" NOT NULL DEFAULT 'DRAFT',
     "totalSlots" INTEGER NOT NULL,
     "filledSlots" INTEGER NOT NULL DEFAULT 0,
@@ -62,7 +55,6 @@ CREATE TABLE IF NOT EXISTS "committee_members" (
     "joinedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "hasReceivedPayout" BOOLEAN NOT NULL DEFAULT false,
-    "payoutOrder" INTEGER,
 
     CONSTRAINT "committee_members_pkey" PRIMARY KEY ("id"),
     CONSTRAINT "committee_members_committeeId_fkey" FOREIGN KEY ("committeeId") REFERENCES "committees"("id") ON DELETE CASCADE ON UPDATE CASCADE,
@@ -103,8 +95,6 @@ CREATE TABLE IF NOT EXISTS "payout_cycles" (
     "winnerSlot" INTEGER NOT NULL,
     "payoutAmtPaise" BIGINT NOT NULL,
     "bidAmountPaise" BIGINT,
-    "lockedMembers" JSONB,
-    "receiptNumber" TEXT,
     "payoutDate" TIMESTAMP(3),
     "isCompleted" BOOLEAN NOT NULL DEFAULT false,
     "transactionId" TEXT,
@@ -115,4 +105,3 @@ CREATE TABLE IF NOT EXISTS "payout_cycles" (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS "payout_cycles_committeeId_cycleNo_key" ON "payout_cycles"("committeeId", "cycleNo");
-CREATE UNIQUE INDEX IF NOT EXISTS "payout_cycles_receiptNumber_key" ON "payout_cycles"("receiptNumber") WHERE "receiptNumber" IS NOT NULL;

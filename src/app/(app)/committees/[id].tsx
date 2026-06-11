@@ -40,12 +40,6 @@ export default function CommitteeDetail() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [schedule, setSchedule] = useState<any[] | null>(null);
 
-  // Lottery (FIXED_WINNER) state
-  const [lotteryStatus, setLotteryStatus] = useState<any | null>(null);
-  const [lotteryLoading, setLotteryLoading] = useState(false);
-  const [lotteryDrawResult, setLotteryDrawResult] = useState<any | null>(null);
-  const [lotteryReceipt, setLotteryReceipt] = useState<any | null>(null);
-
   const confirmAction = async (title: string, message: string, confirmLabel = "Confirm") => {
     if (Platform.OS === "web") {
       const confirmed = window.confirm(`${title}\n\n${message}`);
@@ -297,109 +291,6 @@ export default function CommitteeDetail() {
     }
   };
 
-  // ─── LOTTERY HANDLERS ───────────────────────────────────────────────
-
-  const loadLotteryStatus = async () => {
-    if (!id || !committee || committee.type !== "FIXED_WINNER" || committee.status !== "ACTIVE") return;
-    try {
-      const res = await committeesApi.getLotteryStatus(id);
-      setLotteryStatus(res.data.data);
-    } catch (err) {
-      console.error("[Lottery] Failed to load status:", err);
-    }
-  };
-
-  useEffect(() => {
-    if (committee && committee.type === "FIXED_WINNER" && committee.status === "ACTIVE") {
-      loadLotteryStatus();
-    }
-  }, [committee?.id, committee?.status]);
-
-  const handleLockMembers = async () => {
-    const confirmed = await confirmAction(
-      "Lock Eligible Members",
-      "This will lock the list of eligible members based on who has paid. Only locked members can be drawn as winners. Continue?",
-      "Lock"
-    );
-    if (!confirmed) return;
-
-    try {
-      setLotteryLoading(true);
-      const res = await committeesApi.lockLotteryMembers(id);
-      if (res.data.success) {
-        Alert.alert("Locked", `${res.data.data.lockedCount} eligible members locked for lottery.`);
-        await loadLotteryStatus();
-      }
-    } catch (err) {
-      Alert.alert("Error", err instanceof Error ? err.message : "Failed to lock members");
-    } finally {
-      setLotteryLoading(false);
-    }
-  };
-
-  const handleDrawWinner = async () => {
-    const confirmed = await confirmAction(
-      "Draw Lottery Winner",
-      "A winner will be randomly selected from the locked eligible members. This cannot be undone. Continue?",
-      "Draw"
-    );
-    if (!confirmed) return;
-
-    try {
-      setLotteryLoading(true);
-      const res = await committeesApi.drawLotteryWinner(id);
-      if (res.data.success) {
-        setLotteryDrawResult(res.data.data);
-        Alert.alert(
-          "Winner Drawn!",
-          `${res.data.data.winnerName} (Slot #${res.data.data.winnerSlot}) has been selected!\nPayout: ${formatINR(res.data.data.payoutAmtPaise)}`
-        );
-        await loadLotteryStatus();
-      }
-    } catch (err) {
-      Alert.alert("Error", err instanceof Error ? err.message : "Failed to draw winner");
-    } finally {
-      setLotteryLoading(false);
-    }
-  };
-
-  const handleConfirmPayout = async () => {
-    const confirmed = await confirmAction(
-      "Confirm & Process Payout",
-      `This will credit ${formatINR(lotteryDrawResult?.payoutAmtPaise || 0)} to the winner's wallet and generate a receipt. Continue?`,
-      "Confirm Payout"
-    );
-    if (!confirmed) return;
-
-    try {
-      setLotteryLoading(true);
-      const res = await committeesApi.confirmLotteryPayout(id);
-      if (res.data.success) {
-        const result = res.data.data;
-        Alert.alert(
-          "Payout Complete!",
-          `Winner: ${result.winnerName}\nPayout: ${formatINR(result.payoutAmtPaise)}\nReceipt: ${result.receiptNumber}\n${result.isCompleted ? "Committee completed!" : `Next cycle: #${result.nextCycleNo}`}`
-        );
-        setLotteryDrawResult(null);
-        setLotteryReceipt(null);
-        await Promise.all([loadCommittee(), loadLotteryStatus()]);
-      }
-    } catch (err) {
-      Alert.alert("Error", err instanceof Error ? err.message : "Failed to confirm payout");
-    } finally {
-      setLotteryLoading(false);
-    }
-  };
-
-  const handleViewReceipt = async (cycleNo: number) => {
-    try {
-      const res = await committeesApi.getLotteryReceipt(id, cycleNo);
-      setLotteryReceipt(res.data.data);
-    } catch (err) {
-      Alert.alert("Error", err instanceof Error ? err.message : "Failed to load receipt");
-    }
-  };
-
   if (loading && !refreshing) {
     return (
       <View className="flex-1 bg-surface-950 items-center justify-center">
@@ -469,7 +360,7 @@ export default function CommitteeDetail() {
       <Card style={{ marginBottom: 20 }} padding={0}>
         <View className="p-6">
           <Text className="text-neutral-400 text-xs font-semibold uppercase tracking-wider">
-            {committee.type === "AUCTION" ? "Auction Chit" : committee.type === "FIXED_WINNER" ? "Lottery Chit" : "Fixed Rotation Chit"}
+            Auction Chit
           </Text>
           <Text className="text-white text-2xl font-bold mt-1">{committee.name}</Text>
           {committee.description ? (
@@ -605,7 +496,7 @@ export default function CommitteeDetail() {
       )}
 
       {/* Auction Bidding Panel */}
-      {committee.status === "ACTIVE" && committee.type === "AUCTION" && (
+      {committee.status === "ACTIVE" && (
         <View className="mb-6">
           <Text className="text-white text-base font-bold mb-3">Live Auction</Text>
           <Card style={{ marginBottom: 16 }} padding={0}>
@@ -713,264 +604,6 @@ export default function CommitteeDetail() {
               <Text className="text-neutral-500 text-xs">No bids placed yet for this cycle</Text>
             </View>
           )}
-        </View>
-      )}
-
-      {/* Lottery (FIXED_WINNER) Panel */}
-      {committee.status === "ACTIVE" && committee.type === "FIXED_WINNER" && isOrganizer && (
-        <View className="mb-6">
-          <Text className="text-white text-base font-bold mb-3">Lottery - Cycle #{committee.currentCycleNo}</Text>
-
-          {/* Stage 1: Verify Collections */}
-          {lotteryStatus && !lotteryStatus.existingPayout?.isCompleted && !lotteryDrawResult && (
-            <Card style={{ marginBottom: 12 }} padding={0}>
-              <View className="p-5">
-                <View className="flex-row items-center mb-3">
-                  <View className="w-6 h-6 rounded-full bg-brand-500 items-center justify-center mr-2">
-                    <Text className="text-white font-bold text-[10px]">1</Text>
-                  </View>
-                  <Text className="text-white font-bold text-sm">Verify Collections</Text>
-                </View>
-
-                <View className="flex-row gap-3 mb-4">
-                  <View className="flex-1 bg-success-500/10 p-3 rounded-xl items-center">
-                    <Text className="text-success-500 font-bold text-lg">{lotteryStatus.paidCount}</Text>
-                    <Text className="text-neutral-400 text-[10px]">Paid</Text>
-                  </View>
-                  <View className="flex-1 bg-danger-500/10 p-3 rounded-xl items-center">
-                    <Text className="text-danger-500 font-bold text-lg">{lotteryStatus.unpaidCount}</Text>
-                    <Text className="text-neutral-400 text-[10px]">Unpaid</Text>
-                  </View>
-                  <View className="flex-1 bg-neutral-500/10 p-3 rounded-xl items-center">
-                    <Text className="text-neutral-400 font-bold text-lg">{lotteryStatus.alreadyWonCount}</Text>
-                    <Text className="text-neutral-400 text-[10px]">Already Won</Text>
-                  </View>
-                </View>
-
-                {/* Paid Members */}
-                <Text className="text-success-500 font-bold text-xs mb-2">PAID MEMBERS</Text>
-                {lotteryStatus.paidMembers.map((m: any) => (
-                  <View key={m.memberId} className="flex-row items-center justify-between py-1.5">
-                    <View className="flex-row items-center">
-                      <View className="w-5 h-5 rounded-full bg-success-500/20 items-center justify-center mr-2">
-                        <Ionicons name="checkmark" size={10} color="#4ade80" />
-                      </View>
-                      <Text className="text-neutral-300 text-xs">Slot #{m.slotNumber} - {m.name}</Text>
-                    </View>
-                    <Text className="text-success-500 text-[10px] font-semibold">{formatINR(m.amountPaidPaise)}</Text>
-                  </View>
-                ))}
-
-                {/* Unpaid Members */}
-                {lotteryStatus.unpaidMembers.length > 0 && (
-                  <>
-                    <Text className="text-danger-500 font-bold text-xs mt-3 mb-2">UNPAID MEMBERS</Text>
-                    {lotteryStatus.unpaidMembers.map((m: any) => (
-                      <View key={m.memberId} className="flex-row items-center justify-between py-1.5">
-                        <View className="flex-row items-center">
-                          <View className="w-5 h-5 rounded-full bg-danger-500/20 items-center justify-center mr-2">
-                            <Ionicons name="close" size={10} color="#f87171" />
-                          </View>
-                          <Text className="text-neutral-300 text-xs">Slot #{m.slotNumber} - {m.name}</Text>
-                        </View>
-                        <Text className="text-danger-500 text-[10px] font-semibold">{formatINR(m.amountDuePaise)}</Text>
-                      </View>
-                    ))}
-                  </>
-                )}
-
-                <TouchableOpacity
-                  onPress={handleLockMembers}
-                  disabled={lotteryLoading || lotteryStatus.paidCount === 0}
-                  className={`h-11 rounded-xl items-center justify-center flex-row mt-4 ${
-                    lotteryStatus.paidCount === 0 ? "bg-neutral-600" : "bg-brand-500"
-                  }`}
-                >
-                  {lotteryLoading ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <>
-                      <Ionicons name="lock-closed-outline" size={16} color="#fff" />
-                      <Text className="text-white font-bold ml-1.5 text-sm">
-                        Lock {lotteryStatus.paidCount} Eligible Members
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </Card>
-          )}
-
-          {/* Stage 2: Locked - Ready to Draw */}
-          {lotteryStatus?.existingPayout && !lotteryStatus.existingPayout.isCompleted && !lotteryDrawResult && !lotteryStatus.existingPayout.receiptNumber && (
-            <Card style={{ marginBottom: 12 }} padding={0}>
-              <View className="p-5">
-                <View className="flex-row items-center mb-3">
-                  <View className="w-6 h-6 rounded-full bg-gold-500 items-center justify-center mr-2">
-                    <Text className="text-white font-bold text-[10px]">2</Text>
-                  </View>
-                  <Text className="text-white font-bold text-sm">Ready to Draw</Text>
-                </View>
-
-                <View className="bg-gold-500/5 p-3 rounded-xl border border-gold-500/10 mb-4">
-                  <Text className="text-neutral-300 text-xs">
-                    {(lotteryStatus.existingPayout.lockedMembers as any[])?.length || 0} members locked for lottery draw.
-                    A winner will be randomly selected.
-                  </Text>
-                </View>
-
-                <TouchableOpacity
-                  onPress={handleDrawWinner}
-                  disabled={lotteryLoading}
-                  className="bg-gold-500/80 h-11 rounded-xl items-center justify-center flex-row"
-                >
-                  {lotteryLoading ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <>
-                      <Ionicons name="flash-outline" size={16} color="#fff" />
-                      <Text className="text-white font-bold ml-1.5 text-sm">Draw Winner</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </Card>
-          )}
-
-          {/* Stage 3: Winner Selected - Confirm Payout */}
-          {lotteryDrawResult && (
-            <Card style={{ marginBottom: 12 }} padding={0}>
-              <View className="p-5">
-                <View className="flex-row items-center mb-3">
-                  <View className="w-6 h-6 rounded-full bg-success-500 items-center justify-center mr-2">
-                    <Text className="text-white font-bold text-[10px]">3</Text>
-                  </View>
-                  <Text className="text-white font-bold text-sm">Winner Selected!</Text>
-                </View>
-
-                <View className="bg-success-500/5 p-4 rounded-xl border border-success-500/10 mb-4">
-                  <View className="items-center">
-                    <Text className="text-gold-500 text-3xl mb-1">🏆</Text>
-                    <Text className="text-white font-bold text-lg">{lotteryDrawResult.winnerName}</Text>
-                    <Text className="text-neutral-400 text-xs mt-0.5">Slot #{lotteryDrawResult.winnerSlot}</Text>
-                  </View>
-                  <View className="flex-row justify-between mt-4 pt-3 border-t border-success-500/10">
-                    <View>
-                      <Text className="text-neutral-400 text-[10px]">Payout</Text>
-                      <Text className="text-gold-500 font-bold text-sm">{formatINR(lotteryDrawResult.payoutAmtPaise)}</Text>
-                    </View>
-                    <View className="items-center">
-                      <Text className="text-neutral-400 text-[10px]">Commission</Text>
-                      <Text className="text-white font-semibold text-sm">{formatINR(lotteryDrawResult.commissionPaise)}</Text>
-                    </View>
-                    <View className="items-end">
-                      <Text className="text-neutral-400 text-[10px]">Total Pot</Text>
-                      <Text className="text-white font-semibold text-sm">{formatINR(lotteryDrawResult.totalPot)}</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  onPress={handleConfirmPayout}
-                  disabled={lotteryLoading}
-                  className="bg-success-500 h-11 rounded-xl items-center justify-center flex-row"
-                >
-                  {lotteryLoading ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <>
-                      <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
-                      <Text className="text-white font-bold ml-1.5 text-sm">Confirm & Process Payout</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </Card>
-          )}
-
-          {/* Receipt Modal */}
-          {lotteryReceipt && (
-            <Card style={{ marginBottom: 12 }} padding={0}>
-              <View className="p-5">
-                <View className="flex-row items-center justify-between mb-3">
-                  <View className="flex-row items-center">
-                    <Ionicons name="document-text-outline" size={18} color={COLORS.goldPrimary} />
-                    <Text className="text-white font-bold text-sm ml-2">Receipt</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => setLotteryReceipt(null)}>
-                    <Ionicons name="close-outline" size={20} color="#a3a3a3" />
-                  </TouchableOpacity>
-                </View>
-
-                <View className="bg-surface-bg border border-brand-primary/10 rounded-xl p-4">
-                  <Text className="text-gold-500 font-bold text-center text-sm mb-3">{lotteryReceipt.receiptNumber}</Text>
-                  <View className="border-t border-brand-primary/10 pt-3">
-                    <View className="flex-row justify-between mb-2">
-                      <Text className="text-neutral-400 text-xs">Committee</Text>
-                      <Text className="text-white text-xs font-semibold">{lotteryReceipt.committeeName}</Text>
-                    </View>
-                    <View className="flex-row justify-between mb-2">
-                      <Text className="text-neutral-400 text-xs">Cycle</Text>
-                      <Text className="text-white text-xs font-semibold">#{lotteryReceipt.cycleNo}</Text>
-                    </View>
-                    <View className="flex-row justify-between mb-2">
-                      <Text className="text-neutral-400 text-xs">Winner</Text>
-                      <Text className="text-white text-xs font-semibold">{lotteryReceipt.winner.name} (Slot #{lotteryReceipt.winner.slot})</Text>
-                    </View>
-                    <View className="flex-row justify-between mb-2">
-                      <Text className="text-neutral-400 text-xs">Total Pot</Text>
-                      <Text className="text-white text-xs font-semibold">{formatINR(lotteryReceipt.totalPotPaise)}</Text>
-                    </View>
-                    <View className="flex-row justify-between mb-2">
-                      <Text className="text-neutral-400 text-xs">Commission</Text>
-                      <Text className="text-white text-xs font-semibold">{formatINR(lotteryReceipt.commissionPaise)}</Text>
-                    </View>
-                    <View className="flex-row justify-between mb-2">
-                      <Text className="text-neutral-400 text-xs">Payout</Text>
-                      <Text className="text-gold-500 text-xs font-bold">{formatINR(lotteryReceipt.payoutAmtPaise)}</Text>
-                    </View>
-                    <View className="flex-row justify-between">
-                      <Text className="text-neutral-400 text-xs">Date</Text>
-                      <Text className="text-white text-xs font-semibold">
-                        {new Date(lotteryReceipt.payoutDate).toLocaleDateString("en-IN")}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </Card>
-          )}
-
-          {/* View Receipt buttons for past cycles */}
-          {(committee.payoutCycles || [])
-            .filter((pc: any) => pc.isCompleted && pc.receiptNumber)
-            .sort((a: any, b: any) => b.cycleNo - a.cycleNo)
-            .slice(0, 1)
-            .map((pc: any) => (
-              <TouchableOpacity
-                key={pc.id}
-                onPress={() => handleViewReceipt(pc.cycleNo)}
-                className="bg-surface-card border border-brand-primary/10 h-11 rounded-xl items-center justify-center flex-row mb-2"
-              >
-                <Ionicons name="document-text-outline" size={16} color={COLORS.brandPrimary} />
-                <Text className="text-brand-400 font-bold ml-1.5 text-sm">View Receipt - Cycle #{pc.cycleNo}</Text>
-              </TouchableOpacity>
-            ))}
-        </View>
-      )}
-
-      {/* Lottery Status for Non-Organizer Members */}
-      {committee.status === "ACTIVE" && committee.type === "FIXED_WINNER" && !isOrganizer && (
-        <View className="mb-6">
-          <Card style={{ marginBottom: 0 }} padding={0}>
-            <View className="p-5 items-center">
-              <Ionicons name="gift-outline" size={28} color={COLORS.goldPrimary} />
-              <Text className="text-white font-bold text-sm mt-2">Lottery Committee</Text>
-              <Text className="text-neutral-400 text-xs text-center mt-1">
-                Winner is selected randomly by the organizer each cycle. Check back after the draw!
-              </Text>
-            </View>
-          </Card>
         </View>
       )}
 
@@ -1093,7 +726,7 @@ export default function CommitteeDetail() {
           </View>
 
           <Badge
-            label={member.hasReceivedPayout ? "Payout Received" : committee.type === "FIXED_WINNER" ? "Eligible for Draw" : "Eligible to Bid"}
+            label={member.hasReceivedPayout ? "Payout Received" : "Eligible to Bid"}
             variant={member.hasReceivedPayout ? "success" : "info"}
           />
         </View>

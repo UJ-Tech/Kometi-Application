@@ -2,13 +2,12 @@
 import apiClient from "./api.client";
 import type {
   ApiResponse, Committee, CommitteeDetail, CommitteeMember,
-  CommitteeStatus, CommitteeType, PaginationMeta, JoinRequest,
+  CommitteeStatus, PaginationMeta, JoinRequest,
 } from "../types";
 
 export interface CreateCommitteePayload {
   name:                   string;
   description?:           string;
-  type:                   CommitteeType;
   totalSlots:             number;
   installmentAmountPaise: number;
   cycleDurationDays:      number;
@@ -20,7 +19,6 @@ export interface CreateCommitteePayload {
 
 export interface CommitteeListParams {
   status?: CommitteeStatus;
-  type?:   CommitteeType;
   page?:   number;
   limit?:  number;
 }
@@ -92,78 +90,4 @@ export const committeesApi = {
     apiClient.post<ApiResponse<{ success: boolean }>>(
       `/committees/${committeeId}/join-requests/${requestId}/reject`
     ),
-
-  // ─── LOTTERY (FIXED_WINNER) FLOW ─────────────────────────────────────
-  getLotteryStatus: (committeeId: string) =>
-    apiClient.get<ApiResponse<{
-      committeeId: string;
-      cycleNo: number;
-      totalSlots: number;
-      installmentAmountPaise: number;
-      members: Array<{
-        memberId: string;
-        userId: string;
-        slotNumber: number;
-        name: string;
-        phone: string;
-        hasReceivedPayout: boolean;
-        installmentStatus: string;
-        amountPaidPaise: number;
-        amountDuePaise: number;
-      }>;
-      paidCount: number;
-      unpaidCount: number;
-      alreadyWonCount: number;
-      paidMembers: Array<any>;
-      unpaidMembers: Array<any>;
-      alreadyWon: Array<any>;
-      existingPayout: any;
-    }>>(`/committees/${committeeId}/lottery/status`),
-
-  lockLotteryMembers: (committeeId: string) =>
-    apiClient.post<ApiResponse<{
-      lockedCount: number;
-      lockedMembers: Array<{ memberId: string; userId: string; slotNumber: number }>;
-    }>>(`/committees/${committeeId}/lottery/lock`),
-
-  drawLotteryWinner: (committeeId: string) =>
-    apiClient.post<ApiResponse<{
-      winnerId: string;
-      winnerName: string;
-      winnerPhone: string;
-      winnerSlot: number;
-      payoutAmtPaise: number;
-      commissionPaise: number;
-      totalPot: number;
-      lockedCount: number;
-    }>>(`/committees/${committeeId}/lottery/draw`),
-
-  confirmLotteryPayout: (committeeId: string) =>
-    apiClient.post<ApiResponse<{
-      winnerId: string;
-      winnerName: string;
-      winnerSlot: number;
-      payoutAmtPaise: number;
-      commissionPaise: number;
-      receiptNumber: string;
-      nextCycleNo: number | null;
-      isCompleted: boolean;
-    }>>(`/committees/${committeeId}/lottery/confirm`),
-
-  getLotteryReceipt: (committeeId: string, cycleNo: number) =>
-    apiClient.get<ApiResponse<{
-      receiptNumber: string;
-      committeeName: string;
-      committeeId: string;
-      cycleNo: number;
-      totalSlots: number;
-      installmentAmountPaise: number;
-      totalPotPaise: number;
-      winner: { name: string; phone: string; slot: number };
-      payoutAmtPaise: number;
-      commissionPaise: number;
-      payoutDate: string;
-      createdAt: string;
-      lockedMembers: string[];
-    }>>(`/committees/${committeeId}/lottery/receipt/${cycleNo}`),
 };

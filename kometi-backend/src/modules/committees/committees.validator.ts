@@ -5,7 +5,6 @@ export const createCommitteeSchema = z.object({
   body: z.object({
     name: z.string().min(3, "Name must be at least 3 characters"),
     description: z.string().optional(),
-    type: z.enum(["FIXED_WINNER", "AUCTION", "FIXED_ORDER"]),
     totalSlots: z.number().int().min(2).max(50),
     installmentAmountPaise: z.union([z.string(), z.number()]).transform((val) => BigInt(val)),
     cycleDurationDays: z.number().int().min(1),

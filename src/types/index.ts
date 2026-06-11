@@ -4,7 +4,6 @@
 export type UserRole    = "ADMIN" | "MANAGER" | "ACCOUNTANT" | "AGENT" | "ORGANIZER" | "MEMBER";
 export type KYCStatus   = "PENDING" | "SUBMITTED" | "VERIFIED" | "REJECTED";
 export type CommitteeStatus = "DRAFT" | "ACTIVE" | "COMPLETED" | "CANCELLED";
-export type CommitteeType   = "FIXED_WINNER" | "AUCTION" | "FIXED_ORDER";
 export type InstallmentStatus = "PENDING" | "PAID" | "OVERDUE" | "PARTIAL" | "WAIVED";
 export type PaymentMethod    = "CASH" | "UPI" | "BANK_TRANSFER" | "WALLET";
 export type TransactionType  = "CREDIT" | "DEBIT";
@@ -65,7 +64,6 @@ export interface Committee {
   organizerId:           string;
   organizer?:            User;
   inviteCode:            string;
-  type:                  CommitteeType;
   status:                CommitteeStatus;
   totalSlots:            number;
   filledSlots:           number;

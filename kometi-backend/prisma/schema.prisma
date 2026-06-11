@@ -34,12 +34,6 @@ enum CommitteeStatus {
   CANCELLED
 }
 
-enum CommitteeType {
-  FIXED_WINNER       // Rotation by draw/lot
-  AUCTION            // Highest bidder wins pot
-  FIXED_ORDER        // Pre-defined winner order
-}
-
 enum InstallmentStatus {
   PENDING
   PAID
@@ -163,7 +157,6 @@ model Committee {
   description     String?
   organizerId     String
   inviteCode      String          @unique            // 8-char unique code for members to join
-  type            CommitteeType   @default(FIXED_WINNER)
   status          CommitteeStatus @default(DRAFT)
   totalSlots      Int                              // e.g. 12 members
   filledSlots     Int             @default(0)
@@ -202,7 +195,6 @@ model CommitteeMember {
   joinedAt      DateTime  @default(now())
   isActive      Boolean   @default(true)
   hasReceivedPayout Boolean @default(false)
-  payoutOrder   Int?                            // For FIXED_ORDER type
 
   committee     Committee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
   user          User      @relation(fields: [userId], references: [id])
@@ -254,8 +246,6 @@ model PayoutCycle {
   winnerSlot    Int
   payoutAmtPaise BigInt
   bidAmountPaise BigInt?                // For AUCTION type
-  lockedMembers Json?                   // Array of member IDs eligible at draw time (LOTTERY)
-  receiptNumber String?   @unique       // Auto-generated receipt number (LOTTERY)
   payoutDate    DateTime?
   isCompleted   Boolean   @default(false)
   transactionId String?   @unique

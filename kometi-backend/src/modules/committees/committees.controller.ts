@@ -9,12 +9,11 @@ export class CommitteesController {
       const organizerId = req.user?.id;
       if (!organizerId) throw new Error("Unauthorized");
 
-      const { name, description, type, totalSlots, installmentAmountPaise, cycleDurationDays, includeOrganizerAsMember } = req.body;
+      const { name, description, totalSlots, installmentAmountPaise, cycleDurationDays, includeOrganizerAsMember } = req.body;
       const committee = await CommitteesService.createCommittee(
         organizerId,
         name,
         description,
-        type,
         totalSlots,
         installmentAmountPaise,
         cycleDurationDays,

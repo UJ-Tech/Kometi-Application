@@ -6,15 +6,10 @@ import {
   View,
   Text,
   ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
   Alert,
   Switch,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { COLORS } from "../../../constants/theme";
 import ScreenHeader from "../../../components/shared/ScreenHeader";
 import Input from "../../../components/ui/Input";
 import { AmountInput } from "../../../components/ui/AmountInput";
@@ -24,7 +19,6 @@ import { committeesApi } from "../../../services/committees.api";
 import { useCommitteeStore } from "../../../stores/committee.store";
 import { useAuthStore } from "../../../stores/auth.store";
 import { canCreateCommittee } from "../../../utils/rbac";
-import type { CommitteeType } from "../../../types";
 
 export default function CreateCommittee() {
   const router = useRouter();
@@ -43,7 +37,6 @@ export default function CreateCommittee() {
   const [form, setForm] = useState({
     name: "",
     description: "",
-    type: "AUCTION" as CommitteeType,
     totalSlots: "12",
     installmentAmountPaise: 0n,
     cycleDurationDays: "30",
@@ -80,7 +73,6 @@ export default function CreateCommittee() {
       const res = await committeesApi.create({
         name: form.name,
         description: form.description || undefined,
-        type: form.type,
         totalSlots: parseInt(form.totalSlots),
         installmentAmountPaise: Number(form.installmentAmountPaise),
         cycleDurationDays: parseInt(form.cycleDurationDays),
@@ -101,30 +93,12 @@ export default function CreateCommittee() {
     }
   };
 
-  const committeeTypes: { label: string; value: CommitteeType; description: string }[] = [
-    {
-      label: "Auction (Bidding)",
-      value: "AUCTION",
-      description: "Members bid for the pot. Highest bidder (lowest payout) wins.",
-    },
-    {
-      label: "Fixed Order",
-      value: "FIXED_ORDER",
-      description: "Payout order is pre-defined when starting.",
-    },
-    {
-      label: "Fixed Winner (Lottery)",
-      value: "FIXED_WINNER",
-      description: "Winner is chosen randomly by lucky draw each cycle.",
-    },
-  ];
-
   return (
     <View className="flex-1 bg-surface-950 px-4">
       <ScreenHeader
         title="Create New Chit"
         subtitle="Setup a new chit fund pool"
-        showBackButton
+        showBack
       />
 
       <ScrollView
@@ -231,39 +205,15 @@ export default function CreateCommittee() {
           </View>
         </Card>
 
-        <Text className="text-white font-bold text-base mb-3 ml-1">Payout Mechanism</Text>
-        {committeeTypes.map((type) => (
-          <TouchableOpacity
-            key={type.value}
-            onPress={() => setForm({ ...form, type: type.value })}
-            activeOpacity={0.7}
-            className={`mb-3 p-4 rounded-xl border-2 flex-row items-center ${
-              form.type === type.value
-                ? "bg-brand-500/10 border-brand-500"
-                : "bg-surface-card border-brand-primary/10"
-            }`}
-          >
-            <View className={`w-5 h-5 rounded-full border-2 mr-3 items-center justify-center ${
-              form.type === type.value ? "border-brand-500" : "border-neutral-600"
-            }`}>
-              {form.type === type.value && <View className="w-2.5 h-2.5 rounded-full bg-brand-500" />}
-            </View>
-            <View className="flex-1">
-              <Text className={`font-bold text-sm ${form.type === type.value ? "text-white" : "text-neutral-300"}`}>
-                {type.label}
-              </Text>
-              <Text className="text-neutral-500 text-[10px] mt-0.5">{type.description}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
-
-        <Button
-          title="Create Committee"
-          onPress={handleCreate}
-          loading={isLoading}
-          variant="primary"
-          style={{ marginTop: 24, height: 56 }}
-        />
+        <View style={{ marginTop: 24 }}>
+          <Button
+            label="Create Committee"
+            onPress={handleCreate}
+            isLoading={isLoading}
+            variant="primary"
+            size="lg"
+          />
+        </View>
       </ScrollView>
     </View>
   );
