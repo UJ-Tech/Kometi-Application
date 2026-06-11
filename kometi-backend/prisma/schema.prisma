@@ -110,7 +110,6 @@ model User {
   notifications   Notification[]
   auditLogs       AuditLog[]
   refreshTokens   RefreshToken[]
-  bids            Bid[]
   joinRequests    JoinRequest[]
   reviewedJoinRequests JoinRequest[] @relation("ReviewedBy")
 
@@ -178,9 +177,13 @@ model Committee {
   members         CommitteeMember[]
   installments    Installment[]
   payoutCycles    PayoutCycle[]
-  auditLogs       AuditLog[]
-  bids            Bid[]
-  joinRequests    JoinRequest[]
+  auditLogs             AuditLog[]
+  bids                  Bid[]
+  joinRequests          JoinRequest[]
+  committeeMonths       CommitteeMonth[]
+  monthlyContributions  MonthlyContribution[]
+  fundDisbursements     FundDisbursement[]
+  memberDistributions   MemberDistribution[]
 
   @@index([organizerId, status])
   @@index([inviteCode])
@@ -198,8 +201,12 @@ model CommitteeMember {
 
   committee     Committee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
   user          User      @relation(fields: [userId], references: [id])
-  installments  Installment[]
-  bids          Bid[]
+  installments          Installment[]
+  bids                  Bid[]
+  committeeMonthsWon    CommitteeMonth[]
+  monthlyContributions  MonthlyContribution[]
+  fundDisbursements     FundDisbursement[]
+  memberDistributions   MemberDistribution[]
 
   @@unique([committeeId, userId])
   @@unique([committeeId, slotNumber])
@@ -354,22 +361,141 @@ model OTPVerification {
   @@map("otp_verifications")
 }
 
+enum CommitteeMonthStatus {
+  pending
+  bidding_open
+  completed
+}
+
+enum ResolutionType {
+  bid_single
+  bid_auction
+  lottery
+}
+
+enum BidStatus {
+  pending
+  won
+  lost
+  withdrawn
+}
+
+enum ContributionStatus {
+  pending
+  paid
+  late
+  defaulted
+}
+
+enum DisbursementType {
+  bid_payout
+  lottery_payout
+}
+
+model CommitteeMonth {
+  id                    String               @id @default(dbgenerated("gen_random_uuid()::text"))
+  committeeId           String               @map("committee_id")
+  monthNumber           Int                  @map("month_number")
+  monthDate             DateTime             @map("month_date")
+  totalPool             BigInt               @map("total_pool")
+  status                CommitteeMonthStatus @default(pending)
+  winnerMemberId        String?              @map("winner_member_id")
+  winningBidAmount      BigInt?              @map("winning_bid_amount")
+  remainingBalance      BigInt               @default(0) @map("remaining_balance")
+  organiserFee          BigInt               @default(0) @map("organiser_fee")
+  distributableAmount   BigInt               @default(0) @map("distributable_amount")
+  interestAmount        BigInt               @default(0) @map("interest_amount")
+  perMemberDistribution BigInt               @default(0) @map("per_member_distribution")
+  resolutionType        ResolutionType       @map("resolution_type")
+
+  committee            Committee            @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  winnerMember         CommitteeMember?     @relation(fields: [winnerMemberId], references: [id])
+  bids                 Bid[]
+  monthlyContributions MonthlyContribution[]
+  fundDisbursements    FundDisbursement[]
+  memberDistributions  MemberDistribution[]
+
+  @@unique([committeeId, monthNumber])
+  @@index([committeeId])
+  @@map("committee_months")
+}
+
 model Bid {
-  id              String          @id @default(cuid())
-  committeeId     String
-  cycleNo         Int
-  memberId        String
-  userId          String
-  bidAmountPaise  BigInt
-  createdAt       DateTime        @default(now())
+  id          String    @id @default(dbgenerated("gen_random_uuid()::text"))
+  committeeId String    @map("committee_id")
+  monthId     String    @map("month_id")
+  memberId    String    @map("member_id")
+  bidAmount   BigInt    @map("bid_amount")
+  placedAt    DateTime  @default(now()) @map("placed_at")
+  status      BidStatus @default(pending)
 
   committee       Committee       @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  committeeMonth  CommitteeMonth  @relation(fields: [monthId], references: [id], onDelete: Cascade)
   committeeMember CommitteeMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([committeeId, cycleNo, userId])
+  @@unique([monthId, memberId])
+  @@index([committeeId, monthId])
   @@map("bids")
 }
+
+model MonthlyContribution {
+  id             String             @id @default(dbgenerated("gen_random_uuid()::text"))
+  committeeId    String             @map("committee_id")
+  monthId        String             @map("month_id")
+  memberId       String             @map("member_id")
+  amountDue      BigInt             @map("amount_due")
+  amountPaid     BigInt             @default(0) @map("amount_paid")
+  placedAt       DateTime?          @map("paid_at") // Note: renamed map to paid_at below
+  lateWeeks      Int                @default(0) @map("late_weeks")
+  lateFeeAmount  BigInt             @default(0) @map("late_fee_amount")
+  status         ContributionStatus @default(pending)
+
+  committee       Committee       @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  committeeMonth  CommitteeMonth  @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  committeeMember CommitteeMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([monthId, memberId])
+  @@index([committeeId, monthId])
+  @@map("monthly_contributions")
+}
+
+model FundDisbursement {
+  id               String           @id @default(dbgenerated("gen_random_uuid()::text"))
+  committeeId      String           @map("committee_id")
+  monthId          String           @map("month_id")
+  memberId         String           @map("member_id")
+  disbursementType DisbursementType @map("disbursement_type")
+  amount           BigInt           @map("amount")
+  disbursedAt      DateTime         @default(now()) @map("disbursed_at")
+  notes            String?          @map("notes")
+
+  committee       Committee       @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  committeeMonth  CommitteeMonth  @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  committeeMember CommitteeMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([committeeId, monthId])
+  @@map("fund_disbursements")
+}
+
+model MemberDistribution {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()::text"))
+  committeeId        String   @map("committee_id")
+  monthId            String   @map("month_id")
+  memberId           String   @map("member_id")
+  distributionAmount BigInt   @map("distribution_amount")
+  interestShare      BigInt   @default(0) @map("interest_share")
+  organiserFeeShare  BigInt   @default(0) @map("organiser_fee_share")
+  distributedAt      DateTime @default(now()) @map("distributed_at")
+
+  committee       Committee       @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  committeeMonth  CommitteeMonth  @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  committeeMember CommitteeMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([monthId, memberId])
+  @@index([committeeId, monthId])
+  @@map("member_distributions")
+}
+
 
 enum JoinRequestStatus {
   PENDING

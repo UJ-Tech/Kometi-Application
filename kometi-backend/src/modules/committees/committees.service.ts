@@ -97,7 +97,7 @@ export class CommitteesService {
   static async getCommitteeById(id: string, userId: string) {
     const { data: committee, error } = await supabase
       .from("committees")
-      .select("*, organizer:users!organizerId(id, name, phone), members:committee_members(*, user:users(id, name, phone)), bids:bids(*, user:users(id, name, phone)), payoutCycles:payout_cycles(*)")
+      .select("*, organizer:users!organizerId(id, name, phone), members:committee_members(*, user:users(id, name, phone)), bids:bids(id, committee_id, month_id, member_id, bid_amount, placed_at, status), payoutCycles:payout_cycles(*)")
       .eq("id", id)
       .single();
 
@@ -254,19 +254,30 @@ export class CommitteesService {
       throw new Error(`Bid payout amount cannot exceed the maximum allowed payout (${maxPayout / 100} INR)`);
     }
 
+    // Look up the current committee_month record by cycleNo (month_number)
+    const { data: currentMonth, error: monthError } = await supabase
+      .from("committee_months")
+      .select("id")
+      .eq("committee_id", committeeId)
+      .eq("month_number", currentCycleNo)
+      .maybeSingle();
+
+    if (monthError || !currentMonth) throw new Error("Active committee month not found. Ensure the month has been created before bidding.");
+
+    const monthId = currentMonth.id;
+
     const { data: existingBid } = await supabase
       .from("bids")
       .select("id")
-      .eq("committeeId", committeeId)
-      .eq("cycleNo", currentCycleNo)
-      .eq("userId", userId)
+      .eq("month_id", monthId)
+      .eq("member_id", member.id)
       .maybeSingle();
 
     let bid;
     if (existingBid) {
       const { data: updatedBid, error: updateErr } = await supabase
         .from("bids")
-        .update({ bidAmountPaise: Number(bidAmountPaise) })
+        .update({ bid_amount: Number(bidAmountPaise) })
         .eq("id", existingBid.id)
         .select()
         .single();
@@ -276,11 +287,11 @@ export class CommitteesService {
       const { data: newBid, error: insertErr } = await supabase
         .from("bids")
         .insert({
-          committeeId,
-          cycleNo: currentCycleNo,
-          memberId: member.id,
-          userId,
-          bidAmountPaise: Number(bidAmountPaise),
+          committee_id: committeeId,
+          month_id: monthId,
+          member_id: member.id,
+          bid_amount: Number(bidAmountPaise),
+          status: "pending",
         })
         .select()
         .single();
@@ -308,11 +319,21 @@ export class CommitteesService {
     const commissionRate = Number(committee.commissionRatePct || 5);
     const commissionPaise = (totalPot * commissionRate) / 100;
 
+    // Look up the committee_month record for this cycleNo
+    const { data: currentMonth, error: _monthErr } = await supabase
+      .from("committee_months")
+      .select("id")
+      .eq("committee_id", committeeId)
+      .eq("month_number", cycleNo)
+      .maybeSingle();
+
+    const monthId = currentMonth?.id ?? null;
+
     const { data: bids, error: bidsError } = await supabase
       .from("bids")
       .select("*")
-      .eq("committeeId", committeeId)
-      .eq("cycleNo", cycleNo);
+      .eq("committee_id", committeeId)
+      .eq("month_id", monthId ?? "00000000-0000-0000-0000-000000000000");
 
     if (bidsError) throw bidsError;
 
@@ -328,10 +349,10 @@ export class CommitteesService {
     }
 
     if (bids && bids.length > 0) {
-      const sortedBids = bids.sort((a: any, b: any) => Number(a.bidAmountPaise) - Number(b.bidAmountPaise));
-      const lowestBidAmount = Number(sortedBids[0].bidAmountPaise);
+      const sortedBids = bids.sort((a: any, b: any) => Number(a.bid_amount) - Number(b.bid_amount));
+      const lowestBidAmount = Number(sortedBids[0].bid_amount);
 
-      const tieBidders = sortedBids.filter((b: any) => Number(b.bidAmountPaise) === lowestBidAmount);
+      const tieBidders = sortedBids.filter((b: any) => Number(b.bid_amount) === lowestBidAmount);
       const winningBid = tieBidders[Math.floor(Math.random() * tieBidders.length)];
       
       const winningMember = committee.members.find((m: any) => m.id === winningBid.memberId);
