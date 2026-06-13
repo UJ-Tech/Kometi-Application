@@ -470,6 +470,19 @@ export default function CommitteeDetail() {
         </Text>
       </View>
 
+      {/* Member Dashboard — Visible to ALL members */}
+      <View className="mb-6">
+        <Button
+          label="Member Dashboard"
+          variant="secondary"
+          onPress={() => router.push(`/member/committee/${id}` as any)}
+          icon={<Ionicons name="person-circle-outline" size={20} color={COLORS.brandPrimary} />}
+        />
+        <Text className="text-neutral-500 text-[10px] text-center mt-2 italic">
+          View your contributions, place bids, and track payments.
+        </Text>
+      </View>
+
       {/* Create Month — Organizer Only */}
       {isOrganizer && committee.status === "ACTIVE" && (
         <View className="mb-6">

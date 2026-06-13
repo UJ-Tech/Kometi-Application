@@ -111,4 +111,11 @@ export const committeesApi = {
 
   resolveMonth: (committeeId: string, monthId: string) =>
     apiClient.post<ApiResponse<any>>(`/committees/${committeeId}/months/${monthId}/resolve`),
+
+  // Phase 2 — Member bid placement
+  placeBid: (committeeId: string, monthId: string, memberId: string, bidAmountPaise: number) =>
+    apiClient.post<ApiResponse<any>>(`/committees/${committeeId}/months/${monthId}/bids`, {
+      memberId,
+      bidAmount: bidAmountPaise,
+    }),
 };
