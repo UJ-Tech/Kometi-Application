@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS "committee_months" (
     "interest_amount" BIGINT NOT NULL DEFAULT 0,
     "per_member_distribution" BIGINT NOT NULL DEFAULT 0,
     "resolution_type" "resolution_type" NOT NULL,
+    "bidding_deadline" TIMESTAMP(3),
 
     CONSTRAINT "committee_months_pkey" PRIMARY KEY ("id"),
     CONSTRAINT "committee_months_committee_id_fkey" FOREIGN KEY ("committee_id") REFERENCES "committees"("id") ON DELETE CASCADE ON UPDATE CASCADE,

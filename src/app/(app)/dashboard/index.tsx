@@ -25,7 +25,7 @@ export default function Dashboard() {
   const logout = useAuthStore((s) => s.logout);
   
   const { balancePaise, transactions, fetchWalletData } = useWalletStore();
-  const { committees, fetchCommittees } = useCommitteeStore();
+  const { fetchCommittees } = useCommitteeStore();
   const { upcomingDues, fetchUpcomingDues } = useInstallmentStore();
 
   const loadData = async () => {
@@ -40,6 +40,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const confirmLogout = async () => {

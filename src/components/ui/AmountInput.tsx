@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from "react";
 import { View, TextInput, Text, StyleSheet } from "react-native";
-import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING } from "../../constants/theme";
+import { COLORS, BORDER_RADIUS } from "../../constants/theme";
 import { formatINR } from "../../utils/currency";
 
 interface AmountInputProps {
@@ -38,6 +38,7 @@ export function AmountInput({
         minimumFractionDigits: 0,
       }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [valuePaise, isFocused]);
 
   const handleChangeText = (text: string) => {

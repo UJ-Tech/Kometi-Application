@@ -90,4 +90,25 @@ export const committeesApi = {
     apiClient.post<ApiResponse<{ success: boolean }>>(
       `/committees/${committeeId}/join-requests/${requestId}/reject`
     ),
+
+  // ─── Committee Months (Phase 2) ─────────────────────────────────────────
+  createMonth: (committeeId: string, payload: {
+    monthNumber: number;
+    monthDate: string;
+    resolutionType: "bid_single" | "bid_auction" | "lottery";
+    winningBidAmount?: number;
+  }) =>
+    apiClient.post<ApiResponse<any>>(`/committees/${committeeId}/months`, payload),
+
+  getMonths: (committeeId: string) =>
+    apiClient.get<ApiResponse<any>>(`/committees/${committeeId}/months`),
+
+  getMonth: (committeeId: string, monthId: string) =>
+    apiClient.get<ApiResponse<any>>(`/committees/${committeeId}/months/${monthId}`),
+
+  openBidding: (committeeId: string, monthNumber: number) =>
+    apiClient.post<ApiResponse<any>>(`/committees/${committeeId}/months/${monthNumber}/open-bidding`),
+
+  resolveMonth: (committeeId: string, monthId: string) =>
+    apiClient.post<ApiResponse<any>>(`/committees/${committeeId}/months/${monthId}/resolve`),
 };

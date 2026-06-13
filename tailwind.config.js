@@ -38,6 +38,11 @@ module.exports = {
           100: "#f0effe",
           900: "#0f0d23",   // deepest bg
           950: "#07061a",
+          bg:       "#0f0d23",
+          card:     "#1a1640",
+          elevated: "#231f52",
+          border:   "rgba(111,94,255,0.15)",
+          glow:     "rgba(111,94,255,0.40)",
         },
         // Semantic
         success: { 400: "#4ade80", 500: "#22c55e", 600: "#16a34a" },

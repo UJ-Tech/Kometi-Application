@@ -1,4 +1,6 @@
-// src/app/(app)/committees/[id].tsx
+// src/app/(app)/committees/[id]/index.tsx
+// Moved from committees/[id].tsx → committees/[id]/index.tsx
+// so the [id]/ directory can hold nested manage/ screens without conflict.
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -15,14 +17,14 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { committeesApi } from "../../../services/committees.api";
-import { useAuthStore } from "../../../stores/auth.store";
-import { canAccessAdminPanel } from "../../../utils/rbac";
-import { formatINR } from "../../../utils/currency";
-import { COLORS } from "../../../constants/theme";
-import Card from "../../../components/ui/Card";
-import Badge from "../../../components/ui/Badge";
-import Button from "../../../components/ui/Button";
+import { committeesApi } from "../../../../services/committees.api";
+import { useAuthStore } from "../../../../stores/auth.store";
+import { canAccessAdminPanel } from "../../../../utils/rbac";
+import { formatINR } from "../../../../utils/currency";
+import { COLORS } from "../../../../constants/theme";
+import Card from "../../../../components/ui/Card";
+import Badge from "../../../../components/ui/Badge";
+import Button from "../../../../components/ui/Button";
 
 export default function CommitteeDetail() {
   const rawId = useLocalSearchParams<{ id: string }>().id;
@@ -39,6 +41,11 @@ export default function CommitteeDetail() {
   const [joinRequests, setJoinRequests] = useState<any[]>([]);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [schedule, setSchedule] = useState<any[] | null>(null);
+  const [monthsData, setMonthsData] = useState<any[] | null>(null);
+  const [showCreateMonth, setShowCreateMonth] = useState(false);
+  const [newMonthNumber, setNewMonthNumber] = useState("");
+  const [newMonthDate, setNewMonthDate] = useState("");
+  const [newMonthResolution, setNewMonthResolution] = useState<"bid_single" | "bid_auction" | "lottery">("bid_auction");
 
   const confirmAction = async (title: string, message: string, confirmLabel = "Confirm") => {
     if (Platform.OS === "web") {
@@ -86,6 +93,7 @@ export default function CommitteeDetail() {
     if (isValidId) {
       loadCommittee();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const loadJoinRequests = async () => {
@@ -101,6 +109,7 @@ export default function CommitteeDetail() {
     if (id && committee?.organizerId === currentUser?.id && committee?.status === "DRAFT") {
       loadJoinRequests();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, committee?.organizerId, committee?.status]);
 
   const loadSchedule = async () => {
@@ -117,8 +126,20 @@ export default function CommitteeDetail() {
   useEffect(() => {
     if (committee && committee.status !== "DRAFT") {
       loadSchedule();
+      loadMonths();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [committee?.id, committee?.status]);
+
+  const loadMonths = async () => {
+    try {
+      const res = await committeesApi.getMonths(id);
+      const data = res.data.data;
+      setMonthsData(data.months || []);
+    } catch (err) {
+      console.error("[CommitteeDetail] Failed to load months:", err);
+    }
+  };
 
   if (!isValidId) {
     return (
@@ -130,7 +151,7 @@ export default function CommitteeDetail() {
           Committee Not Found
         </Text>
         <Text className="text-neutral-500 text-sm text-center mb-6 leading-5">
-          The committee you're looking for doesn't exist or the link is invalid.
+          {"The committee you're looking for doesn't exist or the link is invalid."}
         </Text>
         <TouchableOpacity
           onPress={() => router.replace("/committees")}
@@ -261,7 +282,7 @@ export default function CommitteeDetail() {
               const res = await committeesApi.resolveAuction(id, committee.currentCycleNo);
               const result = res.data.data;
               const winner = committee.members.find((m: any) => m.userId === result.winnerId)?.user?.name || "Member";
-              
+
               Alert.alert(
                 "Auction Resolved",
                 `Winner: ${winner}\nPayout: ${formatINR(result.payoutAmtPaise)}\nDistributed Dividend: ${formatINR(result.dividendPerMemberPaise)} per member.`,
@@ -291,6 +312,36 @@ export default function CommitteeDetail() {
     }
   };
 
+  const handleCreateMonth = async () => {
+    const monthNum = Number(newMonthNumber);
+    if (!monthNum || monthNum < 1 || monthNum > committee.totalSlots) {
+      Alert.alert("Invalid Input", `Month number must be between 1 and ${committee.totalSlots}.`);
+      return;
+    }
+    if (!newMonthDate.trim()) {
+      Alert.alert("Invalid Input", "Please enter a month date (YYYY-MM-DD).");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await committeesApi.createMonth(id, {
+        monthNumber: monthNum,
+        monthDate: newMonthDate.trim(),
+        resolutionType: newMonthResolution,
+      });
+      Alert.alert("Success", `Month ${monthNum} created successfully!`);
+      setNewMonthNumber("");
+      setNewMonthDate("");
+      setShowCreateMonth(false);
+      await loadMonths();
+    } catch (err) {
+      Alert.alert("Error", err instanceof Error ? err.message : "Failed to create month");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (loading && !refreshing) {
     return (
       <View className="flex-1 bg-surface-950 items-center justify-center">
@@ -304,7 +355,7 @@ export default function CommitteeDetail() {
   const totalPot = Number(committee.installmentAmountPaise) * committee.totalSlots;
   const isOrganizer = committee.organizerId === currentUser?.id;
   const isAdminOrManager = canAccessAdminPanel(currentUser?.role);
-  
+
   // Find current user's membership
   const myMembership = committee.members?.find((m: any) => m.userId === currentUser?.id);
   const userHasWon = myMembership?.hasReceivedPayout;
@@ -390,6 +441,194 @@ export default function CommitteeDetail() {
           </View>
         </View>
       </Card>
+
+      {/* Organiser Management Dashboard Button */}
+      {isOrganizer && (
+        <View className="mb-6">
+          <Button
+            label="Organiser Dashboard"
+            variant="secondary"
+            onPress={() => router.push(`/committees/${id}/manage`)}
+            icon={<Ionicons name="settings-outline" size={20} color={COLORS.brandPrimary} />}
+          />
+          <Text className="text-neutral-500 text-[10px] text-center mt-2 italic">
+            Manage fund disbursements, bids, and month resolutions.
+          </Text>
+        </View>
+      )}
+
+      {/* Audit Log — Visible to ALL members */}
+      <View className="mb-6">
+        <Button
+          label="View Audit Log"
+          variant="secondary"
+          onPress={() => router.push(`/committees/${id}/audit`)}
+          icon={<Ionicons name="document-text-outline" size={20} color={COLORS.success.light} />}
+        />
+        <Text className="text-neutral-500 text-[10px] text-center mt-2 italic">
+          Transparency panel — view full monthly summary and personal ledger.
+        </Text>
+      </View>
+
+      {/* Create Month — Organizer Only */}
+      {isOrganizer && committee.status === "ACTIVE" && (
+        <View className="mb-6">
+          <View className="flex-row items-center justify-between mb-3">
+            <Text className="text-white text-base font-bold">Committee Months</Text>
+            {!showCreateMonth && (
+              <TouchableOpacity
+                onPress={() => {
+                  const nextNum = (monthsData?.length || 0) + 1;
+                  setNewMonthNumber(String(nextNum));
+                  setNewMonthDate(new Date().toISOString().split("T")[0]);
+                  setShowCreateMonth(true);
+                }}
+                className="bg-brand-500/15 border border-brand-500/20 px-4 py-2 rounded-xl flex-row items-center"
+              >
+                <Ionicons name="add" size={16} color={COLORS.brandPrimary} />
+                <Text className="text-brand-400 font-bold text-sm ml-1">Create Month</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {showCreateMonth && (
+            <Card style={{ marginBottom: 0 }} padding={0}>
+              <View className="p-5">
+                <Text className="text-neutral-400 text-xs font-semibold uppercase tracking-wider mb-4">
+                  New Month Details
+                </Text>
+
+                <Text className="text-neutral-400 text-xs font-semibold mb-1.5">Month Number</Text>
+                <View className="bg-surface-bg border border-brand-primary/10 rounded-xl px-4 h-12 justify-center mb-4">
+                  <TextInput
+                    value={newMonthNumber}
+                    onChangeText={setNewMonthNumber}
+                    keyboardType="numeric"
+                    placeholder={`e.g. ${Number(newMonthNumber) || 1}`}
+                    placeholderTextColor="#a3a3a3"
+                    className="text-white font-semibold text-sm"
+                  />
+                </View>
+
+                <Text className="text-neutral-400 text-xs font-semibold mb-1.5">Month Date (YYYY-MM-DD)</Text>
+                <View className="bg-surface-bg border border-brand-primary/10 rounded-xl px-4 h-12 justify-center mb-4">
+                  <TextInput
+                    value={newMonthDate}
+                    onChangeText={setNewMonthDate}
+                    placeholder="2026-01-15"
+                    placeholderTextColor="#a3a3a3"
+                    className="text-white font-semibold text-sm"
+                  />
+                </View>
+
+                <Text className="text-neutral-400 text-xs font-semibold mb-2">Resolution Type</Text>
+                <View className="flex-row gap-2 mb-4">
+                  {(["bid_auction", "bid_single", "lottery"] as const).map((type) => (
+                    <TouchableOpacity
+                      key={type}
+                      onPress={() => setNewMonthResolution(type)}
+                      className={`flex-1 h-10 rounded-xl items-center justify-center border ${
+                        newMonthResolution === type
+                          ? "bg-brand-500 border-brand-500"
+                          : "bg-surface-bg border-brand-primary/10"
+                      }`}
+                    >
+                      <Text
+                        className={`font-bold text-xs ${
+                          newMonthResolution === type ? "text-white" : "text-neutral-400"
+                        }`}
+                      >
+                        {type === "bid_auction" ? "Auction" : type === "bid_single" ? "Single Bid" : "Lottery"}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <View className="flex-row gap-3">
+                  <TouchableOpacity
+                    onPress={() => setShowCreateMonth(false)}
+                    className="flex-1 h-11 rounded-xl items-center justify-center border border-brand-primary/10"
+                  >
+                    <Text className="text-neutral-400 font-bold text-sm">Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleCreateMonth}
+                    disabled={isSubmitting}
+                    className="flex-1 bg-brand-500 h-11 rounded-xl items-center justify-center"
+                  >
+                    {isSubmitting ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text className="text-white font-bold text-sm">Create Month</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Card>
+          )}
+
+          {!showCreateMonth && monthsData && monthsData.length > 0 && (
+            <Card style={{ marginBottom: 0 }} padding={0}>
+              <View className="p-5">
+                <View className="flex-row border-b border-brand-primary/10 pb-2 mb-3">
+                  <Text className="w-14 text-neutral-400 font-bold text-xs">Month</Text>
+                  <Text className="flex-1 text-neutral-400 font-bold text-xs">Date</Text>
+                  <Text className="w-20 text-right text-neutral-400 font-bold text-xs">Pool</Text>
+                  <Text className="w-20 text-right text-neutral-400 font-bold text-xs">Status</Text>
+                </View>
+                {monthsData.map((m: any) => (
+                  <TouchableOpacity
+                    key={m.id}
+                    onPress={() => router.push(`/committees/${id}/manage/month/${m.id}`)}
+                    className="flex-row py-2.5 border-b border-brand-primary/5 items-center"
+                  >
+                    <Text className="w-14 text-white font-bold text-sm">#{m.monthNumber}</Text>
+                    <Text className="flex-1 text-neutral-300 font-semibold text-sm">
+                      {new Date(m.monthDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                    </Text>
+                    <Text className="w-20 text-right text-gold-500 font-bold text-sm">
+                      {formatINR(Number(m.totalPool))}
+                    </Text>
+                    <View className="w-20 items-end">
+                      <View
+                        className={`px-2 py-0.5 rounded ${
+                          m.status === "completed"
+                            ? "bg-success-500/15"
+                            : m.status === "bidding_open"
+                            ? "bg-brand-500/15"
+                            : "bg-neutral-500/15"
+                        }`}
+                      >
+                        <Text
+                          className={`text-[10px] font-bold ${
+                            m.status === "completed"
+                              ? "text-success-500"
+                              : m.status === "bidding_open"
+                              ? "text-brand-500"
+                              : "text-neutral-400"
+                          }`}
+                        >
+                          {m.status === "bidding_open" ? "BIDDING" : m.status.toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </Card>
+          )}
+
+          {!showCreateMonth && (!monthsData || monthsData.length === 0) && (
+            <View className="items-center py-6 bg-surface-card/30 rounded-xl border border-dashed border-neutral-800">
+              <Ionicons name="calendar-outline" size={28} color="#52525b" />
+              <Text className="text-neutral-500 text-xs mt-2">No months created yet</Text>
+              <Text className="text-neutral-600 text-[10px] mt-1">
+                Create the first month to start bidding.
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Invite Code — Organizer Only */}
       {isOrganizer && committee.status === "DRAFT" && committee.inviteCode && (
@@ -508,7 +747,6 @@ export default function CommitteeDetail() {
                 </Text>
               </View>
 
-              {/* Bidding Limits Info */}
               <View className="bg-surface-elevated/40 border border-brand-primary/5 p-3.5 rounded-xl mb-4">
                 <Text className="text-neutral-400 text-xs font-semibold">Bidding Rules (Reverse Auction):</Text>
                 <Text className="text-neutral-300 text-xs mt-1">
@@ -522,7 +760,6 @@ export default function CommitteeDetail() {
                 </Text>
               </View>
 
-              {/* Form for non-winners */}
               {myMembership && !userHasWon ? (
                 <View>
                   <Text className="text-neutral-400 text-xs font-semibold mb-2">PLACE YOUR BID (Payout Request)</Text>
@@ -560,7 +797,6 @@ export default function CommitteeDetail() {
                 </View>
               )}
 
-              {/* Resolve Button for Admin/Organizer */}
               {(isOrganizer || isAdminOrManager) && (
                 <TouchableOpacity
                   onPress={handleResolveAuction}
@@ -573,7 +809,6 @@ export default function CommitteeDetail() {
             </View>
           </Card>
 
-          {/* Active Bids list */}
           <Text className="text-white text-sm font-bold mb-2">Active Bids (Cycle #{committee.currentCycleNo})</Text>
           {activeBids.map((bid: any, idx: number) => (
             <View

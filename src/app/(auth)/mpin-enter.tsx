@@ -28,15 +28,16 @@ export default function MPINEnterScreen() {
 
   const MAX_ATTEMPTS = 5;
 
-  useEffect(() => {
-    // Offer biometric on mount
-    if (isEnrolled) handleBiometric();
-  }, [isEnrolled]);
-
   const handleBiometric = async () => {
     const ok = await authenticate("Verify your identity to continue");
     if (ok) router.replace("/(app)/dashboard");
   };
+
+  useEffect(() => {
+    // Offer biometric on mount
+    if (isEnrolled) handleBiometric();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEnrolled]);
 
   const handleVerify = async () => {
     if (mpin.length < 6) { setError("Enter your 6-digit MPIN"); return; }
@@ -56,7 +57,7 @@ export default function MPINEnterScreen() {
       } else {
         throw new Error("Incorrect MPIN");
       }
-    } catch (e: any) {
+    } catch {
       const remaining = MAX_ATTEMPTS - attempts - 1;
       setAttempts((a) => a + 1);
       setError(`Incorrect MPIN. ${remaining} attempts remaining.`);

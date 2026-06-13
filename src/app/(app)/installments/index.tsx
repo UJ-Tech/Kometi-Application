@@ -2,8 +2,7 @@
 // Kometi Chit Installments Dues & Collection Dashboard.
 
 import React, { useState, useEffect } from "react";
-import { View, Text, FlatList, TouchableOpacity, RefreshControl, Alert } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { View, Text, FlatList, RefreshControl, Alert } from "react-native";
 import { useInstallmentStore } from "../../../stores/installment.store";
 import { useWalletStore } from "../../../stores/wallet.store";
 import { formatINR } from "../../../utils/currency";
@@ -28,6 +27,7 @@ export default function Installments() {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handlePay = async (id: string, amountPaise: bigint) => {

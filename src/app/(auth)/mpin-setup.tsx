@@ -83,7 +83,11 @@ export default function MPINSetupScreen() {
           value={isSetStep ? mpin : confirm}
           onChange={(val) => {
             setError("");
-            isSetStep ? setMPIN(val) : setConfirm(val);
+            if (isSetStep) {
+              setMPIN(val);
+            } else {
+              setConfirm(val);
+            }
           }}
           error={error}
         />

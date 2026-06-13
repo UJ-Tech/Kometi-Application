@@ -58,14 +58,6 @@ export function useOfflineQueue() {
   const { queue, addToQueue, removeFromQueue, clearQueue } = useOfflineQueueStore();
   const { isOnline, wasOffline, clearWasOffline } = useNetworkStatus();
 
-  // Process the queue sequentially when coming back online
-  useEffect(() => {
-    if (isOnline && wasOffline && queue.length > 0) {
-      processQueue();
-      clearWasOffline();
-    }
-  }, [isOnline, wasOffline, queue.length]);
-
   const processQueue = async () => {
     console.log(`[OfflineQueue] Processing ${queue.length} queued requests...`);
     const activeQueue = [...queue];
@@ -96,6 +88,14 @@ export function useOfflineQueue() {
       }
     }
   };
+
+  // Process the queue sequentially when coming back online
+  useEffect(() => {
+    if (isOnline && wasOffline && queue.length > 0) {
+      processQueue();
+      clearWasOffline();
+    }
+  }, [isOnline, wasOffline, queue.length]);
 
   return {
     queue,

@@ -402,6 +402,7 @@ model CommitteeMonth {
   winnerMemberId        String?              @map("winner_member_id")
   winningBidAmount      BigInt?              @map("winning_bid_amount")
   remainingBalance      BigInt               @default(0) @map("remaining_balance")
+  biddingDeadline       DateTime?            @map("bidding_deadline")
   organiserFee          BigInt               @default(0) @map("organiser_fee")
   distributableAmount   BigInt               @default(0) @map("distributable_amount")
   interestAmount        BigInt               @default(0) @map("interest_amount")

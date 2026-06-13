@@ -116,6 +116,24 @@ export default function AppLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="committees/[id]"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="dashboard/admin"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

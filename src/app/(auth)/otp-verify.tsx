@@ -1,7 +1,7 @@
 // src/app/(auth)/otp-verify.tsx
 // OTP verification with countdown timer, resend, and new-user redirect
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View, Text, KeyboardAvoidingView, Platform, StyleSheet, TouchableOpacity,
 } from "react-native";
@@ -38,6 +38,7 @@ export default function OTPVerifyScreen() {
     if (countdown <= 0) { setCanResend(true); return; }
     const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [countdown]);
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;

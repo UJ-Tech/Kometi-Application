@@ -5,10 +5,14 @@ import { protect, authorize } from "../../middleware/auth.middleware";
 import { validate } from "../../middleware/validate";
 import { createCommitteeSchema, addMemberSchema, joinByCodeSchema } from "./committees.validator";
 
+import committeeMonthsRouter from "../committeeMonths/committeeMonths.router";
+
 const router = Router();
 
 // Protected committee routes
 router.use(protect as any);
+
+router.use("/:id/months", committeeMonthsRouter);
 
 router.get("/", CommitteesController.list as any);
 router.get("/:id", CommitteesController.getById as any);

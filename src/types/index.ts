@@ -216,3 +216,37 @@ export interface JoinRequest {
   createdAt:      string;
   updatedAt:      string;
 }
+
+// ─── Committee Months (Phase 2) ──────────────────────────────────────────────
+export type CommitteeMonthStatus = "pending" | "bidding_open" | "completed";
+export type ResolutionType = "bid_single" | "bid_auction" | "lottery";
+
+export interface CommitteeMonth {
+  id:                    string;
+  committeeId:           string;
+  monthNumber:           number;
+  monthDate:             string;
+  totalPool:             number;
+  status:                CommitteeMonthStatus;
+  winnerMemberId:        string | null;
+  winningBidAmount:      number | null;
+  remainingBalance:      number;
+  biddingDeadline:       string | null;
+  organiserFee:          number;
+  distributableAmount:   number;
+  interestAmount:        number;
+  perMemberDistribution: number;
+  resolutionType:        ResolutionType;
+}
+
+export interface MemberDistribution {
+  id:                 string;
+  committeeId:        string;
+  monthId:            string;
+  memberId:           string;
+  distributionAmount: number;
+  interestShare:      number;
+  organiserFeeShare:  number;
+  distributedAt:      string;
+  member?:            CommitteeMember;
+}

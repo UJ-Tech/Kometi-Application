@@ -2,7 +2,7 @@
 // Manages the Socket.IO connection lifecycle tied to auth state.
 // Auto-reconnects, handles auth errors, joins user-specific rooms.
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import { APP_CONFIG } from "../constants/config";
 import { useAuthStore } from "../stores/auth.store";
@@ -12,6 +12,7 @@ import { useCommitteeStore } from "../stores/committee.store";
 
 export function useSocket(): Socket | null {
   const socketRef      = useRef<Socket | null>(null);
+  const [socket, setSocket] = useState<Socket | null>(null);
   const accessToken    = useAuthStore((s) => s.accessToken);
   const isAuthenticated= useAuthStore((s) => s.isAuthenticated);
   const logout         = useAuthStore((s) => s.logout);
@@ -34,6 +35,7 @@ export function useSocket(): Socket | null {
     });
 
     socketRef.current = socket;
+    setSocket(socket);
 
     // ── Connection events ──────────────────────────────────────────────────
     socket.on("connect",       () => console.log("[Socket] Connected:", socket.id));
@@ -70,8 +72,10 @@ export function useSocket(): Socket | null {
     return () => {
       socket.disconnect();
       socketRef.current = null;
+      setSocket(null);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, accessToken]);
 
-  return socketRef.current;
+  return socket;
 }

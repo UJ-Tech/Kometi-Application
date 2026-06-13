@@ -1,7 +1,7 @@
 // src/components/ui/OTPInput.tsx
 // 6-box OTP input with auto-advance, paste support, and backspace navigation.
 
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef } from "react";
 import { View, TextInput, Text } from "react-native";
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING } from "../../constants/theme";
 

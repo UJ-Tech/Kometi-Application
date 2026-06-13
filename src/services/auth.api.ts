@@ -1,6 +1,6 @@
 // src/services/auth.api.ts
 import apiClient from "./api.client";
-import type { ApiResponse, User, UserRole } from "../types";
+import type { ApiResponse, User } from "../types";
 
 export interface SendOTPPayload    { phone: string }
 export interface VerifyOTPPayload  { phone: string; otp: string }

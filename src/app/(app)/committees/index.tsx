@@ -115,7 +115,7 @@ export default function Committees() {
             <Text style={{
               color: COLORS.goldPrimary, fontSize: 14, fontWeight: "600", marginLeft: 8,
             }}>
-              Or Join Someone Else's Chit
+              Or Join Someone Else{"'"}s Chit
             </Text>
           </TouchableOpacity>
         )}

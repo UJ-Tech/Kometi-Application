@@ -31,7 +31,7 @@ apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =>
 // ─── Response interceptor — handle 401 + token refresh ──────────────────────
 
 let isRefreshing   = false;
-let refreshQueue:  Array<(token: string) => void> = [];
+let refreshQueue: ((token: string) => void)[] = [];
 
 function onRefreshed(token: string) {
   refreshQueue.forEach((cb) => cb(token));

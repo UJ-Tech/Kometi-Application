@@ -3,7 +3,7 @@
 // Allows users to recover, copy error details, or reload the app.
 
 import React, { Component, type ErrorInfo, type ReactNode } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import { View, Text, ScrollView } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { COLORS } from "../../constants/theme";
 import Button from "../ui/Button";

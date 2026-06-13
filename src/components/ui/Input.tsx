@@ -4,7 +4,6 @@ import {
   View,
   TextInput,
   Text,
-  TouchableOpacity,
   type TextInputProps,
   type ViewStyle,
 } from "react-native";

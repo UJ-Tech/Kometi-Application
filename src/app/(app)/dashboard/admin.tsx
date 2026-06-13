@@ -52,6 +52,7 @@ export default function AdminDashboard() {
     if (user && !canOpenAdminPanel) {
       router.replace("/(app)/dashboard");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canOpenAdminPanel, router, user]);
 
   const loadData = async () => {
@@ -83,6 +84,7 @@ export default function AdminDashboard() {
       return;
     }
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canOpenAdminPanel]);
 
   if (user && !canOpenAdminPanel) return null;

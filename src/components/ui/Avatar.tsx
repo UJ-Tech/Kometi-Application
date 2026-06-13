@@ -3,7 +3,7 @@ import React from "react";
 import { View, Text } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { COLORS, BORDER_RADIUS, GRADIENTS } from "../../constants/theme";
+import { COLORS } from "../../constants/theme";
 
 interface AvatarProps {
   name:          string;

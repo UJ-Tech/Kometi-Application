@@ -2,7 +2,7 @@
 // Shows an offline banner at the top of the screen with reconnection animation.
 
 import React, { useEffect } from "react";
-import { View, Text } from "react-native";
+import { Text } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -17,7 +17,6 @@ export default function NetworkBanner() {
   const { isOnline, wasOffline, clearWasOffline } = useNetworkStatus();
   const insets    = useSafeAreaInsets();
   const translateY = useSharedValue(-100);
-  const bgColor    = useSharedValue(0);
 
   const isReconnected = wasOffline && isOnline;
 
@@ -34,6 +33,7 @@ export default function NetworkBanner() {
     } else {
       translateY.value = withTiming(-100, { duration: 400 });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline, isReconnected]);
 
   const animStyle = useAnimatedStyle(() => ({
