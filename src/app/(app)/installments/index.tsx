@@ -31,7 +31,7 @@ export default function Installments() {
   }, []);
 
   const handlePay = async (id: string, amountPaise: bigint) => {
-    if (balancePaise < amountPaise) {
+    if (BigInt(balancePaise) < amountPaise) {
       Alert.alert(
         "Insufficient Balance",
         `Your wallet balance (${formatINR(balancePaise)}) is less than the due amount (${formatINR(amountPaise)}). Please top up your wallet first.`

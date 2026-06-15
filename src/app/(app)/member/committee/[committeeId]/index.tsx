@@ -20,6 +20,7 @@ import { COLORS, GRADIENTS } from "../../../../../constants/theme";
 import Card from "../../../../../components/ui/Card";
 import Badge from "../../../../../components/ui/Badge";
 import Button from "../../../../../components/ui/Button";
+import PayNowButton from "../../../../../components/payments/PayNowButton";
 
 const F = (p: number | bigint | null | undefined) => formatINR(p ?? 0);
 const fmtDate = (d: string) =>
@@ -178,6 +179,12 @@ export default function MemberCommitteeOverview() {
   // Bidding info
   const canBid = !hasWon && latestMonthStatus === "bidding_open";
   const myCurrentBid = currentMonthDetail?.bids?.find((b: any) => b.committeeMemberId === myMemberId);
+  const allBids: any[] = currentMonthDetail?.bids || [];
+  const sortedBids = [...allBids].sort((a: any, b: any) => (a.bidAmount || 0) - (b.bidAmount || 0));
+  const lowestBid = sortedBids.length > 0 ? sortedBids[0] : null;
+  const myBidRank = myCurrentBid ? sortedBids.findIndex((b: any) => b.committeeMemberId === myMemberId) + 1 : 0;
+  const interestAmount = installment * 0.02 * (totalMembers - (months.filter((m: any) => m.status === "completed").length));
+  const maxBidAllowed = totalPool - interestAmount;
 
   return (
     <ScrollView
@@ -311,13 +318,43 @@ export default function MemberCommitteeOverview() {
                 {hasWon && <Badge label="Already Won" variant="warning" size="sm" />}
               </View>
 
+              {/* My bid status */}
               {myCurrentBid ? (
                 <View className="bg-brand-500/10 rounded-xl p-3 mb-3">
-                  <Text className="text-neutral-400 text-[10px] uppercase font-bold mb-1">Your Current Bid</Text>
-                  <Text className="text-brand-400 font-bold text-lg">{F(myCurrentBid.bidAmount)}</Text>
+                  <View className="flex-row items-center justify-between">
+                    <View>
+                      <Text className="text-neutral-400 text-[10px] uppercase font-bold mb-1">Your Current Bid</Text>
+                      <Text className="text-brand-400 font-bold text-lg">{F(myCurrentBid.bidAmount)}</Text>
+                    </View>
+                    {myBidRank > 0 && (
+                      <View className="items-end">
+                        <Text className="text-neutral-500 text-[10px] uppercase font-bold mb-1">Your Rank</Text>
+                        <Text className={`font-bold text-lg ${myBidRank === 1 ? "text-gold-400" : "text-neutral-300"}`}>
+                          #{myBidRank}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                   <Text className="text-neutral-500 text-[10px] mt-1">You can edit or cancel until bidding closes</Text>
                 </View>
               ) : null}
+
+              {/* Lowest bid info */}
+              {lowestBid && (
+                <View className="bg-gold-500/10 rounded-xl p-3 mb-3">
+                  <View className="flex-row items-center justify-between">
+                    <View>
+                      <Text className="text-neutral-400 text-[10px] uppercase font-bold mb-1">Lowest Bid</Text>
+                      <Text className="text-gold-400 font-bold text-lg">{F(lowestBid.bidAmount)}</Text>
+                    </View>
+                    <View className="items-end">
+                      <Text className="text-neutral-400 text-[10px] uppercase font-bold mb-1">Bids Placed</Text>
+                      <Text className="text-white font-bold text-lg">{allBids.length}</Text>
+                    </View>
+                  </View>
+                  <Text className="text-neutral-500 text-[10px] mt-1">Lowest bidder wins the pool</Text>
+                </View>
+              )}
 
               {canBid ? (
                 <Button
@@ -434,6 +471,45 @@ export default function MemberCommitteeOverview() {
           </Card>
         </View>
       )}
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* Pay Contribution (Razorpay)                                      */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {(() => {
+        // Find latest pending contribution for current member
+        const myPendingInst = installments
+          .filter((i: any) => i.userId === currentUser?.id && (i.status === "PENDING" || i.status === "OVERDUE" || i.status === "PARTIAL"))
+          .sort((a: any, b: any) => a.cycleNo - b.cycleNo)[0];
+
+        if (!myPendingInst || !myMemberId || !currentMonth) return null;
+
+        const totalDue = (myPendingInst.amountDuePaise || 0) + (myPendingInst.penaltyPaise || 0);
+        if (totalDue <= 0) return null;
+
+        return (
+          <View className="px-4 mb-5">
+            <View className="flex-row items-center mb-3">
+              <View className="w-7 h-7 rounded-lg bg-gold-500/15 items-center justify-center mr-2">
+                <Ionicons name="card-outline" size={14} color={COLORS.goldPrimary} />
+              </View>
+              <Text className="text-white font-bold text-sm">Pay Contribution</Text>
+            </View>
+
+            <Card>
+              <PayNowButton
+                committeeId={committeeId}
+                monthId={currentMonth.id}
+                memberId={myMemberId}
+                committeeName={committee.name}
+                monthNumber={currentMonth.monthNumber || months.length}
+                amountPaise={totalDue}
+                lateFeePaise={myPendingInst.penaltyPaise || 0}
+                onPaymentSuccess={loadData}
+              />
+            </Card>
+          </View>
+        );
+      })()}
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* Quick Actions                                                     */}

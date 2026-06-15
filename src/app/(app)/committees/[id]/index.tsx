@@ -470,6 +470,27 @@ export default function CommitteeDetail() {
         </Text>
       </View>
 
+      {/* Place Bid — Member CTA (when month bidding is open) */}
+      {!isOrganizer && (() => {
+        const latestMonth = monthsData && monthsData.length > 0 ? monthsData[monthsData.length - 1] : null;
+        const isBiddingOpen = latestMonth?.status === "bidding_open";
+        const alreadyWon = myMembership?.hasReceivedPayout === true;
+        const canMemberBid = isBiddingOpen && !alreadyWon;
+        return canMemberBid ? (
+          <View className="mb-6">
+            <Button
+              label="Place Your Bid"
+              variant="gold"
+              onPress={() => router.push(`/member/committee/${id}/bid` as any)}
+              icon={<Ionicons name="hammer-outline" size={20} color="#fff" />}
+            />
+            <Text className="text-neutral-500 text-[10px] text-center mt-2 italic">
+              Enter the reverse auction — lowest bidder wins the pool.
+            </Text>
+          </View>
+        ) : null;
+      })()}
+
       {/* Member Dashboard — Visible to ALL members */}
       <View className="mb-6">
         <Button
@@ -748,7 +769,10 @@ export default function CommitteeDetail() {
       )}
 
       {/* Auction Bidding Panel */}
-      {committee.status === "ACTIVE" && (
+      {committee.status === "ACTIVE" && (() => {
+        const latestMonth = monthsData && monthsData.length > 0 ? monthsData[monthsData.length - 1] : null;
+        const isMonthBiddingOpen = latestMonth?.status === "bidding_open";
+        return (
         <View className="mb-6">
           <Text className="text-white text-base font-bold mb-3">Live Auction</Text>
           <Card style={{ marginBottom: 16 }} padding={0}>
@@ -773,7 +797,25 @@ export default function CommitteeDetail() {
                 </Text>
               </View>
 
-              {myMembership && !userHasWon ? (
+              {!isOrganizer && isMonthBiddingOpen && myMembership && !userHasWon ? (
+                <View>
+                  <View className="bg-gold-500/10 border border-gold-500/20 rounded-xl p-4 mb-3">
+                    <View className="flex-row items-center mb-2">
+                      <Ionicons name="hammer-outline" size={16} color={COLORS.goldPrimary} />
+                      <Text className="text-gold-400 font-bold text-sm ml-2">Bidding is Open!</Text>
+                    </View>
+                    <Text className="text-neutral-300 text-xs">
+                      Place your bid in the reverse auction. Lowest bidder wins the full pool.
+                    </Text>
+                  </View>
+                  <Button
+                    label="Place Your Bid Now"
+                    variant="gold"
+                    onPress={() => router.push(`/member/committee/${id}/bid` as any)}
+                    icon={<Ionicons name="hammer-outline" size={18} color="#fff" />}
+                  />
+                </View>
+              ) : myMembership && !userHasWon ? (
                 <View>
                   <Text className="text-neutral-400 text-xs font-semibold mb-2">PLACE YOUR BID (Payout Request)</Text>
                   <View className="flex-row gap-3">
@@ -853,7 +895,8 @@ export default function CommitteeDetail() {
             </View>
           )}
         </View>
-      )}
+        );
+      })()}
 
       {/* Payout Cycle History */}
       <Text className="text-white text-base font-bold mb-3">Payout & Dividend History</Text>

@@ -2,7 +2,7 @@
 // Kometi Wallet Management, balance ledger and transactions ledger.
 
 import React, { useState, useEffect } from "react";
-import { View, Text, FlatList, TouchableOpacity, RefreshControl, Alert } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, RefreshControl, Alert, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useWalletStore } from "../../../stores/wallet.store";
 import { formatINR } from "../../../utils/currency";
@@ -12,13 +12,24 @@ import Button from "../../../components/ui/Button";
 import EmptyState from "../../../components/ui/EmptyState";
 import ScreenHeader from "../../../components/shared/ScreenHeader";
 import { AmountInput } from "../../../components/ui/AmountInput";
+import { openRazorpayCheckout, loadRazorpayScript } from "../../../utils/razorpay";
+import { useAuthStore } from "../../../stores/auth.store";
 
 export default function Wallet() {
-  const { balancePaise, transactions, isLoading, fetchWalletData, topupWallet } = useWalletStore();
+  const { balancePaise, transactions, isLoading, fetchWalletData, topupWallet, verifyTopupPayment } = useWalletStore();
+  const currentUser = useAuthStore((s: any) => s.user);
   const [refreshing, setRefreshing] = useState(false);
   const [topupAmount, setTopupAmount] = useState<bigint>(0n);
   const [showTopupInput, setShowTopupInput] = useState(false);
   const [topupLoading, setTopupLoading] = useState(false);
+  const [scriptReady, setScriptReady] = useState<boolean | null>(null);
+
+  // Pre-load Razorpay script on mount (web only)
+  React.useEffect(() => {
+    if (Platform.OS === "web") {
+      loadRazorpayScript().then(setScriptReady);
+    }
+  }, []);
 
   const loadData = async () => {
     setRefreshing(true);
@@ -37,19 +48,75 @@ export default function Wallet() {
       return;
     }
 
+    const amountPaise = Number(topupAmount);
+    if (amountPaise < 100) {
+      Alert.alert("Minimum Amount", "Minimum top-up amount is ₹1.");
+      return;
+    }
+
     try {
       setTopupLoading(true);
-      await topupWallet(topupAmount);
-      Alert.alert("Success", `Added ${formatINR(topupAmount)} to your wallet successfully.`);
-      setTopupAmount(0n);
-      setShowTopupInput(false);
-      loadData();
+
+      // 1. Create Razorpay order from backend
+      const orderData = await topupWallet(amountPaise);
+
+      // 2. Open Razorpay Checkout on web
+      if (Platform.OS === "web") {
+        await openRazorpayCheckout({
+          key: orderData.razorpayKeyId,
+          amount: orderData.amount,
+          currency: orderData.currency,
+          name: "Kometi",
+          description: `Add ${formatINR(topupAmount)} to Wallet`,
+          order_id: orderData.orderId,
+          prefill: {
+            name: currentUser?.name || "",
+            email: currentUser?.email || "",
+            contact: currentUser?.phone || "",
+          },
+          theme: { color: "#6f5eff" },
+          handler: async (response) => {
+            // 3. Verify payment on backend
+            try {
+              await verifyTopupPayment(
+                response.razorpay_order_id,
+                response.razorpay_payment_id,
+                response.razorpay_signature
+              );
+              Alert.alert("Success", `Added ${formatINR(topupAmount)} to your wallet successfully.`);
+              setTopupAmount(0n);
+              setShowTopupInput(false);
+              loadData();
+            } catch (verifyErr: any) {
+              Alert.alert(
+                "Payment Received",
+                "Your payment was successful but verification failed. Please contact support if the issue persists."
+              );
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              Alert.alert("Payment Cancelled", "You cancelled the payment. No amount was charged.");
+              setTopupLoading(false);
+            },
+          },
+        });
+      } else {
+        // Mobile fallback — show manual UPI instruction
+        Alert.alert(
+          "Web Only",
+          "Wallet top-up via Razorpay is currently supported on web. Please use the web app to add funds."
+        );
+      }
     } catch (err: any) {
       Alert.alert("Top-up Failed", err.message || "An error occurred during payment.");
     } finally {
       setTopupLoading(false);
     }
   };
+
+  const isMobile = Platform.OS !== "web";
+  const isScriptLoading = Platform.OS === "web" && scriptReady === null;
 
   return (
     <View className="flex-1 bg-surface-950 px-4">
@@ -124,14 +191,35 @@ export default function Wallet() {
                     </TouchableOpacity>
                   </View>
                   <View className="mt-5">
-                    <Button
-                      label="Proceed to Pay"
-                      onPress={handleTopup}
-                      variant="gold"
-                      isLoading={topupLoading}
-                      disabled={topupAmount <= 0n || topupLoading}
-                    />
+                    {isMobile ? (
+                      <TouchableOpacity
+                        disabled={topupLoading}
+                        className="bg-surface-card border border-brand-primary/20 rounded-xl h-14 items-center justify-center flex-row"
+                        onPress={() =>
+                          Alert.alert(
+                            "Use Web App",
+                            "Wallet top-up is available on the web app. Please visit kometi.app to add funds."
+                          )
+                        }
+                      >
+                        <Ionicons name="phone-portrait-outline" size={18} color={COLORS.brandPrimary} />
+                        <Text className="text-brand-400 font-bold text-sm ml-2">View on Web to Pay</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <Button
+                        label={topupLoading ? "Processing..." : `Pay ${formatINR(topupAmount)}`}
+                        variant="gold"
+                        onPress={handleTopup}
+                        isLoading={topupLoading}
+                        disabled={topupAmount <= 0n || topupLoading || scriptReady === false}
+                      />
+                    )}
                   </View>
+                  {Platform.OS === "web" && scriptReady === false && (
+                    <Text className="text-danger-400 text-[10px] text-center mt-2">
+                      Failed to load payment gateway. Check your network.
+                    </Text>
+                  )}
                 </View>
               </Card>
             )}

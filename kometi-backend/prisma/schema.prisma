@@ -112,6 +112,9 @@ model User {
   refreshTokens   RefreshToken[]
   joinRequests    JoinRequest[]
   reviewedJoinRequests JoinRequest[] @relation("ReviewedBy")
+  savedPaymentMethods SavedPaymentMethod[]
+  payoutRequestsRequested PayoutRequest[] @relation("PayoutRequestRequestedBy")
+  payoutRequestsApproved  PayoutRequest[] @relation("PayoutRequestApprovedBy")
 
   @@index([phone])
   @@map("users")
@@ -184,6 +187,8 @@ model Committee {
   monthlyContributions  MonthlyContribution[]
   fundDisbursements     FundDisbursement[]
   memberDistributions   MemberDistribution[]
+  paymentTransactions   PaymentTransaction[]
+  payoutRequests        PayoutRequest[]
 
   @@index([organizerId, status])
   @@index([inviteCode])
@@ -207,6 +212,8 @@ model CommitteeMember {
   monthlyContributions  MonthlyContribution[]
   fundDisbursements     FundDisbursement[]
   memberDistributions   MemberDistribution[]
+  paymentTransactions   PaymentTransaction[]
+  payoutRequests        PayoutRequest[]
 
   @@unique([committeeId, userId])
   @@unique([committeeId, slotNumber])
@@ -415,6 +422,8 @@ model CommitteeMonth {
   monthlyContributions MonthlyContribution[]
   fundDisbursements    FundDisbursement[]
   memberDistributions  MemberDistribution[]
+  paymentTransactions  PaymentTransaction[]
+  payoutRequests       PayoutRequest[]
 
   @@unique([committeeId, monthNumber])
   @@index([committeeId])
@@ -454,9 +463,13 @@ model MonthlyContribution {
   committee       Committee       @relation(fields: [committeeId], references: [id], onDelete: Cascade)
   committeeMonth  CommitteeMonth  @relation(fields: [monthId], references: [id], onDelete: Cascade)
   committeeMember CommitteeMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  paymentTransaction PaymentTransaction? @relation(fields: [paymentTransactionId], references: [id], onDelete: SetNull)
+
+  paymentTransactionId String? @map("payment_transaction_id")
 
   @@unique([monthId, memberId])
   @@index([committeeId, monthId])
+  @@index([paymentTransactionId])
   @@map("monthly_contributions")
 }
 
@@ -504,6 +517,42 @@ enum JoinRequestStatus {
   REJECTED
 }
 
+enum PaymentMethodType {
+  upi
+  bank_account
+  card
+}
+
+enum RazorpayTxType {
+  contribution
+  late_fee
+  payout
+  refund
+}
+
+enum RazorpayTxStatus {
+  created
+  attempted
+  paid
+  failed
+  refunded
+}
+
+enum PayoutRequestType {
+  bid_winner
+  lottery_winner
+  monthly_distribution
+}
+
+enum PayoutRequestStatus {
+  pending
+  approved
+  processing
+  completed
+  failed
+  rejected
+}
+
 model JoinRequest {
   id            String            @id @default(cuid())
   committeeId   String
@@ -522,4 +571,114 @@ model JoinRequest {
   @@index([committeeId, status])
   @@index([userId])
   @@map("join_requests")
+}
+
+model SavedPaymentMethod {
+  id                      String            @id @default(cuid())
+  userId                  String
+  razorpayContactId       String?           @map("razorpay_contact_id")
+  razorpayFundAccountId   String?           @map("razorpay_fund_account_id")
+  methodType              PaymentMethodType @map("method_type")
+  upiId                   String?           @map("upi_id")
+  bankAccountNumber       String?           @map("bank_account_number")  // Encrypted
+  ifscCode                String?           @map("ifsc_code")
+  accountHolderName       String?           @map("account_holder_name")
+  isDefault               Boolean           @default(false) @map("is_default")
+  isVerified              Boolean           @default(false) @map("is_verified")
+  createdAt               DateTime          @default(now()) @map("created_at")
+
+  user                    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("saved_payment_methods")
+}
+
+model PaymentTransaction {
+  id                    String           @id @default(dbgenerated("gen_random_uuid()::text"))
+  committeeId           String           @map("committee_id")
+  monthId               String           @map("month_id")
+  memberId              String           @map("member_id")
+  transactionType       RazorpayTxType   @map("transaction_type")
+  razorpayOrderId       String?          @map("razorpay_order_id")
+  razorpayPaymentId     String?          @map("razorpay_payment_id")
+  razorpaySignature     String?          @map("razorpay_signature")
+  amount                BigInt           @map("amount")
+  currency              String           @default("INR") @map("currency")
+  status                RazorpayTxStatus @default(created) @map("status")
+  failureReason         String?          @map("failure_reason")
+  createdAt             DateTime         @default(now()) @map("created_at")
+  paidAt                DateTime?        @map("paid_at")
+
+  committee             Committee        @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  committeeMonth        CommitteeMonth   @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  committeeMember       CommitteeMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  monthlyContributions  MonthlyContribution[]
+
+  @@index([committeeId])
+  @@index([monthId])
+  @@index([memberId])
+  @@index([razorpayOrderId])
+  @@index([razorpayPaymentId])
+  @@index([status])
+  @@map("payment_transactions")
+}
+
+model PayoutRequest {
+  id                      String              @id @default(dbgenerated("gen_random_uuid()::text"))
+  committeeId             String              @map("committee_id")
+  monthId                 String              @map("month_id")
+  memberId                String              @map("member_id")
+  requestedBy             String              @map("requested_by")
+  amount                  BigInt              @map("amount")
+  razorpayPayoutId        String?             @map("razorpay_payout_id")
+  payoutType              PayoutRequestType   @map("payout_type")
+  status                  PayoutRequestStatus @default(pending) @map("status")
+  approvedBy              String?             @map("approved_by")
+  approvedAt              DateTime?           @map("approved_at")
+  razorpayFundAccountId   String?             @map("razorpay_fund_account_id")
+  failureReason           String?             @map("failure_reason")
+  createdAt               DateTime            @default(now()) @map("created_at")
+  completedAt             DateTime?           @map("completed_at")
+
+  committee               Committee           @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  committeeMonth          CommitteeMonth      @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  committeeMember         CommitteeMember     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  requestedByUser         User                @relation("PayoutRequestRequestedBy", fields: [requestedBy], references: [id], onDelete: Cascade)
+  approvedByUser          User?               @relation("PayoutRequestApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+
+  @@index([committeeId])
+  @@index([monthId])
+  @@index([memberId])
+  @@index([razorpayPayoutId])
+  @@index([status])
+  @@map("payout_requests")
+}
+
+enum WalletTopupStatus {
+  created
+  attempted
+  completed
+  failed
+  refunded
+}
+
+model WalletTopupOrder {
+  id                    String            @id @default(uuid())
+  userId                String            @map("user_id")
+  razorpayOrderId       String            @unique @map("razorpay_order_id")
+  razorpayPaymentId     String?           @map("razorpay_payment_id")
+  razorpaySignature     String?           @map("razorpay_signature")
+  amount                BigInt            @map("amount")
+  currency              String            @default("INR") @map("currency")
+  status                WalletTopupStatus @default(created) @map("status")
+  failureReason         String?           @map("failure_reason")
+  createdAt             DateTime          @default(now()) @map("created_at")
+  completedAt           DateTime?         @map("completed_at")
+
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([razorpayOrderId])
+  @@index([status])
+  @@map("wallet_topup_orders")
 }

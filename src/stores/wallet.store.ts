@@ -21,7 +21,8 @@ interface WalletState {
   setLoading:         (v: boolean) => void;
   setTransacting:     (v: boolean) => void;
   fetchWalletData:    () => Promise<void>;
-  topupWallet:        (amountPaise: bigint | number) => Promise<void>;
+  topupWallet:        (amountPaise: number) => Promise<{ orderId: string; amount: number; currency: string; razorpayKeyId: string }>;
+  verifyTopupPayment: (orderId: string, paymentId: string, signature: string) => Promise<void>;
   reset:              () => void;
 }
 
@@ -81,7 +82,20 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   topupWallet: async (amountPaise) => {
     set({ isTransacting: true });
     try {
-      await walletApi.topup({ amountPaise: Number(amountPaise), paymentMethod: "UPI" });
+      const orderRes = await walletApi.createTopupOrder(amountPaise);
+      return orderRes.data.data;
+    } catch (err) {
+      console.error("[WalletStore] topupWallet failed:", err);
+      throw err;
+    } finally {
+      set({ isTransacting: false });
+    }
+  },
+
+  verifyTopupPayment: async (orderId, paymentId, signature) => {
+    try {
+      await walletApi.verifyTopup({ orderId, paymentId, signature });
+      // Refresh wallet data after successful topup
       const [walletRes, txRes] = await Promise.all([
         walletApi.getWallet(),
         walletApi.getTransactions(),
@@ -92,10 +106,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         transactions: txRes.data.data,
       });
     } catch (err) {
-      console.error("[WalletStore] topupWallet failed:", err);
+      console.error("[WalletStore] verifyTopupPayment failed:", err);
       throw err;
-    } finally {
-      set({ isTransacting: false });
     }
   },
 

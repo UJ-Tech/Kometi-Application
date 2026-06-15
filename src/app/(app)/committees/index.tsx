@@ -182,7 +182,14 @@ export default function Committees() {
             >
               <Ionicons name="add" size={24} color={COLORS.brandPrimary} />
             </TouchableOpacity>
-          ) : undefined
+          ) : (
+            <TouchableOpacity
+              onPress={() => router.push("/(auth)/join-committee" as any)}
+              className="w-10 h-10 bg-gold-500/10 border border-gold-500/20 rounded-full items-center justify-center"
+            >
+              <Ionicons name="enter-outline" size={22} color={COLORS.goldPrimary} />
+            </TouchableOpacity>
+          )
         }
         transparent
       />
@@ -198,6 +205,41 @@ export default function Committees() {
           />
         }
         contentContainerStyle={{ paddingBottom: 100, flexGrow: 1 }}
+        ListHeaderComponent={
+          committees.length > 0 && !canOpenCommitteeCreation ? (
+            <TouchableOpacity
+              onPress={() => router.push("/(auth)/join-committee" as any)}
+              activeOpacity={0.8}
+              style={{
+                marginBottom: 16, borderRadius: 14, overflow: "hidden",
+                borderWidth: 1.5, borderColor: "rgba(245,158,11,0.25)",
+                backgroundColor: "rgba(245,158,11,0.06)",
+              }}
+            >
+              <View style={{
+                flexDirection: "row", alignItems: "center",
+                paddingHorizontal: 16, paddingVertical: 14,
+              }}>
+                <View style={{
+                  width: 40, height: 40, borderRadius: 12,
+                  backgroundColor: "rgba(245,158,11,0.15)",
+                  alignItems: "center", justifyContent: "center", marginRight: 12,
+                }}>
+                  <Ionicons name="enter-outline" size={20} color={COLORS.goldPrimary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: "#fbbf24", fontSize: 14, fontWeight: "700" }}>
+                    Join Another Committee
+                  </Text>
+                  <Text style={{ color: "#a3a3a3", fontSize: 11, marginTop: 2 }}>
+                    Enter an invite code to join a new chit fund
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="rgba(245,158,11,0.4)" />
+              </View>
+            </TouchableOpacity>
+          ) : null
+        }
         ListEmptyComponent={renderEmptyState()}
         renderItem={({ item }) => {
           const totalPot = BigInt(item.installmentAmountPaise) * BigInt(item.totalSlots);

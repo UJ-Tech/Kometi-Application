@@ -10,7 +10,13 @@ const router = Router();
 // Protected installment routes
 router.use(protect as any);
 
+router.get("/", InstallmentsController.list as any);
 router.get("/upcoming", InstallmentsController.upcoming as any);
-router.post("/:id/pay", validate(collectPaymentSchema), InstallmentsController.collect as any);
+router.get("/due-today", InstallmentsController.dueToday as any);
+router.get("/overdue", InstallmentsController.overdue as any);
+router.get("/:id", InstallmentsController.getById as any);
+router.post("/:id/collect", validate(collectPaymentSchema), InstallmentsController.collect as any);
+router.post("/:id/waive", InstallmentsController.waive as any);
+router.post("/bulk-collect", InstallmentsController.bulkCollect as any);
 
 export default router;

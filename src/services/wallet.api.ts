@@ -9,10 +9,18 @@ export interface TransferPayload {
   notes?:         string;
 }
 
-export interface TopupPayload {
-  amountPaise:    number;
-  paymentMethod:  string;
-  reference?:     string;
+export interface TopupOrderResponse {
+  orderId: string;
+  amount: number;
+  currency: string;
+  razorpayKeyId: string;
+  topupOrderId: string;
+}
+
+export interface VerifyTopupPayload {
+  orderId: string;
+  paymentId: string;
+  signature: string;
 }
 
 export const walletApi = {
@@ -28,8 +36,11 @@ export const walletApi = {
   getTransaction: (id: string) =>
     apiClient.get<ApiResponse<Transaction>>(`/wallet/transactions/${id}`),
 
-  topup: (payload: TopupPayload) =>
-    apiClient.post<ApiResponse<Transaction>>("/wallet/topup", payload),
+  createTopupOrder: (amountPaise: number) =>
+    apiClient.post<ApiResponse<TopupOrderResponse>>("/payments/wallet-topup/order", { amountPaise }),
+
+  verifyTopup: (payload: VerifyTopupPayload) =>
+    apiClient.post<ApiResponse<{ success: boolean; message: string }>>("/payments/wallet-topup/verify", payload),
 
   transfer: (payload: TransferPayload) =>
     apiClient.post<ApiResponse<{ debit: Transaction; credit: Transaction }>>("/wallet/transfer", payload),
