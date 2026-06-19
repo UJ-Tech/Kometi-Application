@@ -8,6 +8,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
+  Platform,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,6 +43,14 @@ export default function OrganiserMonthDetail() {
   const [refreshing, setRefreshing] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
 
+  const notify = async (title: string, message: string) => {
+    if (Platform.OS === "web") {
+      window.alert(`${title}\n\n${message}`);
+    } else {
+      Alert.alert(title, message);
+    }
+  };
+
   const loadData = async () => {
     if (!isValid) return;
     try {
@@ -53,7 +62,7 @@ export default function OrganiserMonthDetail() {
       setMonth(monthRes.data.data);
     } catch (err) {
       console.error("[OrganiserMonthDetail] Failed to load:", err);
-      Alert.alert("Error", "Failed to load month details");
+      await notify("Error", "Failed to load month details");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -65,7 +74,7 @@ export default function OrganiserMonthDetail() {
       loadData();
     } else {
       setLoading(false);
-      Alert.alert("Error", "Invalid committee or month ID");
+      notify("Error", "Invalid committee or month ID");
       router.back();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -76,31 +85,38 @@ export default function OrganiserMonthDetail() {
     loadData();
   };
 
-  const handleResolveMonth = () => {
-    Alert.alert(
+  const confirmAction = async (title: string, message: string, confirmLabel = "Confirm") => {
+    if (Platform.OS === "web") {
+      const confirmed = window.confirm(`${title}\n\n${message}`);
+      return confirmed;
+    }
+    return new Promise<boolean>((resolve) => {
+      Alert.alert(title, message, [
+        { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+        { text: confirmLabel, style: "destructive", onPress: () => resolve(true) },
+      ]);
+    });
+  };
+
+  const handleResolveMonth = async () => {
+    const confirmed = await confirmAction(
       "Resolve Month",
       "Are you sure you want to close bidding and resolve this month? The lowest bid will win, or if there are no bids, a random lottery will be drawn. This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Confirm & Resolve",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setIsResolving(true);
-              await committeesApi.resolveMonth(id, monthId);
-              Alert.alert("Success", "Month resolved successfully!");
-              loadData(); // Reload to show the resolved summary
-            } catch (err: any) {
-              const msg = err.response?.data?.message || err.message || "Failed to resolve month";
-              Alert.alert("Error", msg);
-            } finally {
-              setIsResolving(false);
-            }
-          },
-        },
-      ]
+      "Confirm & Resolve"
     );
+    if (!confirmed) return;
+
+    try {
+      setIsResolving(true);
+      await committeesApi.resolveMonth(id, monthId);
+      await confirmAction("Success", "Month resolved successfully!", "OK");
+      loadData();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || "Failed to resolve month";
+      await confirmAction("Error", msg, "OK");
+    } finally {
+      setIsResolving(false);
+    }
   };
 
   // Guard: invalid URL params

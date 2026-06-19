@@ -48,6 +48,15 @@ export const committeesApi = {
   addMember: (id: string, userId: string, slotNumber?: number) =>
     apiClient.post<ApiResponse<CommitteeMember>>(`/committees/${id}/members`, { userId, slotNumber }),
 
+  adjustCommitteeSize: (id: string, newTotalSlots: number) =>
+    apiClient.post<ApiResponse<{
+      success: boolean;
+      previousTotalSlots: number;
+      newTotalSlots: number;
+      filledSlots: number;
+      isNowFull: boolean;
+    }>>(`/committees/${id}/adjust-size`, { newTotalSlots }),
+
   removeMember: (id: string, memberId: string) =>
     apiClient.delete<ApiResponse<null>>(`/committees/${id}/members/${memberId}`),
 
@@ -62,9 +71,6 @@ export const committeesApi = {
 
   releasePayout: (id: string, cycleNo: number) =>
     apiClient.post<ApiResponse<null>>(`/committees/${id}/payout`, { cycleNo }),
-
-  resolveAuction: (id: string, cycleNo: number) =>
-    apiClient.post<ApiResponse<{ winnerId: string; payoutAmtPaise: number; dividendPerMemberPaise: number; isDraw: boolean }>>(`/committees/${id}/resolve-auction`, { cycleNo }),
 
   // ─── Join by Invite Code ─────────────────────────────────────────────────
   joinByCode: (inviteCode: string) =>
@@ -112,7 +118,7 @@ export const committeesApi = {
   resolveMonth: (committeeId: string, monthId: string) =>
     apiClient.post<ApiResponse<any>>(`/committees/${committeeId}/months/${monthId}/resolve`),
 
-  // Phase 2 — Member bid placement
+  // ─── Member Bid Placement ────────────────────────────────────────────────
   placeBid: (committeeId: string, monthId: string, memberId: string, bidAmountPaise: number) =>
     apiClient.post<ApiResponse<any>>(`/committees/${committeeId}/months/${monthId}/bids`, {
       memberId,

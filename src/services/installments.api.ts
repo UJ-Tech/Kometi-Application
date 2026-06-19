@@ -34,7 +34,7 @@ export const installmentsApi = {
 
   getByCommittee: (committeeId: string, params?: InstallmentListParams) =>
     apiClient.get<ApiResponse<Installment[]> & { meta: PaginationMeta }>(
-      `/committees/${committeeId}/installments`, { params }
+      `/installments`, { params: { ...params, committeeId } }
     ),
 
   getByMember: (userId: string, params?: InstallmentListParams) =>

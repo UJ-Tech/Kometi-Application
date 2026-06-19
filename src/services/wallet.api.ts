@@ -1,6 +1,6 @@
 // src/services/wallet.api.ts
 import apiClient from "./api.client";
-import type { ApiResponse, Wallet, Transaction, PaginationMeta } from "../types";
+import type { ApiResponse, Wallet, Transaction, PaginationMeta, Withdrawal } from "../types";
 
 export interface TransferPayload {
   toUserId:       string;
@@ -50,4 +50,27 @@ export const walletApi = {
 
   getStatement: (month: string) =>   // "2026-05"
     apiClient.get<ApiResponse<{ url: string }>>(`/wallet/statement?month=${month}`),
+
+  // ─── Withdrawals ──────────────────────────────────────────────────────
+
+  requestWithdrawal: (payload: {
+    committeeId: string;
+    amount: number;
+    paymentMethodId: string;
+  }) =>
+    apiClient.post<ApiResponse<Withdrawal>>("/wallet/withdrawals", payload),
+
+  getWithdrawals: (params?: {
+    committeeId?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }) =>
+    apiClient.get<ApiResponse<Withdrawal[]> & { meta: PaginationMeta }>("/wallet/withdrawals", { params }),
+
+  getWithdrawal: (id: string) =>
+    apiClient.get<ApiResponse<Withdrawal>>(`/wallet/withdrawals/${id}`),
+
+  cancelWithdrawal: (id: string) =>
+    apiClient.post<ApiResponse<Withdrawal>>(`/wallet/withdrawals/${id}/cancel`),
 };

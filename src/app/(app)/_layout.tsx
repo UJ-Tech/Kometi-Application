@@ -140,6 +140,12 @@ export default function AppLayout() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="wallet/withdraw"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

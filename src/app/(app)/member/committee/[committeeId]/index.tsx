@@ -152,15 +152,20 @@ export default function MemberCommitteeOverview() {
   let myCurrentDistribution = 0;
   if (currentMonthDetail && myMemberId) {
     const dist = (currentMonthDetail.memberDistributions || []).find((d: any) => d.memberId === myMemberId);
-    if (dist) myCurrentDistribution = (dist.distributionAmount || 0) + (dist.interestShare || 0);
+    if (dist) myCurrentDistribution = dist.distributionAmount || 0;
   }
 
   // Total received across all months (from distributions loaded so far)
   let myTotalReceived = 0;
-  // We only have current month detail; for others, use the month's perMemberDistribution if available
+  // For each completed month, every member gets perMemberDistribution.
+  // If the current user WON a month, they also receive winningBidAmount - interestAmount.
   months.forEach((m: any) => {
     if (m.perMemberDistribution) {
       myTotalReceived += m.perMemberDistribution;
+    }
+    if (m.status === "completed" && m.winnerMemberId === myMemberId) {
+      const netBidPayout = (m.winningBidAmount || 0) - (m.interestAmount || 0);
+      myTotalReceived += netBidPayout;
     }
   });
 
@@ -306,10 +311,31 @@ export default function MemberCommitteeOverview() {
               <Text className="text-neutral-500 text-xs mt-2">No months created yet</Text>
             </View>
           ) : latestMonthStatus === "pending" ? (
-            <View className="items-center py-4">
-              <Ionicons name="time-outline" size={28} color={COLORS.warning.light} />
-              <Text className="text-white font-bold text-sm mt-2">Bidding Opens Soon</Text>
-              <Text className="text-neutral-500 text-xs mt-1">Month #{currentMonth.monthNumber} is being prepared</Text>
+            <View>
+              <View className="flex-row items-center justify-between mb-3">
+                <Badge label="Contribution Due" variant="warning" size="md" />
+                <Text className="text-neutral-500 text-[10px]">Month #{currentMonth.monthNumber}</Text>
+              </View>
+
+              {/* Projected Pool & Distribution */}
+              <View className="bg-surface-950 rounded-xl p-3 mb-2">
+                <View className="flex-row justify-between items-center mb-2">
+                  <Text className="text-neutral-400 text-[10px] uppercase font-bold">Total Pool</Text>
+                  <Text className="text-white font-bold text-sm">{F(currentMonth.totalPool)}</Text>
+                </View>
+                <View className="flex-row justify-between items-center mb-2">
+                  <Text className="text-neutral-400 text-[10px] uppercase font-bold">Your Contribution</Text>
+                  <Text className="text-white font-bold text-sm">{F(installment)}</Text>
+                </View>
+                <View className="flex-row justify-between items-center">
+                  <Text className="text-neutral-400 text-[10px] uppercase font-bold">Est. Distribution/Member</Text>
+                  <Text className="text-success-400 font-bold text-sm">+{F(currentMonth.perMemberDistribution)}</Text>
+                </View>
+              </View>
+
+              <Text className="text-neutral-500 text-[10px] text-center mt-1">
+                Pay your contribution to unlock bidding
+              </Text>
             </View>
           ) : latestMonthStatus === "bidding_open" ? (
             <View>

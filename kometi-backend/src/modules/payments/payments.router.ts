@@ -9,6 +9,7 @@ import {
   verifyPaymentSchema,
   createWalletTopupOrderSchema,
   verifyWalletTopupSchema,
+  payFromWalletSchema,
 } from "./payments.validator";
 
 const router = Router();
@@ -45,6 +46,13 @@ router.post(
   "/verify-payment",
   validate(verifyPaymentSchema),
   PaymentsController.verifyAndCapturePayment as any
+);
+
+// ─── Pay Contribution from Wallet ─────────────────────────────────────
+router.post(
+  "/pay-from-wallet",
+  validate(payFromWalletSchema),
+  PaymentsController.payFromWallet as any
 );
 
 export default router;

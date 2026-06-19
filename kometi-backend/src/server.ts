@@ -14,6 +14,7 @@ import membersRouter from "./modules/members/members.router";
 import committeesRouter from "./modules/committees/committees.router";
 import installmentsRouter from "./modules/installments/installments.router";
 import walletRouter from "./modules/wallet/wallet.router";
+import withdrawalRouter from "./modules/wallet/withdrawal.router";
 import adminRouter from "./modules/admin/admin.router";
 import paymentsRouter from "./modules/payments/payments.router";
 
@@ -37,6 +38,7 @@ app.use("/api/v1/members", membersRouter);
 app.use("/api/v1/committees", committeesRouter);
 app.use("/api/v1/installments", installmentsRouter);
 app.use("/api/v1/wallet", walletRouter);
+app.use("/api/v1/wallet/withdrawals", withdrawalRouter);
 app.use("/api/v1/payments", paymentsRouter);
 app.use("/api/v1/admin", adminRouter);
 

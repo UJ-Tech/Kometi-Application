@@ -3,7 +3,7 @@ import { Router } from "express";
 import { CommitteesController } from "./committees.controller";
 import { protect, authorize } from "../../middleware/auth.middleware";
 import { validate } from "../../middleware/validate";
-import { createCommitteeSchema, addMemberSchema, joinByCodeSchema } from "./committees.validator";
+import { createCommitteeSchema, addMemberSchema, joinByCodeSchema, adjustCommitteeSizeSchema } from "./committees.validator";
 
 import committeeMonthsRouter from "../committeeMonths/committeeMonths.router";
 
@@ -33,6 +33,13 @@ router.post(
 );
 
 router.post(
+  "/:id/adjust-size",
+  authorize("ADMIN", "ORGANIZER") as any,
+  validate(adjustCommitteeSizeSchema),
+  CommitteesController.adjustCommitteeSize as any
+);
+
+router.post(
   "/:id/start",
   authorize("ADMIN", "ORGANIZER") as any,
   CommitteesController.start as any
@@ -41,12 +48,6 @@ router.post(
 router.post(
   "/:id/bid",
   CommitteesController.submitBid as any
-);
-
-router.post(
-  "/:id/resolve-auction",
-  authorize("ADMIN", "ORGANIZER", "MANAGER", "ACCOUNTANT", "AGENT") as any,
-  CommitteesController.resolveAuction as any
 );
 
 // Join by invite code (any authenticated member)

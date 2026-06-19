@@ -134,4 +134,18 @@ export class PaymentsController {
       next(err);
     }
   }
+
+  // ─── Pay contribution from wallet ──────────────────────────────────────
+  static async payFromWallet(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) throw new Error("Unauthorized");
+
+      const { committeeId, monthId, memberId } = req.body;
+      const result = await PaymentsService.payFromWallet(committeeId, monthId, memberId);
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
 }

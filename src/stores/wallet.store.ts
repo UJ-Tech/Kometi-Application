@@ -1,12 +1,13 @@
 // src/stores/wallet.store.ts
 import { create } from "zustand";
-import type { Wallet, Transaction, PaginationMeta } from "../types";
+import type { Wallet, Transaction, PaginationMeta, Withdrawal } from "../types";
 import { walletApi } from "../services/wallet.api";
 
 interface WalletState {
   wallet:       Wallet | null;
   balancePaise: number;
   transactions: Transaction[];
+  withdrawals:  Withdrawal[];
   isLoading:    boolean;
   isTransacting:boolean;
   hasMore:      boolean;
@@ -23,6 +24,9 @@ interface WalletState {
   fetchWalletData:    () => Promise<void>;
   topupWallet:        (amountPaise: number) => Promise<{ orderId: string; amount: number; currency: string; razorpayKeyId: string }>;
   verifyTopupPayment: (orderId: string, paymentId: string, signature: string) => Promise<void>;
+  fetchWithdrawals:   (committeeId?: string) => Promise<void>;
+  requestWithdrawal:  (committeeId: string, amountPaise: number, paymentMethodId: string) => Promise<Withdrawal>;
+  cancelWithdrawal:   (withdrawalId: string) => Promise<void>;
   reset:              () => void;
 }
 
@@ -34,6 +38,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   wallet:        null,
   balancePaise:  0,
   transactions:  [],
+  withdrawals:   [],
   isLoading:     false,
   isTransacting: false,
   hasMore:       false,
@@ -111,8 +116,73 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     }
   },
 
+  fetchWithdrawals: async (committeeId?: string) => {
+    try {
+      const res = await walletApi.getWithdrawals({
+        committeeId,
+        limit: 50,
+      });
+      set({ withdrawals: res.data.data });
+    } catch (err) {
+      console.error("[WalletStore] fetchWithdrawals failed:", err);
+    }
+  },
+
+  requestWithdrawal: async (committeeId, amountPaise, paymentMethodId) => {
+    set({ isTransacting: true });
+    try {
+      const res = await walletApi.requestWithdrawal({
+        committeeId,
+        amount: amountPaise,
+        paymentMethodId,
+      });
+      // Refresh wallet data after withdrawal request
+      const [walletRes, txRes, wdRes] = await Promise.all([
+        walletApi.getWallet(),
+        walletApi.getTransactions(),
+        walletApi.getWithdrawals(),
+      ]);
+      set({
+        wallet: walletRes.data.data,
+        balancePaise: walletRes.data.data.balancePaise,
+        transactions: txRes.data.data,
+        withdrawals: wdRes.data.data,
+      });
+      return res.data.data;
+    } catch (err) {
+      console.error("[WalletStore] requestWithdrawal failed:", err);
+      throw err;
+    } finally {
+      set({ isTransacting: false });
+    }
+  },
+
+  cancelWithdrawal: async (withdrawalId) => {
+    set({ isTransacting: true });
+    try {
+      await walletApi.cancelWithdrawal(withdrawalId);
+      // Refresh wallet + withdrawals after cancel
+      const [walletRes, txRes, wdRes] = await Promise.all([
+        walletApi.getWallet(),
+        walletApi.getTransactions(),
+        walletApi.getWithdrawals(),
+      ]);
+      set({
+        wallet: walletRes.data.data,
+        balancePaise: walletRes.data.data.balancePaise,
+        transactions: txRes.data.data,
+        withdrawals: wdRes.data.data,
+      });
+    } catch (err) {
+      console.error("[WalletStore] cancelWithdrawal failed:", err);
+      throw err;
+    } finally {
+      set({ isTransacting: false });
+    }
+  },
+
   reset: () => set({
-    wallet: null, balancePaise: 0, transactions: [], isLoading: false,
-    isTransacting: false, hasMore: false, pagination: defaultPagination,
+    wallet: null, balancePaise: 0, transactions: [], withdrawals: [],
+    isLoading: false, isTransacting: false, hasMore: false, pagination: defaultPagination,
   }),
 }));

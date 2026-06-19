@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   TextInput,
+  Platform,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -41,6 +42,14 @@ export default function OrganiserManageTimeline() {
   const [newMonthDate, setNewMonthDate] = useState("");
   const [newMonthResolution, setNewMonthResolution] = useState<"bid_single" | "bid_auction" | "lottery">("bid_auction");
   const [isCreating, setIsCreating] = useState(false);
+
+  const notify = async (title: string, message: string) => {
+    if (Platform.OS === "web") {
+      window.alert(`${title}\n\n${message}`);
+    } else {
+      Alert.alert(title, message);
+    }
+  };
 
   const loadData = useCallback(async () => {
     if (!isValidId) return;
@@ -86,11 +95,11 @@ export default function OrganiserManageTimeline() {
     try {
       setProcessingOpen(monthNumber);
       await committeesApi.openBidding(id, monthNumber);
-      Alert.alert("Success", `Bidding opened for Month ${monthNumber}`);
+      await notify("Success", `Bidding opened for Month ${monthNumber}`);
       loadData();
     } catch (err: any) {
       const msg = err?.message || "Failed to open bidding";
-      Alert.alert("Error", msg);
+      await notify("Error", msg);
     } finally {
       setProcessingOpen(null);
     }
@@ -99,11 +108,11 @@ export default function OrganiserManageTimeline() {
   const handleCreateMonth = async () => {
     const monthNum = Number(newMonthNumber);
     if (!monthNum || monthNum < 1) {
-      Alert.alert("Invalid Input", "Month number must be at least 1.");
+      await notify("Invalid Input", "Month number must be at least 1.");
       return;
     }
     if (!newMonthDate.trim()) {
-      Alert.alert("Invalid Input", "Please enter a month date (YYYY-MM-DD).");
+      await notify("Invalid Input", "Please enter a month date (YYYY-MM-DD).");
       return;
     }
 
@@ -114,13 +123,13 @@ export default function OrganiserManageTimeline() {
         monthDate: newMonthDate.trim(),
         resolutionType: newMonthResolution,
       });
-      Alert.alert("Success", `Month ${monthNum} created successfully!`);
+      await notify("Success", `Month ${monthNum} created successfully!`);
       setNewMonthNumber("");
       setNewMonthDate("");
       setShowCreateMonth(false);
       loadData();
     } catch (err: any) {
-      Alert.alert("Error", err?.message || "Failed to create month");
+      await notify("Error", err?.message || "Failed to create month");
     } finally {
       setIsCreating(false);
     }

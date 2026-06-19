@@ -90,51 +90,56 @@ model User {
   name            String
   email           String?   @unique
   passwordHash    String?
-  pin             String?                        // 6-digit hashed MPIN
+  pin             String? // 6-digit hashed MPIN
   role            UserRole  @default(MEMBER)
   isActive        Boolean   @default(true)
   kycStatus       KYCStatus @default(PENDING)
   profileImageUrl String?
-  deviceTokens    String[]                       // FCM tokens for push
+  deviceTokens    String[] // FCM tokens for push
   lastLoginAt     DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
   // Relations
-  kycDocument     KYCDocument?
-  wallet          Wallet?
-  memberOf        CommitteeMember[]
-  organizedCommittees Committee[] @relation("OrganizerCommittees")
-  installmentsPaid  Installment[]
-  transactions    Transaction[]
-  notifications   Notification[]
-  auditLogs       AuditLog[]
-  refreshTokens   RefreshToken[]
-  joinRequests    JoinRequest[]
-  reviewedJoinRequests JoinRequest[] @relation("ReviewedBy")
-  savedPaymentMethods SavedPaymentMethod[]
-  payoutRequestsRequested PayoutRequest[] @relation("PayoutRequestRequestedBy")
-  payoutRequestsApproved  PayoutRequest[] @relation("PayoutRequestApprovedBy")
+  kycDocument             KYCDocument?
+  wallet                  Wallet?
+  memberOf                CommitteeMember[]
+  organizedCommittees     Committee[]           @relation("OrganizerCommittees")
+  installmentsPaid        Installment[]
+  transactions            Transaction[]
+  notifications           Notification[]
+  auditLogs               AuditLog[]
+  refreshTokens           RefreshToken[]
+  joinRequests            JoinRequest[]
+  reviewedJoinRequests    JoinRequest[]         @relation("ReviewedBy")
+  savedPaymentMethods     SavedPaymentMethod[]
+  payoutRequestsRequested PayoutRequest[]       @relation("PayoutRequestRequestedBy")
+  payoutRequestsApproved  PayoutRequest[]       @relation("PayoutRequestApprovedBy")
+  walletLedgerEntries     WalletLedgerEntry[]
+  walletBalancesCaches    WalletBalancesCache[]
+  walletTopupOrders       WalletTopupOrder[]
+  withdrawalRequests      WithdrawalRequest[]
+  ledgerAuditLogs         LedgerAuditLog[]
 
   @@index([phone])
   @@map("users")
 }
 
 model KYCDocument {
-  id           String    @id @default(cuid())
-  userId       String    @unique
-  aadhaarNum   String?                   // Masked: XXXX-XXXX-1234
-  panNum       String?                   // Masked: XXXXXX1234X
-  aadhaarUrl   String?                   // S3 signed URL
-  panUrl       String?
-  selfieUrl    String?
-  status       KYCStatus @default(PENDING)
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  aadhaarNum     String? // Masked: XXXX-XXXX-1234
+  panNum         String? // Masked: XXXXXX1234X
+  aadhaarUrl     String? // S3 signed URL
+  panUrl         String?
+  selfieUrl      String?
+  status         KYCStatus @default(PENDING)
   rejectedReason String?
-  verifiedAt   DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  verifiedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("kyc_documents")
 }
@@ -147,48 +152,51 @@ model RefreshToken {
   isRevoked Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("refresh_tokens")
 }
 
 model Committee {
-  id              String          @id @default(cuid())
-  name            String
-  description     String?
-  organizerId     String
-  inviteCode      String          @unique            // 8-char unique code for members to join
-  status          CommitteeStatus @default(DRAFT)
-  totalSlots      Int                              // e.g. 12 members
-  filledSlots     Int             @default(0)
-  installmentAmountPaise BigInt                   // Amount in paise (avoid float)
-  cycleDurationDays Int                            // e.g. 30 (monthly)
-  startDate       DateTime?
-  endDate         DateTime?
-  nextDueDate     DateTime?
-  currentCycleNo  Int             @default(0)
-  penaltyRatePct  Decimal         @default(0)      // e.g. 2.5%
-  gracePeriodDays Int             @default(3)
-  commissionRatePct Decimal        @default(5.0)    // Default 5%
-  maxDiscountPct    Decimal        @default(30.0)   // Default 30%
-  rules           Json?                            // Custom rules blob
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  id                     String          @id @default(cuid())
+  name                   String
+  description            String?
+  organizerId            String
+  inviteCode             String          @unique // 8-char unique code for members to join
+  status                 CommitteeStatus @default(DRAFT)
+  totalSlots             Int // e.g. 12 members
+  filledSlots            Int             @default(0)
+  installmentAmountPaise BigInt // Amount in paise (avoid float)
+  cycleDurationDays      Int // e.g. 30 (monthly)
+  startDate              DateTime?
+  endDate                DateTime?
+  nextDueDate            DateTime?
+  currentCycleNo         Int             @default(0)
+  penaltyRatePct         Decimal         @default(0) // e.g. 2.5%
+  gracePeriodDays        Int             @default(3)
+  commissionRatePct      Decimal         @default(5.0) // Default 5%
+  maxDiscountPct         Decimal         @default(30.0) // Default 30%
+  rules                  Json? // Custom rules blob
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
 
-  organizer       User            @relation("OrganizerCommittees", fields: [organizerId], references: [id])
-  members         CommitteeMember[]
-  installments    Installment[]
-  payoutCycles    PayoutCycle[]
-  auditLogs             AuditLog[]
-  bids                  Bid[]
-  joinRequests          JoinRequest[]
-  committeeMonths       CommitteeMonth[]
-  monthlyContributions  MonthlyContribution[]
-  fundDisbursements     FundDisbursement[]
-  memberDistributions   MemberDistribution[]
-  paymentTransactions   PaymentTransaction[]
-  payoutRequests        PayoutRequest[]
+  organizer            User                  @relation("OrganizerCommittees", fields: [organizerId], references: [id])
+  members              CommitteeMember[]
+  installments         Installment[]
+  payoutCycles         PayoutCycle[]
+  auditLogs            AuditLog[]
+  bids                 Bid[]
+  joinRequests         JoinRequest[]
+  committeeMonths      CommitteeMonth[]
+  monthlyContributions MonthlyContribution[]
+  fundDisbursements    FundDisbursement[]
+  memberDistributions  MemberDistribution[]
+  paymentTransactions  PaymentTransaction[]
+  payoutRequests       PayoutRequest[]
+  WalletLedgerEntry    WalletLedgerEntry[]
+  WalletBalancesCache  WalletBalancesCache[]
+  WithdrawalRequest    WithdrawalRequest[]
 
   @@index([organizerId, status])
   @@index([inviteCode])
@@ -196,24 +204,24 @@ model Committee {
 }
 
 model CommitteeMember {
-  id            String    @id @default(cuid())
-  committeeId   String
-  userId        String
-  slotNumber    Int                              // 1-based slot in the committee
-  joinedAt      DateTime  @default(now())
-  isActive      Boolean   @default(true)
-  hasReceivedPayout Boolean @default(false)
+  id                String   @id @default(cuid())
+  committeeId       String
+  userId            String
+  slotNumber        Int // 1-based slot in the committee
+  joinedAt          DateTime @default(now())
+  isActive          Boolean  @default(true)
+  hasReceivedPayout Boolean  @default(false)
 
-  committee     Committee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
-  user          User      @relation(fields: [userId], references: [id])
-  installments          Installment[]
-  bids                  Bid[]
-  committeeMonthsWon    CommitteeMonth[]
-  monthlyContributions  MonthlyContribution[]
-  fundDisbursements     FundDisbursement[]
-  memberDistributions   MemberDistribution[]
-  paymentTransactions   PaymentTransaction[]
-  payoutRequests        PayoutRequest[]
+  committee            Committee             @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  user                 User                  @relation(fields: [userId], references: [id])
+  installments         Installment[]
+  bids                 Bid[]
+  committeeMonthsWon   CommitteeMonth[]
+  monthlyContributions MonthlyContribution[]
+  fundDisbursements    FundDisbursement[]
+  memberDistributions  MemberDistribution[]
+  paymentTransactions  PaymentTransaction[]
+  payoutRequests       PayoutRequest[]
 
   @@unique([committeeId, userId])
   @@unique([committeeId, slotNumber])
@@ -222,28 +230,28 @@ model CommitteeMember {
 }
 
 model Installment {
-  id                 String            @id @default(cuid())
-  committeeId        String
-  memberId           String            // CommitteeMember.id
-  userId             String
-  cycleNo            Int
-  amountDuePaise     BigInt
-  amountPaidPaise    BigInt            @default(0)
-  penaltyPaise       BigInt            @default(0)
-  status             InstallmentStatus @default(PENDING)
-  dueDate            DateTime
-  paidAt             DateTime?
-  paymentMethod      PaymentMethod?
-  paymentReference   String?           // UPI txn ID / receipt no
-  collectedById      String?           // Who collected (organizer/agent)
-  notes              String?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
+  id               String            @id @default(cuid())
+  committeeId      String
+  memberId         String // CommitteeMember.id
+  userId           String
+  cycleNo          Int
+  amountDuePaise   BigInt
+  amountPaidPaise  BigInt            @default(0)
+  penaltyPaise     BigInt            @default(0)
+  status           InstallmentStatus @default(PENDING)
+  dueDate          DateTime
+  paidAt           DateTime?
+  paymentMethod    PaymentMethod?
+  paymentReference String? // UPI txn ID / receipt no
+  collectedById    String? // Who collected (organizer/agent)
+  notes            String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
-  committee          Committee         @relation(fields: [committeeId], references: [id])
-  committeeMember    CommitteeMember   @relation(fields: [memberId], references: [id])
-  paidByUser         User              @relation(fields: [userId], references: [id])
-  transaction        Transaction?
+  committee       Committee       @relation(fields: [committeeId], references: [id])
+  committeeMember CommitteeMember @relation(fields: [memberId], references: [id])
+  paidByUser      User            @relation(fields: [userId], references: [id])
+  transaction     Transaction?
 
   @@unique([committeeId, memberId, cycleNo])
   @@index([committeeId, status])
@@ -253,65 +261,65 @@ model Installment {
 }
 
 model PayoutCycle {
-  id            String    @id @default(cuid())
-  committeeId   String
-  cycleNo       Int
-  winnerId      String                  // CommitteeMember.userId
-  winnerSlot    Int
+  id             String    @id @default(cuid())
+  committeeId    String
+  cycleNo        Int
+  winnerId       String // CommitteeMember.userId
+  winnerSlot     Int
   payoutAmtPaise BigInt
-  bidAmountPaise BigInt?                // For AUCTION type
-  payoutDate    DateTime?
-  isCompleted   Boolean   @default(false)
-  transactionId String?   @unique
-  createdAt     DateTime  @default(now())
+  bidAmountPaise BigInt? // For AUCTION type
+  payoutDate     DateTime?
+  isCompleted    Boolean   @default(false)
+  transactionId  String?   @unique
+  createdAt      DateTime  @default(now())
 
-  committee     Committee @relation(fields: [committeeId], references: [id])
+  committee Committee @relation(fields: [committeeId], references: [id])
 
   @@unique([committeeId, cycleNo])
   @@map("payout_cycles")
 }
 
 model Wallet {
-  id              String    @id @default(cuid())
-  userId          String    @unique
-  balancePaise    BigInt    @default(0)
-  reservedPaise   BigInt    @default(0)  // Holds for pending txns
-  currency        String    @default("INR")
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  balancePaise  BigInt   @default(0)
+  reservedPaise BigInt   @default(0) // Holds for pending txns
+  currency      String   @default("INR")
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions    Transaction[]
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
 
   @@map("wallets")
 }
 
 model Transaction {
-  id              String              @id @default(cuid())
-  walletId        String
-  userId          String
-  type            TransactionType
-  category        TransactionCategory
-  status          TransactionStatus   @default(PENDING)
-  amountPaise     BigInt
-  balanceBefore   BigInt              // Snapshot for audit
-  balanceAfter    BigInt
-  description     String
-  referenceId     String?             // installmentId / payoutCycleId
-  referenceType   String?             // "Installment" | "PayoutCycle"
-  paymentMethod   PaymentMethod?
-  externalTxnId  String?             // UPI/Bank reference
-  installmentId   String?             @unique
-  failureReason   String?
-  metadata        Json?
-  idempotencyKey  String              @unique  // Prevent duplicate txns
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  id             String              @id @default(cuid())
+  walletId       String
+  userId         String
+  type           TransactionType
+  category       TransactionCategory
+  status         TransactionStatus   @default(PENDING)
+  amountPaise    BigInt
+  balanceBefore  BigInt // Snapshot for audit
+  balanceAfter   BigInt
+  description    String
+  referenceId    String? // installmentId / payoutCycleId
+  referenceType  String? // "Installment" | "PayoutCycle"
+  paymentMethod  PaymentMethod?
+  externalTxnId  String? // UPI/Bank reference
+  installmentId  String?             @unique
+  failureReason  String?
+  metadata       Json?
+  idempotencyKey String              @unique // Prevent duplicate txns
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 
-  wallet          Wallet              @relation(fields: [walletId], references: [id])
-  user            User                @relation(fields: [userId], references: [id])
-  installment     Installment?        @relation(fields: [installmentId], references: [id])
+  wallet      Wallet       @relation(fields: [walletId], references: [id])
+  user        User         @relation(fields: [userId], references: [id])
+  installment Installment? @relation(fields: [installmentId], references: [id])
 
   @@index([walletId, createdAt])
   @@index([userId, status])
@@ -320,35 +328,35 @@ model Transaction {
 }
 
 model Notification {
-  id          String           @id @default(cuid())
-  userId      String
-  type        NotificationType
-  title       String
-  body        String
-  isRead      Boolean          @default(false)
-  metadata    Json?
-  createdAt   DateTime         @default(now())
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  isRead    Boolean          @default(false)
+  metadata  Json?
+  createdAt DateTime         @default(now())
 
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead])
   @@map("notifications")
 }
 
 model AuditLog {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   actorId     String
-  entity      String    // "Committee" | "Installment" | "Wallet" etc.
+  entity      String // "Committee" | "Installment" | "Wallet" etc.
   entityId    String
-  action      String    // "CREATE" | "UPDATE" | "DELETE" | "PAY"
-  diff        Json?     // Before/after snapshot
+  action      String // "CREATE" | "UPDATE" | "DELETE" | "PAY"
+  diff        Json? // Before/after snapshot
   ipAddress   String?
   userAgent   String?
   committeeId String?
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime @default(now())
 
-  actor       User      @relation(fields: [actorId], references: [id])
-  committee   Committee? @relation(fields: [committeeId], references: [id])
+  actor     User       @relation(fields: [actorId], references: [id])
+  committee Committee? @relation(fields: [committeeId], references: [id])
 
   @@index([actorId, createdAt])
   @@index([entityId, entity])
@@ -358,7 +366,7 @@ model AuditLog {
 model OTPVerification {
   id        String   @id @default(cuid())
   phone     String
-  otp       String                // bcrypt hashed
+  otp       String // bcrypt hashed
   expiresAt DateTime
   attempts  Int      @default(0)
   verified  Boolean  @default(false)
@@ -399,6 +407,51 @@ enum DisbursementType {
   lottery_payout
 }
 
+// ─── Append-Only Wallet Ledger Enums ───────────────────────────────────
+
+enum LedgerEntryType {
+  contribution_made
+  bid_payout
+  distribution_credit
+  interest_charge
+  late_fee_charge
+  withdrawal_debit
+  withdrawal_reversed
+  adjustment_credit
+  adjustment_debit
+}
+
+enum LedgerDirection {
+  credit
+  debit
+}
+
+enum LedgerStatus {
+  confirmed
+  pending
+  reversed
+}
+
+enum LedgerCreatedBy {
+  system
+  organiser
+  admin
+}
+
+enum WithdrawalStatus {
+  requested
+  processing
+  completed
+  failed
+  cancelled
+}
+
+enum LedgerAuditAction {
+  created
+  reversed
+  disputed
+}
+
 model CommitteeMonth {
   id                    String               @id @default(dbgenerated("gen_random_uuid()::text"))
   committeeId           String               @map("committee_id")
@@ -416,14 +469,15 @@ model CommitteeMonth {
   perMemberDistribution BigInt               @default(0) @map("per_member_distribution")
   resolutionType        ResolutionType       @map("resolution_type")
 
-  committee            Committee            @relation(fields: [committeeId], references: [id], onDelete: Cascade)
-  winnerMember         CommitteeMember?     @relation(fields: [winnerMemberId], references: [id])
+  committee            Committee             @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  winnerMember         CommitteeMember?      @relation(fields: [winnerMemberId], references: [id])
   bids                 Bid[]
   monthlyContributions MonthlyContribution[]
   fundDisbursements    FundDisbursement[]
   memberDistributions  MemberDistribution[]
   paymentTransactions  PaymentTransaction[]
   payoutRequests       PayoutRequest[]
+  walletLedgerEntries  WalletLedgerEntry[]
 
   @@unique([committeeId, monthNumber])
   @@index([committeeId])
@@ -449,20 +503,20 @@ model Bid {
 }
 
 model MonthlyContribution {
-  id             String             @id @default(dbgenerated("gen_random_uuid()::text"))
-  committeeId    String             @map("committee_id")
-  monthId        String             @map("month_id")
-  memberId       String             @map("member_id")
-  amountDue      BigInt             @map("amount_due")
-  amountPaid     BigInt             @default(0) @map("amount_paid")
-  placedAt       DateTime?          @map("paid_at") // Note: renamed map to paid_at below
-  lateWeeks      Int                @default(0) @map("late_weeks")
-  lateFeeAmount  BigInt             @default(0) @map("late_fee_amount")
-  status         ContributionStatus @default(pending)
+  id            String             @id @default(dbgenerated("gen_random_uuid()::text"))
+  committeeId   String             @map("committee_id")
+  monthId       String             @map("month_id")
+  memberId      String             @map("member_id")
+  amountDue     BigInt             @map("amount_due")
+  amountPaid    BigInt             @default(0) @map("amount_paid")
+  placedAt      DateTime?          @map("paid_at") // Note: renamed map to paid_at below
+  lateWeeks     Int                @default(0) @map("late_weeks")
+  lateFeeAmount BigInt             @default(0) @map("late_fee_amount")
+  status        ContributionStatus @default(pending)
 
-  committee       Committee       @relation(fields: [committeeId], references: [id], onDelete: Cascade)
-  committeeMonth  CommitteeMonth  @relation(fields: [monthId], references: [id], onDelete: Cascade)
-  committeeMember CommitteeMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  committee          Committee           @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  committeeMonth     CommitteeMonth      @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  committeeMember    CommitteeMember     @relation(fields: [memberId], references: [id], onDelete: Cascade)
   paymentTransaction PaymentTransaction? @relation(fields: [paymentTransactionId], references: [id], onDelete: SetNull)
 
   paymentTransactionId String? @map("payment_transaction_id")
@@ -510,7 +564,6 @@ model MemberDistribution {
   @@map("member_distributions")
 }
 
-
 enum JoinRequestStatus {
   PENDING
   APPROVED
@@ -554,18 +607,18 @@ enum PayoutRequestStatus {
 }
 
 model JoinRequest {
-  id            String            @id @default(cuid())
-  committeeId   String
-  userId        String
-  status        JoinRequestStatus @default(PENDING)
-  reviewedById  String?           // Organizer who approved/rejected
-  reviewedAt    DateTime?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  id           String            @id @default(cuid())
+  committeeId  String
+  userId       String
+  status       JoinRequestStatus @default(PENDING)
+  reviewedById String? // Organizer who approved/rejected
+  reviewedAt   DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 
-  committee     Committee         @relation(fields: [committeeId], references: [id], onDelete: Cascade)
-  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reviewedBy    User?             @relation("ReviewedBy", fields: [reviewedById], references: [id])
+  committee  Committee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy User?     @relation("ReviewedBy", fields: [reviewedById], references: [id])
 
   @@unique([committeeId, userId])
   @@index([committeeId, status])
@@ -574,45 +627,46 @@ model JoinRequest {
 }
 
 model SavedPaymentMethod {
-  id                      String            @id @default(cuid())
-  userId                  String
-  razorpayContactId       String?           @map("razorpay_contact_id")
-  razorpayFundAccountId   String?           @map("razorpay_fund_account_id")
-  methodType              PaymentMethodType @map("method_type")
-  upiId                   String?           @map("upi_id")
-  bankAccountNumber       String?           @map("bank_account_number")  // Encrypted
-  ifscCode                String?           @map("ifsc_code")
-  accountHolderName       String?           @map("account_holder_name")
-  isDefault               Boolean           @default(false) @map("is_default")
-  isVerified              Boolean           @default(false) @map("is_verified")
-  createdAt               DateTime          @default(now()) @map("created_at")
+  id                    String            @id @default(cuid())
+  userId                String
+  razorpayContactId     String?           @map("razorpay_contact_id")
+  razorpayFundAccountId String?           @map("razorpay_fund_account_id")
+  methodType            PaymentMethodType @map("method_type")
+  upiId                 String?           @map("upi_id")
+  bankAccountNumber     String?           @map("bank_account_number") // Encrypted
+  ifscCode              String?           @map("ifsc_code")
+  accountHolderName     String?           @map("account_holder_name")
+  isDefault             Boolean           @default(false) @map("is_default")
+  isVerified            Boolean           @default(false) @map("is_verified")
+  createdAt             DateTime          @default(now()) @map("created_at")
 
-  user                    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  withdrawalRequests WithdrawalRequest[]
 
   @@index([userId])
   @@map("saved_payment_methods")
 }
 
 model PaymentTransaction {
-  id                    String           @id @default(dbgenerated("gen_random_uuid()::text"))
-  committeeId           String           @map("committee_id")
-  monthId               String           @map("month_id")
-  memberId              String           @map("member_id")
-  transactionType       RazorpayTxType   @map("transaction_type")
-  razorpayOrderId       String?          @map("razorpay_order_id")
-  razorpayPaymentId     String?          @map("razorpay_payment_id")
-  razorpaySignature     String?          @map("razorpay_signature")
-  amount                BigInt           @map("amount")
-  currency              String           @default("INR") @map("currency")
-  status                RazorpayTxStatus @default(created) @map("status")
-  failureReason         String?          @map("failure_reason")
-  createdAt             DateTime         @default(now()) @map("created_at")
-  paidAt                DateTime?        @map("paid_at")
+  id                String           @id @default(dbgenerated("gen_random_uuid()::text"))
+  committeeId       String           @map("committee_id")
+  monthId           String           @map("month_id")
+  memberId          String           @map("member_id")
+  transactionType   RazorpayTxType   @map("transaction_type")
+  razorpayOrderId   String?          @map("razorpay_order_id")
+  razorpayPaymentId String?          @map("razorpay_payment_id")
+  razorpaySignature String?          @map("razorpay_signature")
+  amount            BigInt           @map("amount")
+  currency          String           @default("INR") @map("currency")
+  status            RazorpayTxStatus @default(created) @map("status")
+  failureReason     String?          @map("failure_reason")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  paidAt            DateTime?        @map("paid_at")
 
-  committee             Committee        @relation(fields: [committeeId], references: [id], onDelete: Cascade)
-  committeeMonth        CommitteeMonth   @relation(fields: [monthId], references: [id], onDelete: Cascade)
-  committeeMember       CommitteeMember  @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  monthlyContributions  MonthlyContribution[]
+  committee            Committee             @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  committeeMonth       CommitteeMonth        @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  committeeMember      CommitteeMember       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  monthlyContributions MonthlyContribution[]
 
   @@index([committeeId])
   @@index([monthId])
@@ -624,27 +678,27 @@ model PaymentTransaction {
 }
 
 model PayoutRequest {
-  id                      String              @id @default(dbgenerated("gen_random_uuid()::text"))
-  committeeId             String              @map("committee_id")
-  monthId                 String              @map("month_id")
-  memberId                String              @map("member_id")
-  requestedBy             String              @map("requested_by")
-  amount                  BigInt              @map("amount")
-  razorpayPayoutId        String?             @map("razorpay_payout_id")
-  payoutType              PayoutRequestType   @map("payout_type")
-  status                  PayoutRequestStatus @default(pending) @map("status")
-  approvedBy              String?             @map("approved_by")
-  approvedAt              DateTime?           @map("approved_at")
-  razorpayFundAccountId   String?             @map("razorpay_fund_account_id")
-  failureReason           String?             @map("failure_reason")
-  createdAt               DateTime            @default(now()) @map("created_at")
-  completedAt             DateTime?           @map("completed_at")
+  id                    String              @id @default(dbgenerated("gen_random_uuid()::text"))
+  committeeId           String              @map("committee_id")
+  monthId               String              @map("month_id")
+  memberId              String              @map("member_id")
+  requestedBy           String              @map("requested_by")
+  amount                BigInt              @map("amount")
+  razorpayPayoutId      String?             @map("razorpay_payout_id")
+  payoutType            PayoutRequestType   @map("payout_type")
+  status                PayoutRequestStatus @default(pending) @map("status")
+  approvedBy            String?             @map("approved_by")
+  approvedAt            DateTime?           @map("approved_at")
+  razorpayFundAccountId String?             @map("razorpay_fund_account_id")
+  failureReason         String?             @map("failure_reason")
+  createdAt             DateTime            @default(now()) @map("created_at")
+  completedAt           DateTime?           @map("completed_at")
 
-  committee               Committee           @relation(fields: [committeeId], references: [id], onDelete: Cascade)
-  committeeMonth          CommitteeMonth      @relation(fields: [monthId], references: [id], onDelete: Cascade)
-  committeeMember         CommitteeMember     @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  requestedByUser         User                @relation("PayoutRequestRequestedBy", fields: [requestedBy], references: [id], onDelete: Cascade)
-  approvedByUser          User?               @relation("PayoutRequestApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+  committee       Committee       @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  committeeMonth  CommitteeMonth  @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  committeeMember CommitteeMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  requestedByUser User            @relation("PayoutRequestRequestedBy", fields: [requestedBy], references: [id], onDelete: Cascade)
+  approvedByUser  User?           @relation("PayoutRequestApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
 
   @@index([committeeId])
   @@index([monthId])
@@ -663,22 +717,135 @@ enum WalletTopupStatus {
 }
 
 model WalletTopupOrder {
-  id                    String            @id @default(uuid())
-  userId                String            @map("user_id")
-  razorpayOrderId       String            @unique @map("razorpay_order_id")
-  razorpayPaymentId     String?           @map("razorpay_payment_id")
-  razorpaySignature     String?           @map("razorpay_signature")
-  amount                BigInt            @map("amount")
-  currency              String            @default("INR") @map("currency")
-  status                WalletTopupStatus @default(created) @map("status")
-  failureReason         String?           @map("failure_reason")
-  createdAt             DateTime          @default(now()) @map("created_at")
-  completedAt           DateTime?         @map("completed_at")
+  id                String            @id @default(uuid())
+  userId            String            @map("user_id")
+  razorpayOrderId   String            @unique @map("razorpay_order_id")
+  razorpayPaymentId String?           @map("razorpay_payment_id")
+  razorpaySignature String?           @map("razorpay_signature")
+  amount            BigInt            @map("amount")
+  currency          String            @default("INR") @map("currency")
+  status            WalletTopupStatus @default(created) @map("status")
+  failureReason     String?           @map("failure_reason")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  completedAt       DateTime?         @map("completed_at")
 
-  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([razorpayOrderId])
   @@index([status])
   @@map("wallet_topup_orders")
+}
+
+// ─── Append-Only Wallet Ledger ─────────────────────────────────────────
+// Balances are NEVER stored. Calculated via SUM of entries.
+// UPDATE and DELETE are blocked by database triggers.
+
+model WalletLedgerEntry {
+  id          String @id @default(uuid())
+  memberId    String @map("member_id")
+  committeeId String @map("committee_id")
+
+  entryType LedgerEntryType @map("entry_type")
+  amount    BigInt // ALWAYS positive integer (paise)
+  direction LedgerDirection @map("direction")
+
+  referenceType String? @map("reference_type") // e.g. 'committee_months', 'payout_requests'
+  referenceId   String? @map("reference_id") // FK to the related record
+
+  balanceAfter BigInt       @map("balance_after") // snapshot: cumulative balance after this entry
+  status       LedgerStatus @default(confirmed) @map("status")
+
+  idempotencyKey String          @unique @map("idempotency_key")
+  createdBy      LedgerCreatedBy @default(system) @map("created_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  notes     String?
+
+  member             User                  @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  committee          Committee             @relation(fields: [committeeId], references: [id], onDelete: Restrict)
+  cacheEntries       WalletBalancesCache[]
+  withdrawalRequests WithdrawalRequest[]
+  auditLogs          LedgerAuditLog[]
+  CommitteeMonth     CommitteeMonth?       @relation(fields: [committeeMonthId], references: [id])
+  committeeMonthId   String?
+
+  @@index([memberId, committeeId, createdAt])
+  @@index([referenceType, referenceId])
+  @@index([status])
+  @@map("wallet_ledger_entries")
+}
+
+// ─── Wallet Balances Cache (read-optimization only) ───────────────────
+// NOT source of truth. Rebuilt by replaying wallet_ledger_entries.
+// Auto-refreshed via trigger after every ledger INSERT.
+
+model WalletBalancesCache {
+  id          String @id @default(uuid())
+  memberId    String @map("member_id")
+  committeeId String @map("committee_id")
+
+  totalBalance           BigInt @default(0) @map("total_balance")
+  availableForWithdrawal BigInt @default(0) @map("available_for_withdrawal")
+  lockedBalance          BigInt @default(0) @map("locked_balance")
+
+  lastLedgerEntryId String?  @map("last_ledger_entry_id")
+  lastUpdatedAt     DateTime @default(now()) @map("last_updated_at")
+
+  member          User               @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  committee       Committee          @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  lastLedgerEntry WalletLedgerEntry? @relation(fields: [lastLedgerEntryId], references: [id], onDelete: SetNull)
+
+  @@unique([memberId, committeeId])
+  @@index([memberId])
+  @@index([committeeId])
+  @@map("wallet_balances_cache")
+}
+
+// ─── Withdrawal Requests ──────────────────────────────────────────────
+
+model WithdrawalRequest {
+  id          String @id @default(uuid())
+  memberId    String @map("member_id")
+  committeeId String @map("committee_id")
+  amount      BigInt @map("amount")
+
+  paymentMethodId String?          @map("payment_method_id")
+  status          WithdrawalStatus @default(requested) @map("status")
+
+  razorpayPayoutId String? @map("razorpay_payout_id")
+  ledgerEntryId    String? @map("ledger_entry_id")
+
+  requestedAt   DateTime  @default(now()) @map("requested_at")
+  completedAt   DateTime? @map("completed_at")
+  failureReason String?   @map("failure_reason")
+
+  member        User                @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  committee     Committee           @relation(fields: [committeeId], references: [id], onDelete: Restrict)
+  paymentMethod SavedPaymentMethod? @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
+  ledgerEntry   WalletLedgerEntry?  @relation(fields: [ledgerEntryId], references: [id], onDelete: Restrict)
+
+  @@index([memberId, status])
+  @@index([committeeId, status])
+  @@index([razorpayPayoutId])
+  @@index([ledgerEntryId])
+  @@map("withdrawal_requests")
+}
+
+// ─── Ledger Audit Log ─────────────────────────────────────────────────
+
+model LedgerAuditLog {
+  id            String            @id @default(uuid())
+  ledgerEntryId String            @map("ledger_entry_id")
+  action        LedgerAuditAction @map("action")
+  performedBy   String            @map("performed_by")
+  reason        String?
+  createdAt     DateTime          @default(now()) @map("created_at")
+
+  ledgerEntry WalletLedgerEntry @relation(fields: [ledgerEntryId], references: [id], onDelete: Cascade)
+  performer   User              @relation(fields: [performedBy], references: [id], onDelete: Restrict)
+
+  @@index([ledgerEntryId])
+  @@index([performedBy, createdAt])
+  @@map("ledger_audit_log")
 }

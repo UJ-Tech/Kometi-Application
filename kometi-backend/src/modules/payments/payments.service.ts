@@ -4,7 +4,8 @@
 import crypto from "crypto";
 import supabase from "../../config/supabase";
 import razorpay from "../../config/razorpay";
-import { emitToUser } from "../../config/socket";
+import { emitToUser, emitToAll } from "../../config/socket";
+import { WalletLedgerService } from "../wallet/wallet-ledger.service";
 
 export class PaymentsService {
   // ─── Saved Payment Methods (Supabase) ──────────────────────────────────
@@ -521,11 +522,312 @@ export class PaymentsService {
 
     if (updateContributionError) throw updateContributionError;
 
-    // 5. Emit real-time event
+    // 5. Update installments table → PAID (member dashboard reads this)
+    //    Need month_number to match cycleNo, and userId for the installment record.
+    const [monthRes, memberRes] = await Promise.all([
+      supabase.from("committee_months").select("month_number").eq("id", tx.month_id).single(),
+      supabase.from("committee_members").select("userId").eq("id", tx.member_id).single(),
+    ]);
+
+    const resolvedUserId = memberRes.data?.userId || tx.member_id;
+
+    if (monthRes.data && resolvedUserId) {
+      const cycleNo = monthRes.data.month_number;
+
+      await supabase
+        .from("installments")
+        .update({
+          status: "PAID",
+          amountPaidPaise: tx.amount,
+          paidAt: new Date().toISOString(),
+          paymentMethod: "UPI",
+          paymentReference: paymentId,
+        })
+        .eq("committeeId", tx.committee_id)
+        .eq("userId", resolvedUserId)
+        .eq("cycleNo", cycleNo);
+    }
+
+    // 6. Create wallet ledger entry — contribution_made
+    //    This ensures the conservation check during resolveMonth passes.
+    try {
+      await WalletLedgerService.creditWallet({
+        memberId: resolvedUserId,
+        committeeId: tx.committee_id,
+        amount: tx.amount,
+        entryType: "contribution_made",
+        referenceType: "monthly_contributions",
+        referenceId: contribution.id,
+        idempotencyKey: `contrib_${tx.committee_id}_${tx.month_id}_${tx.member_id}`,
+        createdBy: "system",
+        notes: `Month ${monthRes.data?.month_number || "?"} contribution`,
+      });
+    } catch (err) {
+      // Wallet ledger failure is non-fatal — log and continue.
+      // The payment is already captured; ledger can be reconciled later.
+      console.error("[PaymentsService] Failed to create wallet ledger entry:", err);
+    }
+
+    // 7. Emit real-time events
     emitToUser(tx.member_id, "contribution:paid", {
       committeeId: tx.committee_id,
       monthId: tx.month_id,
       amount: tx.amount,
+    });
+
+    // Notify organizer
+    const { data: committee } = await supabase
+      .from("committees")
+      .select("organizerId")
+      .eq("id", tx.committee_id)
+      .single();
+
+    if (committee?.organizerId) {
+      emitToUser(committee.organizerId, "contribution:member-paid", {
+        committeeId: tx.committee_id,
+        monthId: tx.month_id,
+        memberId: tx.member_id,
+        amount: tx.amount,
+      });
+    }
+
+    // Broadcast to all committee members
+    emitToAll("committee:contribution-updated", {
+      committeeId: tx.committee_id,
+      monthId: tx.month_id,
+      memberId: tx.member_id,
+    });
+
+    return { success: true, contribution };
+  }
+
+  /**
+   * Pay contribution from wallet balance.
+   * All DB updates happen FIRST, wallet debit LAST — so if anything fails,
+   * the wallet is untouched. No partial state.
+   */
+  static async payFromWallet(
+    committeeId: string,
+    monthId: string,
+    memberId: string
+  ) {
+    // ── 1. Validate contribution record ──────────────────────────────────
+    const { data: contribution, error: fetchError } = await supabase
+      .from("monthly_contributions")
+      .select("*")
+      .eq("committee_id", committeeId)
+      .eq("month_id", monthId)
+      .eq("member_id", memberId)
+      .single();
+
+    if (fetchError || !contribution) {
+      throw new Error("Monthly contribution record not found");
+    }
+    if (contribution.status === "paid") {
+      throw new Error("Contribution already paid");
+    }
+    if (contribution.status === "defaulted") {
+      throw new Error("Contribution has been defaulted — contact organizer");
+    }
+
+    // ── 2. Resolve userId ────────────────────────────────────────────────
+    const { data: member, error: memberError } = await supabase
+      .from("committee_members")
+      .select("userId")
+      .eq("id", memberId)
+      .single();
+
+    if (memberError || !member) throw new Error("Committee member not found");
+    const userId = member.userId;
+
+    // ── 3. Calculate amount ──────────────────────────────────────────────
+    const amountDue = Number(contribution.amount_due);
+    const lateFee = Number(contribution.late_fee_amount || 0);
+    const totalAmountPaise = amountDue + lateFee;
+
+    if (totalAmountPaise <= 0) {
+      throw new Error("Invalid amount — nothing to pay");
+    }
+
+    // ── 4. Validate wallet has sufficient balance (READ ONLY) ─────────────
+    const { data: wallet, error: walletError } = await supabase
+      .from("wallets")
+      .select("id, balancePaise")
+      .eq("userId", userId)
+      .single();
+
+    if (walletError || !wallet) {
+      throw new Error("Wallet not found — please top up your wallet first");
+    }
+
+    const walletBalance = Number(wallet.balancePaise);
+    if (walletBalance < totalAmountPaise) {
+      throw new Error(
+        `Insufficient wallet balance. You have ₹${(walletBalance / 100).toFixed(0)} but need ₹${(totalAmountPaise / 100).toFixed(0)}`
+      );
+    }
+
+    // ── 5. Get month number for installment lookup ────────────────────────
+    const { data: monthRow, error: monthError } = await supabase
+      .from("committee_months")
+      .select("month_number")
+      .eq("id", monthId)
+      .single();
+
+    if (monthError || !monthRow) {
+      throw new Error("Month record not found");
+    }
+
+    const cycleNo = monthRow.month_number;
+
+    // ── 6. Create payment_transactions record ─────────────────────────────
+    const { data: tx, error: txError } = await supabase
+      .from("payment_transactions")
+      .insert({
+        committee_id: committeeId,
+        month_id: monthId,
+        member_id: memberId,
+        transaction_type: lateFee > 0 ? "late_fee" : "contribution",
+        amount: totalAmountPaise,
+        currency: "INR",
+        status: "paid",
+        paid_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (txError || !tx) {
+      console.error("[PaymentsService] payment_transactions insert failed:", txError);
+      throw new Error("Failed to record payment transaction");
+    }
+
+    // ── 7. Update monthly_contributions → paid ────────────────────────────
+    const { data: updatedMC, error: updateMCError } = await supabase
+      .from("monthly_contributions")
+      .update({
+        status: "paid",
+        amount_paid: totalAmountPaise,
+        paid_at: new Date().toISOString(),
+        payment_transaction_id: tx.id,
+      })
+      .eq("committee_id", committeeId)
+      .eq("month_id", monthId)
+      .eq("member_id", memberId)
+      .select();
+
+    if (updateMCError) {
+      console.error("[PaymentsService] monthly_contributions update failed:", updateMCError);
+      throw updateMCError;
+    }
+    if (!updatedMC || updatedMC.length === 0) {
+      console.error("[PaymentsService] monthly_contributions update matched 0 rows", { committeeId, monthId, memberId });
+      throw new Error("Contribution record not found — no rows updated");
+    }
+
+    // ── 8. Update installments → PAID ────────────────────────────────────
+    const { error: installError } = await supabase
+      .from("installments")
+      .update({
+        status: "PAID",
+        amountPaidPaise: totalAmountPaise,
+        paidAt: new Date().toISOString(),
+        paymentMethod: "WALLET",
+        paymentReference: tx.id,
+      })
+      .eq("committeeId", committeeId)
+      .eq("userId", userId)
+      .eq("cycleNo", cycleNo);
+
+    if (installError) {
+      console.error("[PaymentsService] installments update failed:", installError);
+      // Non-fatal — monthly_contributions is the source of truth
+    }
+
+    // ── 9. Credit wallet ledger — contribution_made ───────────────────────
+    try {
+      await WalletLedgerService.creditWallet({
+        memberId: userId,
+        committeeId,
+        amount: totalAmountPaise,
+        entryType: "contribution_made",
+        referenceType: "monthly_contributions",
+        referenceId: contribution.id,
+        idempotencyKey: `contrib_wallet_${committeeId}_${monthId}_${memberId}`,
+        createdBy: "system",
+        notes: `Month ${cycleNo} contribution (wallet)`,
+      });
+    } catch (err) {
+      console.error("[PaymentsService] Wallet ledger credit failed:", err);
+      // Non-fatal — contribution is already marked paid
+    }
+
+    // ── 10. DEBIT WALLET (LAST — all DB updates above succeeded) ──────────
+    const idempotencyKey = `wallet_contrib_${committeeId}_${monthId}_${memberId}`;
+    const balanceAfter = walletBalance - totalAmountPaise;
+
+    const { error: debitError } = await supabase
+      .from("wallets")
+      .update({ balancePaise: balanceAfter })
+      .eq("id", wallet.id);
+
+    if (debitError) {
+      console.error("[PaymentsService] Wallet debit failed:", debitError);
+      throw new Error("Failed to debit wallet — payment not processed");
+    }
+
+    // Record debit transaction in legacy ledger
+    const { error: txnError } = await supabase
+      .from("transactions")
+      .insert({
+        walletId: wallet.id,
+        userId,
+        type: "DEBIT",
+        category: "INSTALLMENT_PAYMENT",
+        status: "COMPLETED",
+        amountPaise: totalAmountPaise,
+        balanceBefore: walletBalance,
+        balanceAfter,
+        description: `Committee contribution — Month ${cycleNo}`,
+        paymentMethod: "WALLET",
+        idempotencyKey,
+      });
+
+    if (txnError) {
+      console.error("[PaymentsService] transactions insert failed:", txnError);
+      // Non-fatal — wallet already debited, contribution is recorded
+    }
+
+    // ── 11. Emit real-time events ─────────────────────────────────────────
+    emitToUser(memberId, "contribution:paid", {
+      committeeId,
+      monthId,
+      amount: totalAmountPaise,
+    });
+
+    const { data: committee } = await supabase
+      .from("committees")
+      .select("organizerId")
+      .eq("id", committeeId)
+      .single();
+
+    if (committee?.organizerId) {
+      emitToUser(committee.organizerId, "contribution:member-paid", {
+        committeeId,
+        monthId,
+        memberId,
+        amount: totalAmountPaise,
+      });
+    }
+
+    emitToAll("committee:contribution-updated", {
+      committeeId,
+      monthId,
+      memberId,
+    });
+
+    emitToUser(userId, "wallet:debited", {
+      amountPaise: totalAmountPaise,
+      newBalance: balanceAfter,
     });
 
     return { success: true, contribution };

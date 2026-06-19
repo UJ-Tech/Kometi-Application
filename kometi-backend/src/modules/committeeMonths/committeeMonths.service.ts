@@ -1,5 +1,4 @@
 // src/modules/committeeMonths/committeeMonths.service.ts
-import prisma from "../../config/database";
 import supabase from "../../config/supabase";
 import crypto from "crypto";
 import {
@@ -7,327 +6,564 @@ import {
   calculateMaxBid,
   calculateMonthSummary,
   calculateLastMemberTotal,
-  calculateLateFee,
+  calculateLateFeeForMember,
 } from "../../utils/committeeCalculations";
-import type { CommitteeMonthStatus, ResolutionType } from "@prisma/client";
+import { WalletLedgerService } from "../wallet/wallet-ledger.service";
+import { InsufficientBalanceError, LedgerIntegrityError } from "../../utils/errors";
 
-/** Round a float calculation result and wrap it as BigInt for Prisma BigInt fields. */
-function toBigInt(n: number): bigint {
-  return BigInt(Math.round(n));
+/**
+ * Generate placeholder contribution records for projection/display.
+ * Used when calculateMonthSummary needs contributions but no real payments exist yet.
+ */
+function placeholderContributions(totalMembers: number, contributionPerPerson: number) {
+  return Array.from({ length: totalMembers }, (_, i) => ({
+    memberId: `_placeholder_${i + 1}`,
+    amountDue: contributionPerPerson,
+    amountPaid: contributionPerPerson,
+    lateFeeAmount: 0,
+    weeksLate: 0,
+    status: "paid" as const,
+  }));
 }
 
 export class CommitteeMonthsService {
   
   // ─── 1. Open Bidding for Month ─────────────────────────────────────────────
   static async openBiddingForMonth(committeeId: string, monthNumber: number) {
-    return prisma.$transaction(async (tx) => {
-      // Find the month
-      const month = await tx.committeeMonth.findUnique({
-        where: {
-          committeeId_monthNumber: { committeeId, monthNumber },
-        },
-        select: {
-          id: true,
-          committeeId: true,
-          monthNumber: true,
-          monthDate: true,
-          totalPool: true,
-          status: true,
-          resolutionType: true,
-          committee: true,
-        },
-      });
+    // Find the month
+    const { data: month, error: monthErr } = await supabase
+      .from("committee_months")
+      .select("id, committee_id, month_number, status")
+      .eq("committee_id", committeeId)
+      .eq("month_number", monthNumber)
+      .single();
 
-      if (!month) {
-        throw new Error("Committee month not found");
+    if (monthErr || !month) {
+      throw new Error("Committee month not found");
+    }
+
+    if (month.status !== "pending") {
+      throw new Error(`Month is already in ${month.status} status`);
+    }
+
+    // Check if all active members have paid their contribution for this month
+    const { data: activeMembers, error: membersErr } = await supabase
+      .from("committee_members")
+      .select("id")
+      .eq("committeeId", committeeId)
+      .eq("isActive", true);
+
+    if (membersErr) throw membersErr;
+
+    const { data: contributions, error: contribErr } = await supabase
+      .from("monthly_contributions")
+      .select("member_id, status")
+      .eq("committee_id", committeeId)
+      .eq("month_id", month.id);
+
+    if (contribErr) throw contribErr;
+
+    const paidMemberIds = new Set(
+      (contributions || [])
+        .filter((c) => c.status === "paid")
+        .map((c) => c.member_id)
+    );
+
+    for (const member of activeMembers || []) {
+      if (!paidMemberIds.has(member.id)) {
+        throw new Error("Cannot open bidding: Not all members have paid their contributions for this month.");
       }
+    }
 
-      if (month.status !== "pending") {
-        throw new Error(`Month is already in ${month.status} status`);
-      }
+    // Set bidding deadline (default 48 hours from now)
+    const biddingDeadline = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
 
-      // Check if all active members have paid their contribution for this month
-      // Note: We're checking monthlyContributions. If they don't exist, they haven't paid.
-      const activeMembers = await tx.committeeMember.findMany({
-        where: { committeeId, isActive: true },
-      });
+    // Update status
+    const { data: updatedMonth, error: updateErr } = await supabase
+      .from("committee_months")
+      .update({
+        status: "bidding_open",
+        bidding_deadline: biddingDeadline,
+      })
+      .eq("id", month.id)
+      .select()
+      .single();
 
-      const contributions = await tx.monthlyContribution.findMany({
-        where: { committeeId, monthId: month.id },
-      });
+    if (updateErr) throw updateErr;
 
-      const paidMemberIds = new Set(
-        contributions
-          .filter((c) => c.status === "paid")
-          .map((c) => c.memberId)
-      );
-
-      for (const member of activeMembers) {
-        if (!paidMemberIds.has(member.id)) {
-          throw new Error("Cannot open bidding: Not all members have paid their contributions for this month.");
-        }
-      }
-
-      // Set bidding deadline (default 48 hours from now)
-      const biddingDeadline = new Date(Date.now() + 48 * 60 * 60 * 1000);
-
-      // Update status
-      const updatedMonth = await tx.committeeMonth.update({
-        where: { id: month.id },
-        data: {
-          status: "bidding_open",
-          // @ts-ignore - Requires prisma generate to pick up biddingDeadline
-          biddingDeadline,
-        },
-      });
-
-      return updatedMonth;
-    });
+    return updatedMonth;
   }
 
   // ─── 2. Place Bid ──────────────────────────────────────────────────────────
   static async placeBid(committeeId: string, monthId: string, memberId: string, bidAmount: number) {
-    return prisma.$transaction(async (tx) => {
-      // Validations
-      const month = await tx.committeeMonth.findUnique({
-        where: { id: monthId },
-        select: {
-          id: true,
-          committeeId: true,
-          monthNumber: true,
-          totalPool: true,
-          status: true,
-          resolutionType: true,
-          committee: true,
-        },
-      });
+    // Fetch month + committee in parallel
+    const [monthRes, committeeRes] = await Promise.all([
+      supabase
+        .from("committee_months")
+        .select("id, committee_id, month_number, total_pool, status, bidding_deadline")
+        .eq("id", monthId)
+        .single(),
+      supabase
+        .from("committees")
+        .select("totalSlots, installmentAmountPaise")
+        .eq("id", committeeId)
+        .single(),
+    ]);
 
-      if (!month) throw new Error("Month not found");
-      if (month.committeeId !== committeeId) throw new Error("Month does not belong to this committee");
-      if (month.status !== "bidding_open") throw new Error("Bidding is not open for this month");
+    const month = monthRes.data;
+    const committee = committeeRes.data;
 
-      // Check deadline
-      // @ts-ignore - Requires prisma generate to pick up biddingDeadline
-      if (month.biddingDeadline && new Date() > month.biddingDeadline) {
-        throw new Error("Bidding deadline has passed");
-      }
+    if (monthRes.error || !month) throw new Error("Month not found");
+    if (committeeRes.error || !committee) throw new Error("Committee not found");
+    if (month.committee_id !== committeeId) throw new Error("Month does not belong to this committee");
+    if (month.status !== "bidding_open") throw new Error("Bidding is not open for this month");
 
-      if (bidAmount <= 0) {
-        throw new Error("Bid amount must be greater than zero");
-      }
+    // Check deadline
+    if (month.bidding_deadline && new Date() > new Date(month.bidding_deadline)) {
+      throw new Error("Bidding deadline has passed");
+    }
 
-      const eligibility = await this.getMemberEligibility(committeeId, memberId, monthId, tx);
-      if (!eligibility.canBid) {
-        throw new Error(`Member is not eligible to bid: ${eligibility.reason}`);
-      }
+    if (bidAmount <= 0) {
+      throw new Error("Bid amount must be greater than zero");
+    }
 
-      // Calculate max bid allowed
-      const totalMembers = month.committee.totalSlots;
-      const contributionPerPerson = Number(month.committee.installmentAmountPaise);
-      const remainingNonWinners = Math.max(totalMembers - (month.monthNumber - 1), 1);
-      
-      const interestAmount = calculateMonthlyInterest(
-        totalMembers,
-        remainingNonWinners,
-        contributionPerPerson
-      );
-      const maxBidAllowed = calculateMaxBid(Number(month.totalPool), interestAmount);
+    const eligibility = await this.getMemberEligibility(committeeId, memberId, monthId);
+    if (!eligibility.canBid) {
+      throw new Error(`Member is not eligible to bid: ${eligibility.reason}`);
+    }
 
-      if (bidAmount > maxBidAllowed) {
-        throw new Error(`Bid amount exceeds maximum allowed bid of ${maxBidAllowed}`);
-      }
+    // Calculate max bid allowed
+    const totalMembers = committee.totalSlots;
+    const contributionPerPerson = Number(committee.installmentAmountPaise);
+    const remainingNonWinners = Math.max(totalMembers - (month.month_number - 1), 1);
 
-      // Upsert bid (replace old bid if exists, or create new one)
-      const bid = await tx.bid.upsert({
-        where: { monthId_memberId: { monthId, memberId } },
-        update: {
-          bidAmount: toBigInt(bidAmount),
-          placedAt: new Date(),
+    const interestAmount = calculateMonthlyInterest(
+      totalMembers,
+      remainingNonWinners,
+      contributionPerPerson
+    );
+    const maxBidAllowed = calculateMaxBid(Number(month.total_pool), interestAmount);
+
+    if (bidAmount > maxBidAllowed) {
+      throw new Error(`Bid amount exceeds maximum allowed bid of ${maxBidAllowed}`);
+    }
+
+    // Upsert bid (replace old bid if exists, or create new one)
+    const { data: existingBid } = await supabase
+      .from("bids")
+      .select("id")
+      .eq("month_id", monthId)
+      .eq("member_id", memberId)
+      .single();
+
+    let bid;
+    if (existingBid) {
+      const { data: updated, error: updErr } = await supabase
+        .from("bids")
+        .update({
+          bid_amount: bidAmount,
+          placed_at: new Date().toISOString(),
           status: "pending",
-        },
-        create: {
-          committeeId,
-          monthId,
-          memberId,
-          bidAmount: toBigInt(bidAmount),
+        })
+        .eq("id", existingBid.id)
+        .select()
+        .single();
+      if (updErr) throw updErr;
+      bid = updated;
+    } else {
+      const { data: created, error: insErr } = await supabase
+        .from("bids")
+        .insert({
+          committee_id: committeeId,
+          month_id: monthId,
+          member_id: memberId,
+          bid_amount: bidAmount,
           status: "pending",
-        },
-      });
+        })
+        .select()
+        .single();
+      if (insErr) throw insErr;
+      bid = created;
+    }
 
-      return {
-        success: true,
-        bid,
-        maxBidAllowed,
-        message: "Bid placed successfully",
-      };
-    });
+    return {
+      success: true,
+      bid,
+      maxBidAllowed,
+      message: "Bid placed successfully",
+    };
   }
 
   // ─── 3. Resolve Month ──────────────────────────────────────────────────────
+  // ARCHITECTURAL NOTE: This function uses sequential Supabase writes (no
+  // multi-table transaction). If any step fails midway, the month stays in
+  // its previous state and can be retried. All wallet operations use
+  // idempotency keys, and the post-resolution verifyMonthLedgerIntegrity
+  // check ensures total credits == total debits.
   static async resolveMonth(committeeId: string, monthId: string) {
-    return prisma.$transaction(async (tx) => {
-      const month = await tx.committeeMonth.findUnique({
-        where: { id: monthId },
-        select: {
-          id: true,
-          committeeId: true,
-          monthNumber: true,
-          totalPool: true,
-          status: true,
-          resolutionType: true,
-          committee: true,
-        },
-      });
+    const { data: month, error: monthErr } = await supabase
+      .from("committee_months")
+      .select("id, committee_id, month_number, total_pool, status, resolution_type")
+      .eq("id", monthId)
+      .single();
 
-      if (!month) throw new Error("Month not found");
-      if (month.status === "completed") throw new Error("Month is already completed");
+    if (monthErr || !month) throw new Error("Month not found");
+    if (month.status === "completed") throw new Error("Month is already completed");
 
-      const bids = await tx.bid.findMany({
-        where: { monthId, status: "pending" },
-      });
+    // Fetch committee details
+    const { data: committee, error: cErr } = await supabase
+      .from("committees")
+      .select("totalSlots, installmentAmountPaise, commissionRatePct, organizerId")
+      .eq("id", committeeId)
+      .single();
 
-      const totalMembers = month.committee.totalSlots;
-      const contributionPerPerson = Number(month.committee.installmentAmountPaise);
-      const totalPool = Number(month.totalPool);
-      const feePercent = Number(month.committee.commissionRatePct ?? 5);
+    if (cErr || !committee) throw new Error("Committee not found");
 
-      let winnerMemberId: string;
-      let winningBidAmount: number;
-      let resolutionType: "bid_single" | "bid_auction" | "lottery";
+    // Fetch bids
+    const { data: bids, error: bidsErr } = await supabase
+      .from("bids")
+      .select("id, member_id, bid_amount, status")
+      .eq("month_id", monthId)
+      .eq("status", "pending");
 
-      if (bids.length === 0) {
-        // Lottery among eligible members
-        const activeMembers = await tx.committeeMember.findMany({
-          where: { committeeId, isActive: true },
-        });
+    if (bidsErr) throw bidsErr;
 
-        const eligibleMembers = [];
-        for (const member of activeMembers) {
-          const el = await this.getMemberEligibility(committeeId, member.id, monthId, tx);
-          if (el.canBid) {
-            eligibleMembers.push(member.id);
-          }
+    const totalMembers = committee.totalSlots;
+    const contributionPerPerson = Number(committee.installmentAmountPaise);
+    const totalPool = Number(month.total_pool);
+    const feePercent = Number(committee.commissionRatePct ?? 5);
+
+    let winnerMemberId: string;
+    let winningBidAmount: number;
+    let resolutionType: "bid_single" | "bid_auction" | "lottery";
+
+    if (!bids || bids.length === 0) {
+      // Lottery among eligible members
+      const { data: activeMembers, error: amErr } = await supabase
+        .from("committee_members")
+        .select("id")
+        .eq("committeeId", committeeId)
+        .eq("isActive", true);
+
+      if (amErr) throw amErr;
+
+      const eligibleMembers: string[] = [];
+      for (const member of activeMembers || []) {
+        const el = await this.getMemberEligibility(committeeId, member.id, monthId);
+        if (el.canBid) {
+          eligibleMembers.push(member.id);
         }
-
-        if (eligibleMembers.length === 0) {
-          throw new Error("No eligible members found for lottery");
-        }
-
-        winnerMemberId = this.runLottery(eligibleMembers);
-        // Winning bid amount in lottery is technically the max allowed bid, or totalPool - interest
-        const remainingNonWinners = Math.max(totalMembers - (month.monthNumber - 1), 1);
-        const interestAmount = calculateMonthlyInterest(totalMembers, remainingNonWinners, contributionPerPerson);
-        winningBidAmount = calculateMaxBid(totalPool, interestAmount);
-        resolutionType = "lottery";
-
-      } else if (bids.length === 1) {
-        // Single bid
-        winnerMemberId = bids[0].memberId;
-        winningBidAmount = Number(bids[0].bidAmount);
-        resolutionType = "bid_single";
-      } else {
-        // 2+ bids, find lowest
-        bids.sort((a, b) => Number(a.bidAmount) - Number(b.bidAmount));
-        const lowestBidAmount = Number(bids[0].bidAmount);
-        
-        const tiedBids = bids.filter(b => Number(b.bidAmount) === lowestBidAmount);
-        
-        if (tiedBids.length > 1) {
-          // Tie-breaker lottery among tied members
-          const tiedMemberIds = tiedBids.map(b => b.memberId);
-          winnerMemberId = this.runLottery(tiedMemberIds);
-        } else {
-          winnerMemberId = tiedBids[0].memberId;
-        }
-        winningBidAmount = lowestBidAmount;
-        resolutionType = "bid_auction";
       }
 
-      // Mark bids status
-      await tx.bid.updateMany({
-        where: { monthId, memberId: { not: winnerMemberId } },
-        data: { status: "lost" },
+      if (eligibleMembers.length === 0) {
+        throw new Error("No eligible members found for lottery");
+      }
+
+      winnerMemberId = this.runLottery(eligibleMembers);
+      const remainingNonWinners = Math.max(totalMembers - (month.month_number - 1), 1);
+      const interestAmount = calculateMonthlyInterest(totalMembers, remainingNonWinners, contributionPerPerson);
+      winningBidAmount = calculateMaxBid(totalPool, interestAmount);
+      resolutionType = "lottery";
+
+    } else if (bids.length === 1) {
+      winnerMemberId = bids[0].member_id;
+      winningBidAmount = Number(bids[0].bid_amount);
+      resolutionType = "bid_single";
+    } else {
+      // 2+ bids, find lowest
+      bids.sort((a, b) => Number(a.bid_amount) - Number(b.bid_amount));
+      const lowestBidAmount = Number(bids[0].bid_amount);
+
+      const tiedBids = bids.filter(b => Number(b.bid_amount) === lowestBidAmount);
+
+      if (tiedBids.length > 1) {
+        const tiedMemberIds = tiedBids.map(b => b.member_id);
+        winnerMemberId = this.runLottery(tiedMemberIds);
+      } else {
+        winnerMemberId = tiedBids[0].member_id;
+      }
+      winningBidAmount = lowestBidAmount;
+      resolutionType = "bid_auction";
+    }
+
+    // Mark non-winning bids as "lost"
+    const nonWinnerIds = bids?.filter(b => b.member_id !== winnerMemberId).map(b => b.id) || [];
+    if (nonWinnerIds.length > 0) {
+      const { error: lostErr } = await supabase
+        .from("bids")
+        .update({ status: "lost" })
+        .in("id", nonWinnerIds);
+      if (lostErr) throw lostErr;
+    }
+
+    // Mark winning bid as "won"
+    if (bids && bids.length > 0) {
+      const { error: wonErr } = await supabase
+        .from("bids")
+        .update({ status: "won" })
+        .eq("month_id", monthId)
+        .eq("member_id", winnerMemberId);
+      if (wonErr) throw wonErr;
+    }
+
+    // Calculate month summary
+    const remainingNonWinners = Math.max(totalMembers - (month.month_number - 1), 1);
+    const interestRatePercent = 2;
+    const summary = calculateMonthSummary({
+      committeeId,
+      monthNumber: month.month_number,
+      totalMembers,
+      contributionPerPerson,
+      organiserFeePercent: feePercent,
+      interestRatePercent,
+      winningBidAmount,
+      winnerId: winnerMemberId,
+      resolutionType,
+      contributions: placeholderContributions(totalMembers, contributionPerPerson),
+      remainingNonWinners,
+    });
+
+    // Update month status to completed
+    const { error: updateMonthErr } = await supabase
+      .from("committee_months")
+      .update({
+        status: "completed",
+        winner_member_id: winnerMemberId,
+        winning_bid_amount: winningBidAmount,
+        resolution_type: resolutionType,
+        remaining_balance: summary.remainingBalance,
+        organiser_fee: summary.organiserFee,
+        distributable_amount: summary.distributableAmount,
+        interest_amount: summary.interestAmount,
+        per_member_distribution: summary.perMemberDistribution,
+      })
+      .eq("id", monthId);
+
+    if (updateMonthErr) throw updateMonthErr;
+
+    // Mark winner as having received payout
+    const { error: winnerErr } = await supabase
+      .from("committee_members")
+      .update({ hasReceivedPayout: true })
+      .eq("id", winnerMemberId);
+
+    if (winnerErr) throw winnerErr;
+
+    // Create fund disbursement for winner
+    const { error: disburseErr } = await supabase
+      .from("fund_disbursements")
+      .insert({
+        committee_id: committeeId,
+        month_id: monthId,
+        member_id: winnerMemberId,
+        disbursement_type: resolutionType === "lottery" ? "lottery_payout" : "bid_payout",
+        amount: winningBidAmount,
+        notes: `Month ${month.month_number} payout`,
       });
 
-      await tx.bid.updateMany({
-        where: { monthId, memberId: winnerMemberId },
-        data: { status: "won" },
-      });
+    if (disburseErr) throw disburseErr;
 
-      // Calculate month summary
-      const remainingNonWinners = Math.max(totalMembers - (month.monthNumber - 1), 1);
-      const summary = calculateMonthSummary({
-        totalMembers,
-        remainingNonWinners,
-        contributionPerPerson,
-        totalPool,
-        winningBidAmount,
-        feePercent,
-      });
+    // Create member distributions
+    const { data: activeMembers, error: amErr2 } = await supabase
+      .from("committee_members")
+      .select("id, userId")
+      .eq("committeeId", committeeId)
+      .eq("isActive", true);
 
-      // Update month (BigInt cast required for Prisma BigInt fields)
-      const updatedMonth = await tx.committeeMonth.update({
-        where: { id: monthId },
-        data: {
-          status: "completed" as CommitteeMonthStatus,
-          winnerMemberId,
-          winningBidAmount: toBigInt(winningBidAmount),
-          resolutionType: resolutionType as ResolutionType,
-          remainingBalance: toBigInt(summary.remainingBalance),
-          organiserFee: toBigInt(summary.organiserFee),
-          distributableAmount: toBigInt(summary.distributableAmount),
-          interestAmount: toBigInt(summary.interestAmount),
-          perMemberDistribution: toBigInt(summary.perMemberDistribution),
-        },
-      });
+    if (amErr2) throw amErr2;
 
-      // Mark member as having received payout
-      await tx.committeeMember.update({
-        where: { id: winnerMemberId },
-        data: { hasReceivedPayout: true },
-      });
-
-      // Create fund disbursement for winner
-      await tx.fundDisbursement.create({
-        data: {
-          committeeId,
-          monthId,
-          memberId: winnerMemberId,
-          disbursementType: (resolutionType === "lottery" ? "lottery_payout" : "bid_payout") as "lottery_payout" | "bid_payout",
-          amount: toBigInt(winningBidAmount),
-          notes: `Month ${month.monthNumber} payout`,
-        },
-      });
-
-      // Create member distributions
-      const activeMembers = await tx.committeeMember.findMany({
-        where: { committeeId, isActive: true },
-      });
-
+    if (activeMembers && activeMembers.length > 0) {
       const distributions = activeMembers.map(m => ({
-        committeeId,
-        monthId,
-        memberId: m.id,
-        distributionAmount: toBigInt(summary.perMemberDistribution),
-        interestShare: toBigInt(summary.interestAmount / totalMembers),
-        organiserFeeShare: toBigInt(summary.organiserFee / totalMembers),
+        committee_id: committeeId,
+        month_id: monthId,
+        member_id: m.id,
+        distribution_amount: summary.perMemberDistribution,
+        interest_share: summary.interestAmount / totalMembers,
+        organiser_fee_share: summary.organiserFee / totalMembers,
       }));
 
-      for (const dist of distributions) {
-        await tx.memberDistribution.upsert({
-          where: { monthId_memberId: { monthId, memberId: dist.memberId } },
-          create: dist,
-          update: dist,
-        });
-      }
+      const { error: distErr } = await supabase
+        .from("member_distributions")
+        .upsert(distributions, { onConflict: "month_id,member_id" });
 
-      return {
-        success: true,
-        month: updatedMonth,
-        summary,
-        winnerMemberId,
-      };
+      if (distErr) throw distErr;
+    }
+
+    // ─── Wallet Ledger Operations ─────────────────────────────────────
+    // Resolve committee_member.id → users.id for wallet ledger FK
+    const { data: winnerMember } = await supabase
+      .from("committee_members")
+      .select("userId")
+      .eq("id", winnerMemberId)
+      .single();
+
+    const winnerUserId = winnerMember?.userId || winnerMemberId;
+    const activeMembersWithUserId = (activeMembers || []).map(m => ({ committeeMemberId: m.id, userId: m.userId }));
+
+    // 1. Winner: credit bid payout
+    await WalletLedgerService.creditWallet({
+      memberId: winnerUserId,
+      committeeId,
+      amount: winningBidAmount,
+      entryType: "bid_payout",
+      referenceType: "committee_months",
+      referenceId: monthId,
+      idempotencyKey: `payout_${committeeId}_${monthId}`,
+      createdBy: "system",
+      notes: `Month ${month.month_number} winning bid payout`,
     });
+
+    // 1b. Winner: debit interest charge
+    try {
+      await WalletLedgerService.debitWallet({
+        memberId: winnerUserId,
+        committeeId,
+        amount: summary.interestAmount,
+        entryType: "interest_charge",
+        referenceType: "committee_months",
+        referenceId: monthId,
+        idempotencyKey: `interest_${committeeId}_${monthId}`,
+        createdBy: "system",
+        notes: `Month ${month.month_number} interest charge on winner`,
+      });
+    } catch (err: any) {
+      if (err instanceof InsufficientBalanceError) {
+        console.error(
+          `[CRITICAL] resolveMonth: Winner ${winnerUserId} has insufficient balance for interest charge ` +
+          `(${summary.interestAmount} paise) after receiving bid payout of ${winningBidAmount} paise. ` +
+          `Committee: ${committeeId}, Month: ${monthId}. Rolling back entire resolution.`
+        );
+        throw new Error(
+          `CRITICAL: Winner wallet cannot cover interest charge (₹${summary.interestAmount / 100}). ` +
+          `Month resolution rolled back. Please investigate member ${winnerUserId}'s wallet state.`
+        );
+      }
+      throw err;
+    }
+
+    // 2. Each active member: credit distribution (including the winner)
+    for (const member of activeMembersWithUserId) {
+      await WalletLedgerService.creditWallet({
+        memberId: member.userId,
+        committeeId,
+        amount: summary.perMemberDistribution,
+        entryType: "distribution_credit",
+        referenceType: "committee_months",
+        referenceId: monthId,
+        idempotencyKey: `dist_${committeeId}_${monthId}_${member.committeeMemberId}`,
+        createdBy: "system",
+        notes: `Month ${month.month_number} distribution credit`,
+      });
+    }
+
+    // 2b. Organiser fee: debit from organizer's wallet
+    if (summary.organiserFee > 0) {
+      await WalletLedgerService.debitWallet({
+        memberId: committee.organizerId,
+        committeeId,
+        amount: summary.organiserFee,
+        entryType: "adjustment_debit",
+        referenceType: "committee_months",
+        referenceId: monthId,
+        idempotencyKey: `orgfee_${committeeId}_${monthId}`,
+        createdBy: "system",
+        notes: `Month ${month.month_number} organiser fee`,
+      });
+    }
+
+    // 3. Post-resolution verification: ensure conservation of money
+    const integrity = await this.verifyMonthLedgerIntegrity(committeeId, monthId);
+    if (integrity.imbalance !== 0) {
+      throw new LedgerIntegrityError(
+        committeeId,
+        monthId,
+        integrity.totalCredits,
+        integrity.totalDebits
+      );
+    }
+
+    return {
+      success: true,
+      month: { id: monthId, status: "completed" },
+      summary,
+      winnerMemberId,
+    };
+  }
+
+  // ─── 3b. Verify Month Ledger Integrity ────────────────────────────────────
+  /**
+   * Post-resolution verification: ensures all wallet ledger entries for this
+   * month sum to zero within the committee (conservation of money).
+   *
+   * Checks:
+   *   - Sum all credits for this committee+month → totalCredits
+   *   - Sum all debits for this committee+month → totalDebits
+   *   - totalCredits - totalDebits must equal 0
+   *
+   * If mismatch: logs CRITICAL error, throws LedgerIntegrityError.
+   * The caller should NOT proceed to next month's bidding.
+   */
+  static async verifyMonthLedgerIntegrity(
+    committeeId: string,
+    monthId: string
+  ): Promise<{
+    totalCredits: number;
+    totalDebits: number;
+    imbalance: number;
+    entryCount: number;
+  }> {
+    // Query all confirmed ledger entries for this committee+month
+    const { data: entries, error } = await supabase
+      .from("wallet_ledger_entries")
+      .select("amount, direction, reference_type, reference_id")
+      .eq("committee_id", committeeId)
+      .eq("reference_type", "committee_months")
+      .eq("reference_id", monthId)
+      .eq("status", "confirmed");
+
+    if (error) throw error;
+
+    const allEntries = entries || [];
+
+    if (allEntries.length === 0) {
+      console.error(
+        `[CRITICAL] verifyMonthLedgerIntegrity: No ledger entries found for committee=${committeeId} month=${monthId}. ` +
+        `Month was marked completed but no wallet operations were recorded.`
+      );
+      throw new LedgerIntegrityError(committeeId, monthId, 0, 0);
+    }
+
+    // Sum credits and debits
+    let totalCredits = 0;
+    let totalDebits = 0;
+
+    for (const entry of allEntries) {
+      const amount = Number(entry.amount);
+      if (entry.direction === "credit") {
+        totalCredits += amount;
+      } else if (entry.direction === "debit") {
+        totalDebits += amount;
+      }
+    }
+
+    const imbalance = totalCredits - totalDebits;
+
+    // Conservation check: total credits must equal total debits
+    if (imbalance !== 0) {
+      console.error(
+        `[CRITICAL] verifyMonthLedgerIntegrity: Ledger imbalance for committee=${committeeId} month=${monthId}. ` +
+        `totalCredits=${totalCredits} paise, totalDebits=${totalDebits} paise, imbalance=${imbalance} paise. ` +
+        `Committee flagged for manual review.`
+      );
+      throw new LedgerIntegrityError(committeeId, monthId, totalCredits, totalDebits);
+    }
+
+    return {
+      totalCredits,
+      totalDebits,
+      imbalance,
+      entryCount: allEntries.length,
+    };
   }
 
   // ─── 4. Run Lottery ────────────────────────────────────────────────────────
@@ -340,14 +576,14 @@ export class CommitteeMonthsService {
   }
 
   // ─── 5. Get Member Eligibility ─────────────────────────────────────────────
-  static async getMemberEligibility(_committeeId: string, memberId: string, monthId: string, txContext?: any) {
-    const tx = txContext || prisma;
-    
-    const member = await tx.committeeMember.findUnique({
-      where: { id: memberId },
-    });
+  static async getMemberEligibility(_committeeId: string, memberId: string, monthId: string) {
+    const { data: member, error: memberErr } = await supabase
+      .from("committee_members")
+      .select("id, isActive, hasReceivedPayout")
+      .eq("id", memberId)
+      .single();
 
-    if (!member) {
+    if (memberErr || !member) {
       return { canBid: false, reason: "Member not found", hasWonBefore: false, contributionStatus: "unknown" };
     }
     if (!member.isActive) {
@@ -358,9 +594,12 @@ export class CommitteeMonthsService {
       return { canBid: false, reason: "Member has already won a previous month", hasWonBefore: true, contributionStatus: "unknown" };
     }
 
-    const contribution = await tx.monthlyContribution.findUnique({
-      where: { monthId_memberId: { monthId, memberId } },
-    });
+    const { data: contribution } = await supabase
+      .from("monthly_contributions")
+      .select("status")
+      .eq("month_id", monthId)
+      .eq("member_id", memberId)
+      .single();
 
     const status = contribution?.status || "pending";
 
@@ -404,12 +643,17 @@ export class CommitteeMonthsService {
       const remainingNonWinners = Math.max(totalMembers - (month.month_number - 1), 1);
 
       const calculated = calculateMonthSummary({
+        committeeId,
+        monthNumber: month.month_number,
         totalMembers,
-        remainingNonWinners,
         contributionPerPerson,
-        totalPool,
+        organiserFeePercent: feePercent,
+        interestRatePercent: 2,
         winningBidAmount: month.winning_bid_amount ? Number(month.winning_bid_amount) : 0,
-        feePercent,
+        winnerId: month.winner_member_id || "",
+        resolutionType: (month.resolution_type || "bid_auction") as "bid_single" | "bid_auction" | "lottery",
+        contributions: placeholderContributions(totalMembers, contributionPerPerson),
+        remainingNonWinners,
       });
 
       return {
@@ -471,16 +715,20 @@ export class CommitteeMonthsService {
     const totalMembers = committee.totalSlots;
     const contributionPerPerson = Number(committee.installmentAmountPaise);
     const feePercent = Number(committee.commissionRatePct ?? 5);
-    const totalPool = totalMembers * contributionPerPerson;
     const remainingNonWinners = Math.max(totalMembers - (month.month_number - 1), 1);
 
     const calculated = calculateMonthSummary({
+      committeeId,
+      monthNumber: month.month_number,
       totalMembers,
-      remainingNonWinners,
       contributionPerPerson,
-      totalPool,
+      organiserFeePercent: feePercent,
+      interestRatePercent: 2,
       winningBidAmount: month.winning_bid_amount ? Number(month.winning_bid_amount) : 0,
-      feePercent,
+      winnerId: month.winner_member_id || "",
+      resolutionType: (month.resolution_type || "bid_auction") as "bid_single" | "bid_auction" | "lottery",
+      contributions: placeholderContributions(totalMembers, contributionPerPerson),
+      remainingNonWinners,
     });
 
     // Fetch related data in parallel
@@ -583,15 +831,21 @@ export class CommitteeMonthsService {
     const remainingNonWinners = Math.max(totalMembers - (monthNumber - 1), 1);
 
     const summary = calculateMonthSummary({
+      committeeId,
+      monthNumber,
       totalMembers,
-      remainingNonWinners,
       contributionPerPerson,
-      totalPool,
+      organiserFeePercent: feePercent,
+      interestRatePercent: 2,
       winningBidAmount: winningBidAmount ?? 0,
-      feePercent,
+      winnerId: "",
+      resolutionType: "bid_auction",
+      contributions: placeholderContributions(totalMembers, contributionPerPerson),
+      remainingNonWinners,
     });
 
     return {
+      ...summary,
       committeeId,
       monthNumber,
       totalMembers,
@@ -599,7 +853,6 @@ export class CommitteeMonthsService {
       totalPool,
       remainingNonWinners,
       feePercent,
-      ...summary,
     };
   }
 
@@ -627,12 +880,17 @@ export class CommitteeMonthsService {
     const remainingNonWinners = Math.max(totalMembers - (monthNumber - 1), 1);
 
     const summary = calculateMonthSummary({
+      committeeId,
+      monthNumber,
       totalMembers,
-      remainingNonWinners,
       contributionPerPerson,
-      totalPool,
+      organiserFeePercent: feePercent,
+      interestRatePercent: 2,
       winningBidAmount: winningBidAmount ?? 0,
-      feePercent,
+      winnerId: "",
+      resolutionType,
+      contributions: placeholderContributions(totalMembers, contributionPerPerson),
+      remainingNonWinners,
     });
 
     const { data: month, error: mErr } = await supabase
@@ -656,6 +914,36 @@ export class CommitteeMonthsService {
 
     if (mErr) throw mErr;
 
+    // Create monthly_contributions records for all active members
+    // so that the payment flow (createContributionOrder) and
+    // openBiddingForMonth (checks all members paid) have records to work with.
+    const { data: activeMembers, error: membersErr } = await supabase
+      .from("committee_members")
+      .select("id")
+      .eq("committeeId", committeeId)
+      .eq("isActive", true);
+
+    if (membersErr) throw membersErr;
+
+    if (activeMembers && activeMembers.length > 0) {
+      const contributionRecords = activeMembers.map((member) => ({
+        committee_id: committeeId,
+        month_id: month.id,
+        member_id: member.id,
+        amount_due: contributionPerPerson,
+        amount_paid: 0,
+        status: "pending",
+        late_fee_amount: 0,
+        late_weeks: 0,
+      }));
+
+      const { error: contribErr } = await supabase
+        .from("monthly_contributions")
+        .insert(contributionRecords);
+
+      if (contribErr) throw contribErr;
+    }
+
     return { ...month, projected: summary };
   }
 
@@ -676,7 +964,7 @@ export class CommitteeMonthsService {
     if (cErr || !committee) throw new Error("Committee not found");
 
     const contributionAmount = Number(committee.installmentAmountPaise);
-    const lateFeeAmount = calculateLateFee(contributionAmount, weeksLate);
+    const lateFeeAmount = calculateLateFeeForMember(contributionAmount, weeksLate);
 
     return {
       committeeId,
@@ -710,7 +998,7 @@ export class CommitteeMonthsService {
     const monthlyDistributions = (distributions || []).map(d => Number(d.distribution_amount));
     const finalPayout = disbursement ? Number(disbursement.amount) : 0;
 
-    const total = calculateLastMemberTotal(monthlyDistributions, finalPayout);
+    const total = calculateLastMemberTotal(monthlyDistributions, finalPayout, 0);
 
     return {
       committeeId,

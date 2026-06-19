@@ -155,6 +155,43 @@ export class CommitteesService {
     return member;
   }
 
+  static async adjustCommitteeSize(committeeId: string, newTotalSlots: number) {
+    const { data: committee, error: commError } = await supabase
+      .from("committees")
+      .select("status, filledSlots, totalSlots")
+      .eq("id", committeeId)
+      .single();
+
+    if (commError || !committee) throw new Error("Committee not found");
+    if (committee.status !== "DRAFT") throw new Error("Committee size can only be adjusted before starting");
+
+    if (newTotalSlots < committee.filledSlots) {
+      throw new Error(
+        `Cannot reduce size to ${newTotalSlots}: already ${committee.filledSlots} members joined. ` +
+        `Minimum allowed is ${committee.filledSlots}.`
+      );
+    }
+
+    if (newTotalSlots === committee.totalSlots) {
+      throw new Error("New size is the same as current size");
+    }
+
+    const { error: updateError } = await supabase
+      .from("committees")
+      .update({ totalSlots: newTotalSlots })
+      .eq("id", committeeId);
+
+    if (updateError) throw updateError;
+
+    return {
+      success: true,
+      previousTotalSlots: committee.totalSlots,
+      newTotalSlots,
+      filledSlots: committee.filledSlots,
+      isNowFull: newTotalSlots === committee.filledSlots,
+    };
+  }
+
   static async startCommittee(committeeId: string) {
     const { data: committee, error: commError } = await supabase
       .from("committees")
@@ -223,7 +260,6 @@ export class CommitteesService {
 
     if (commError || !committee) throw new Error("Committee not found");
     if (committee.status !== "ACTIVE") throw new Error("Bids can only be submitted for active committees");
-    if (committee.type !== "AUCTION") throw new Error("Bids can only be submitted for auction-type committees");
 
     const currentCycleNo = committee.currentCycleNo;
 
@@ -301,224 +337,6 @@ export class CommitteesService {
 
     emitToAll("committee:bid_submitted", { committeeId, cycleNo: currentCycleNo, userId, bidAmountPaise });
     return bid;
-  }
-
-  static async resolveAuction(committeeId: string, cycleNo: number) {
-    const { data: committee, error: commError } = await supabase
-      .from("committees")
-      .select("*, members:committee_members(*, user:users(*))")
-      .eq("id", committeeId)
-      .single();
-
-    if (commError || !committee) throw new Error("Committee not found");
-    if (committee.status !== "ACTIVE") throw new Error("Committee is not active");
-    if (committee.currentCycleNo !== cycleNo) throw new Error(`Requested cycle ${cycleNo} does not match current cycle ${committee.currentCycleNo}`);
-
-    const totalSlots = committee.totalSlots;
-    const totalPot = Number(committee.installmentAmountPaise) * totalSlots;
-    const commissionRate = Number(committee.commissionRatePct || 5);
-    const commissionPaise = (totalPot * commissionRate) / 100;
-
-    // Look up the committee_month record for this cycleNo
-    const { data: currentMonth, error: _monthErr } = await supabase
-      .from("committee_months")
-      .select("id")
-      .eq("committee_id", committeeId)
-      .eq("month_number", cycleNo)
-      .maybeSingle();
-
-    const monthId = currentMonth?.id ?? null;
-
-    const { data: bids, error: bidsError } = await supabase
-      .from("bids")
-      .select("*")
-      .eq("committee_id", committeeId)
-      .eq("month_id", monthId ?? "00000000-0000-0000-0000-000000000000");
-
-    if (bidsError) throw bidsError;
-
-    let winnerMemberId: string;
-    let winnerUserId: string;
-    let winnerSlot: number;
-    let winningBidAmountPaise: number;
-    let isDraw = false;
-
-    const eligibleMembers = committee.members.filter((m: any) => !m.hasReceivedPayout);
-    if (eligibleMembers.length === 0) {
-      throw new Error("No eligible members left for payout");
-    }
-
-    if (bids && bids.length > 0) {
-      const sortedBids = bids.sort((a: any, b: any) => Number(a.bid_amount) - Number(b.bid_amount));
-      const lowestBidAmount = Number(sortedBids[0].bid_amount);
-
-      const tieBidders = sortedBids.filter((b: any) => Number(b.bid_amount) === lowestBidAmount);
-      const winningBid = tieBidders[Math.floor(Math.random() * tieBidders.length)];
-      
-      const winningMember = committee.members.find((m: any) => m.id === winningBid.memberId);
-      if (!winningMember) throw new Error("Winning member not found in committee");
-
-      winnerMemberId = winningMember.id;
-      winnerUserId = winningMember.userId;
-      winnerSlot = winningMember.slotNumber;
-      winningBidAmountPaise = lowestBidAmount;
-    } else {
-      isDraw = true;
-      const winningMember = eligibleMembers[Math.floor(Math.random() * eligibleMembers.length)];
-      winnerMemberId = winningMember.id;
-      winnerUserId = winningMember.userId;
-      winnerSlot = winningMember.slotNumber;
-      winningBidAmountPaise = totalPot - commissionPaise;
-    }
-
-    const discountPaise = totalPot - winningBidAmountPaise;
-    const dividendTotalPaise = discountPaise - commissionPaise;
-    const dividendPerMemberPaise = dividendTotalPaise > 0 ? Math.floor(dividendTotalPaise / totalSlots) : 0;
-
-    const { data: payoutCycle, error: payoutError } = await supabase
-      .from("payout_cycles")
-      .insert({
-        committeeId,
-        cycleNo,
-        winnerId: winnerUserId,
-        winnerSlot,
-        payoutAmtPaise: winningBidAmountPaise,
-        bidAmountPaise: isDraw ? null : winningBidAmountPaise,
-        isCompleted: true,
-        payoutDate: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (payoutError) throw payoutError;
-
-    const { error: memberUpdateError } = await supabase
-      .from("committee_members")
-      .update({ hasReceivedPayout: true })
-      .eq("id", winnerMemberId);
-
-    if (memberUpdateError) throw memberUpdateError;
-
-    const { data: winnerWallet, error: walletErr } = await supabase
-      .from("wallets")
-      .select("*")
-      .eq("userId", winnerUserId)
-      .single();
-
-    if (walletErr || !winnerWallet) throw new Error("Winner wallet not found");
-
-    const winnerBalanceBefore = Number(winnerWallet.balancePaise);
-    const winnerBalanceAfter = winnerBalanceBefore + winningBidAmountPaise;
-
-    await supabase
-      .from("wallets")
-      .update({ balancePaise: winnerBalanceAfter })
-      .eq("id", winnerWallet.id);
-
-    await supabase
-      .from("transactions")
-      .insert({
-        walletId: winnerWallet.id,
-        userId: winnerUserId,
-        type: "CREDIT",
-        category: "COMMITTEE_PAYOUT",
-        status: "COMPLETED",
-        amountPaise: winningBidAmountPaise,
-        balanceBefore: winnerBalanceBefore,
-        balanceAfter: winnerBalanceAfter,
-        description: `Chit Payout Winner - Cycle #${cycleNo}`,
-        referenceId: payoutCycle.id,
-        referenceType: "PayoutCycle",
-        idempotencyKey: `payout-${committeeId}-${cycleNo}-${Date.now()}`,
-      });
-
-    const { data: organizerWallet, error: orgWalletErr } = await supabase
-      .from("wallets")
-      .select("*")
-      .eq("userId", committee.organizerId)
-      .single();
-
-    if (!orgWalletErr && organizerWallet) {
-      const orgBalanceBefore = Number(organizerWallet.balancePaise);
-      const orgBalanceAfter = orgBalanceBefore + commissionPaise;
-
-      await supabase
-        .from("wallets")
-        .update({ balancePaise: orgBalanceAfter })
-        .eq("id", organizerWallet.id);
-
-      await supabase
-        .from("transactions")
-        .insert({
-          walletId: organizerWallet.id,
-          userId: committee.organizerId,
-          type: "CREDIT",
-          category: "COMMISSION",
-          status: "COMPLETED",
-          amountPaise: commissionPaise,
-          balanceBefore: orgBalanceBefore,
-          balanceAfter: orgBalanceAfter,
-          description: `Chit Foreman Commission - Committee ${committee.name} Cycle #${cycleNo}`,
-          referenceId: payoutCycle.id,
-          referenceType: "PayoutCycle",
-          idempotencyKey: `commission-${committeeId}-${cycleNo}-${Date.now()}`,
-        });
-      
-      emitToUser(committee.organizerId, "wallet:credited", {
-        amountPaise: commissionPaise,
-        newBalance: orgBalanceAfter,
-      });
-    }
-
-    emitToUser(winnerUserId, "wallet:credited", {
-      amountPaise: winningBidAmountPaise,
-      newBalance: winnerBalanceAfter,
-    });
-
-    const nextCycleNo = cycleNo + 1;
-    if (nextCycleNo <= totalSlots) {
-      const newInstallmentAmount = Number(committee.installmentAmountPaise) - dividendPerMemberPaise;
-
-      const { error: instUpdateErr } = await supabase
-        .from("installments")
-        .update({ amountDuePaise: newInstallmentAmount })
-        .eq("committeeId", committeeId)
-        .eq("cycleNo", nextCycleNo);
-      
-      if (instUpdateErr) throw instUpdateErr;
-    }
-
-    let nextStatus = "ACTIVE";
-    if (cycleNo >= totalSlots) {
-      nextStatus = "COMPLETED";
-    }
-
-    const nextDueDate = new Date(new Date().getTime() + committee.cycleDurationDays * 24 * 60 * 60 * 1000).toISOString();
-
-    await supabase
-      .from("committees")
-      .update({
-        currentCycleNo: nextStatus === "COMPLETED" ? cycleNo : nextCycleNo,
-        status: nextStatus,
-        nextDueDate: nextStatus === "COMPLETED" ? null : nextDueDate,
-      })
-      .eq("id", committeeId);
-
-    emitToAll("committee:resolved", {
-      committeeId,
-      cycleNo,
-      winnerId: winnerUserId,
-      payoutAmtPaise: winningBidAmountPaise,
-      dividendPerMemberPaise,
-    });
-
-    return {
-      winnerId: winnerUserId,
-      winnerSlot,
-      payoutAmtPaise: winningBidAmountPaise,
-      dividendPerMemberPaise,
-      isDraw,
-    };
   }
 
   // ─── Join by Invite Code ──────────────────────────────────────────────────

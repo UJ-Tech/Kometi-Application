@@ -250,3 +250,20 @@ export interface MemberDistribution {
   distributedAt:      string;
   member?:            CommitteeMember;
 }
+
+// ─── Withdrawals ───────────────────────────────────────────────────────────
+export type WithdrawalStatus = "requested" | "processing" | "completed" | "failed" | "cancelled";
+
+export interface Withdrawal {
+  id:                  string;
+  member_id:           string;
+  committee_id:        string;
+  amount:              number;
+  payment_method_id:   string | null;
+  status:              WithdrawalStatus;
+  razorpay_payout_id:  string | null;
+  ledger_entry_id:     string | null;
+  requested_at:        string;
+  completed_at:        string | null;
+  failure_reason:      string | null;
+}

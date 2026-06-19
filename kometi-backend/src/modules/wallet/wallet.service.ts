@@ -26,6 +26,24 @@ export class WalletService {
       );
     }
 
+    // Include committee wallet ledger balance (bid payouts, distributions, etc.)
+    // The legacy wallets.balancePaise only tracks topup/transfer/contribution-debits.
+    // Committee credits/debits live in wallet_ledger_entries and must be added.
+    // EXCLUDE contribution_made credits — those are records of payments, not spendable balance.
+    const { data: ledgerEntries } = await supabase
+      .from("wallet_ledger_entries")
+      .select("amount, direction, entry_type")
+      .eq("member_id", userId)
+      .eq("status", "confirmed");
+
+    const committeeBalance = (ledgerEntries || []).reduce((sum: number, entry: any) => {
+      // contribution_made is a record of payment into the pool, not spendable money
+      if (entry.entry_type === "contribution_made") return sum;
+      return sum + (entry.direction === "credit" ? Number(entry.amount) : -Number(entry.amount));
+    }, 0);
+
+    wallet.balancePaise = Number(wallet.balancePaise) + committeeBalance;
+
     return wallet;
   }
 

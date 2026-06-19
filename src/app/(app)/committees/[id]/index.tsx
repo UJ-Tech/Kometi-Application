@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Platform,
   Share,
+  Keyboard,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -46,6 +47,9 @@ export default function CommitteeDetail() {
   const [newMonthNumber, setNewMonthNumber] = useState("");
   const [newMonthDate, setNewMonthDate] = useState("");
   const [newMonthResolution, setNewMonthResolution] = useState<"bid_single" | "bid_auction" | "lottery">("bid_auction");
+  const [showAdjustSize, setShowAdjustSize] = useState(false);
+  const [adjustSizeValue, setAdjustSizeValue] = useState("");
+  const [isAdjusting, setIsAdjusting] = useState(false);
 
   const confirmAction = async (title: string, message: string, confirmLabel = "Confirm") => {
     if (Platform.OS === "web") {
@@ -217,27 +221,22 @@ export default function CommitteeDetail() {
   };
 
   const handleStartCommittee = async () => {
-    Alert.alert(
+    const confirmed = await confirmAction(
       "Start Chit Committee",
       "Are you sure you want to start this chit? This will generate the installment schedule and activate the first cycle. You cannot add more members after starting.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Start Now",
-          onPress: async () => {
-            try {
-              setLoading(true);
-              await committeesApi.start(id);
-              Alert.alert("Success", "Committee has been started successfully!");
-              await loadCommittee();
-            } catch (err) {
-              Alert.alert("Error", err instanceof Error ? err.message : "Failed to start committee");
-              setLoading(false);
-            }
-          },
-        },
-      ]
+      "Start Now"
     );
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      await committeesApi.start(id);
+      Alert.alert("Success", "Committee has been started successfully!");
+      await loadCommittee();
+    } catch (err) {
+      Alert.alert("Error", err instanceof Error ? err.message : "Failed to start committee");
+      setLoading(false);
+    }
   };
 
   const handleRefresh = () => {
@@ -267,35 +266,41 @@ export default function CommitteeDetail() {
     }
   };
 
-  const handleResolveAuction = async () => {
-    Alert.alert(
-      "Confirm Resolution",
-      `Are you sure you want to resolve the auction for Cycle #${committee.currentCycleNo}? If no bids are submitted, a random winner will be selected.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Resolve",
-          style: "default",
-          onPress: async () => {
-            try {
-              setLoading(true);
-              const res = await committeesApi.resolveAuction(id, committee.currentCycleNo);
-              const result = res.data.data;
-              const winner = committee.members.find((m: any) => m.userId === result.winnerId)?.user?.name || "Member";
+  const handleResolveMonth = async () => {
+    if (!monthsData || monthsData.length === 0) {
+      await confirmAction("No Months", "No months have been created yet. Create a month first.", "OK");
+      return;
+    }
 
-              Alert.alert(
-                "Auction Resolved",
-                `Winner: ${winner}\nPayout: ${formatINR(result.payoutAmtPaise)}\nDistributed Dividend: ${formatINR(result.dividendPerMemberPaise)} per member.`,
-                [{ text: "OK", onPress: loadCommittee }]
-              );
-            } catch (err) {
-              Alert.alert("Resolution Failed", err instanceof Error ? err.message : "Failed to resolve auction");
-              setLoading(false);
-            }
-          },
-        },
-      ]
+    const currentMonth = monthsData.find((m: any) => m.status !== "completed");
+    if (!currentMonth) {
+      await confirmAction("All Resolved", "All months have already been resolved.", "OK");
+      return;
+    }
+
+    const confirmed = await confirmAction(
+      "Confirm Resolution",
+      `Are you sure you want to resolve Month #${currentMonth.monthNumber}? If no bids are submitted, a random winner will be selected.`,
+      "Resolve"
     );
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      const res = await committeesApi.resolveMonth(id, currentMonth.id);
+      const result = res.data.data;
+      const winner = committee.members.find((m: any) => m.userId === result.winnerMemberId)?.user?.name || "Member";
+
+      await confirmAction(
+        "Month Resolved",
+        `Winner: ${winner}\nMonth #${currentMonth.monthNumber} has been resolved.`,
+        "OK"
+      );
+      loadCommittee();
+    } catch (err) {
+      await confirmAction("Resolution Failed", err instanceof Error ? err.message : "Failed to resolve month", "OK");
+      setLoading(false);
+    }
   };
 
   const handleShareInviteCode = async () => {
@@ -339,6 +344,57 @@ export default function CommitteeDetail() {
       Alert.alert("Error", err instanceof Error ? err.message : "Failed to create month");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleAdjustSize = async () => {
+    const newSize = Number(adjustSizeValue);
+    if (!newSize || newSize < 2) {
+      Alert.alert("Invalid Input", "Committee must have at least 2 members.");
+      return;
+    }
+    if (newSize > committee.totalSlots) {
+      Alert.alert("Invalid Input", `Cannot increase size beyond original ${committee.totalSlots} slots.`);
+      return;
+    }
+    if (newSize < committee.filledSlots) {
+      Alert.alert("Invalid Input", `Cannot reduce below ${committee.filledSlots} — that many members already joined.`);
+      return;
+    }
+    if (newSize === committee.totalSlots) {
+      Alert.alert("No Change", "New size is the same as current size.");
+      return;
+    }
+
+    const confirmed = await confirmAction(
+      "Adjust Committee Size",
+      `Change total slots from ${committee.totalSlots} to ${newSize}?\n\n` +
+      `${committee.filledSlots} members have already joined. ` +
+      (newSize === committee.filledSlots
+        ? "This will fill all slots and unlock the committee."
+        : `${newSize - committee.filledSlots} more slot(s) will need to be filled.`),
+      "Adjust"
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsAdjusting(true);
+      const res = await committeesApi.adjustCommitteeSize(id, newSize);
+      if (res.data.success) {
+        Alert.alert(
+          "Size Adjusted",
+          res.data.data.isNowFull
+            ? "All slots are now filled! You can start the committee."
+            : `Committee size updated to ${newSize} members.`
+        );
+        setAdjustSizeValue("");
+        setShowAdjustSize(false);
+        await loadCommittee();
+      }
+    } catch (err) {
+      Alert.alert("Error", err instanceof Error ? err.message : "Failed to adjust size");
+    } finally {
+      setIsAdjusting(false);
     }
   };
 
@@ -503,6 +559,31 @@ export default function CommitteeDetail() {
           View your contributions, place bids, and track payments.
         </Text>
       </View>
+
+      {/* Committee Not Ready — Member-facing when DRAFT and not full */}
+      {!isOrganizer && committee.status === "DRAFT" && committee.filledSlots < committee.totalSlots && (
+        <View className="mb-6">
+          <Card style={{ marginBottom: 0 }} padding={0}>
+            <View className="p-5">
+              <View className="flex-row items-center mb-3">
+                <View className="w-10 h-10 rounded-full bg-amber-500/15 border border-amber-500/20 items-center justify-center mr-3">
+                  <Ionicons name="time-outline" size={20} color="#f59e0b" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-white font-bold text-sm">Committee Not Ready Yet</Text>
+                  <Text className="text-neutral-400 text-xs mt-0.5">
+                    Waiting for {committee.totalSlots - committee.filledSlots} more member(s) to join.
+                  </Text>
+                </View>
+              </View>
+              <Text className="text-neutral-400 text-xs">
+                The organizer will start the committee once all slots are filled or adjusted.
+                You&apos;ll be notified when it&apos;s active.
+              </Text>
+            </View>
+          </Card>
+        </View>
+      )}
 
       {/* Create Month — Organizer Only */}
       {isOrganizer && committee.status === "ACTIVE" && (
@@ -702,7 +783,117 @@ export default function CommitteeDetail() {
         </View>
       )}
 
-      {/* Start Committee Button — Organizer Only */}
+      {/* Waiting for Members — Organizer + DRAFT + Not Full */}
+      {isOrganizer && committee.status === "DRAFT" && committee.filledSlots < committee.totalSlots && (
+        <View className="mb-6">
+          <Card style={{ marginBottom: 0 }} padding={0}>
+            <View className="p-5">
+              <View className="flex-row items-center mb-3">
+                <View className="w-10 h-10 rounded-full bg-amber-500/15 border border-amber-500/20 items-center justify-center mr-3">
+                  <Ionicons name="time-outline" size={20} color="#f59e0b" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-white font-bold text-sm">Waiting for Members</Text>
+                  <Text className="text-neutral-400 text-xs mt-0.5">
+                    {committee.totalSlots - committee.filledSlots} more slot(s) to fill
+                  </Text>
+                </View>
+              </View>
+
+              {/* Progress bar */}
+              <View className="bg-surface-bg rounded-full h-2.5 mb-4">
+                <View
+                  className="bg-amber-500 h-2.5 rounded-full"
+                  style={{ width: `${(committee.filledSlots / committee.totalSlots) * 100}%` }}
+                />
+              </View>
+
+              <Text className="text-neutral-400 text-xs mb-4">
+                No actions (starting, bidding, payouts) can be performed until all slots are filled.
+                Ask members to join using the invite code, or adjust the committee size below.
+              </Text>
+
+              {/* Adjust Size Section */}
+              {!showAdjustSize ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    setAdjustSizeValue(String(committee.filledSlots));
+                    setShowAdjustSize(true);
+                  }}
+                  className="bg-brand-500/15 border border-brand-500/20 h-11 rounded-xl items-center justify-center flex-row"
+                >
+                  <Ionicons name="resize-outline" size={16} color={COLORS.brandPrimary} />
+                  <Text className="text-brand-400 font-bold text-sm ml-1.5">Adjust Committee Size</Text>
+                </TouchableOpacity>
+              ) : (
+                <View className="bg-surface-bg border border-brand-primary/10 rounded-xl p-4">
+                  <Text className="text-neutral-400 text-xs font-semibold mb-2">
+                    New Total Slots (min: {committee.filledSlots})
+                  </Text>
+                  <View className="flex-row gap-3 mb-3">
+                    <View className="flex-1 bg-surface-card border border-brand-primary/10 rounded-xl px-4 h-12 justify-center">
+                      <TextInput
+                        value={adjustSizeValue}
+                        onChangeText={setAdjustSizeValue}
+                        keyboardType="numeric"
+                        returnKeyType="done"
+                        blurOnSubmit={true}
+                        onSubmitEditing={() => Keyboard.dismiss()}
+                        placeholder={`${committee.filledSlots}`}
+                        placeholderTextColor="#a3a3a3"
+                        className="text-white font-semibold text-sm"
+                      />
+                    </View>
+                    <View className="flex-row gap-2">
+                      <TouchableOpacity
+                        onPress={() => { Keyboard.dismiss(); setAdjustSizeValue(String(committee.filledSlots)); }}
+                        className="bg-surface-card border border-brand-primary/10 h-12 px-3 rounded-xl items-center justify-center"
+                      >
+                        <Text className="text-neutral-400 font-bold text-xs">Min</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => { Keyboard.dismiss(); setAdjustSizeValue(String(committee.totalSlots)); }}
+                        className="bg-surface-card border border-brand-primary/10 h-12 px-3 rounded-xl items-center justify-center"
+                      >
+                        <Text className="text-neutral-400 font-bold text-xs">Max</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <Text className="text-neutral-500 text-[10px] mb-3">
+                    Set to {committee.filledSlots} to immediately unlock the committee.
+                  </Text>
+                  <View className="flex-row gap-3">
+                    <TouchableOpacity
+                      onPress={() => { Keyboard.dismiss(); setShowAdjustSize(false); }}
+                      className="flex-1 h-10 rounded-xl items-center justify-center border border-brand-primary/10"
+                    >
+                      <Text className="text-neutral-400 font-bold text-sm">Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setTimeout(() => handleAdjustSize(), 100);
+                      }}
+                      disabled={isAdjusting}
+                      activeOpacity={0.7}
+                      className="flex-1 bg-brand-500 h-10 rounded-xl items-center justify-center"
+                      style={{ opacity: isAdjusting ? 0.6 : 1 }}
+                    >
+                      {isAdjusting ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text className="text-white font-bold text-sm">Confirm</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
+          </Card>
+        </View>
+      )}
+
+      {/* Start Committee Button — Organizer Only (only when ALL slots filled) */}
       {isOrganizer && committee.status === "DRAFT" && committee.filledSlots === committee.totalSlots && (
         <View className="mb-6">
           <Button
@@ -854,7 +1045,7 @@ export default function CommitteeDetail() {
 
               {(isOrganizer || isAdminOrManager) && (
                 <TouchableOpacity
-                  onPress={handleResolveAuction}
+                  onPress={handleResolveMonth}
                   className="bg-gold-500/80 hover:bg-gold-500 h-11 rounded-xl items-center justify-center flex-row mt-4"
                 >
                   <Ionicons name="flash-outline" size={16} color="#fff" />

@@ -27,7 +27,7 @@ export class WalletController {
         success: true,
         data: {
           balancePaise: wallet.balancePaise,
-          reservedPaise: wallet.reservedPaise,
+          reservedPaise: wallet.reservedPaise || 0,
         },
       });
     } catch (err) {

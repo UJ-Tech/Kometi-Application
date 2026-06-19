@@ -62,6 +62,17 @@ export class CommitteesController {
     }
   }
 
+  static async adjustCommitteeSize(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const { newTotalSlots } = req.body;
+      const result = await CommitteesService.adjustCommitteeSize(id, Number(newTotalSlots));
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   static async start(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
@@ -81,17 +92,6 @@ export class CommitteesController {
       const { amountPaise } = req.body;
       const bid = await CommitteesService.submitBid(id, userId, Number(amountPaise));
       res.status(201).json({ success: true, data: bid });
-    } catch (err) {
-      next(err);
-    }
-  }
-
-  static async resolveAuction(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const { id } = req.params;
-      const { cycleNo } = req.body;
-      const result = await CommitteesService.resolveAuction(id, Number(cycleNo));
-      res.status(200).json({ success: true, data: result });
     } catch (err) {
       next(err);
     }

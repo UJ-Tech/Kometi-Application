@@ -46,3 +46,11 @@ export const verifyWalletTopupSchema = z.object({
     signature: z.string().min(1, "Signature is required"),
   }),
 });
+
+export const payFromWalletSchema = z.object({
+  body: z.object({
+    committeeId: z.string().min(1, "Committee ID is required"),
+    monthId: z.string().min(1, "Month ID is required"),
+    memberId: z.string().min(1, "Member ID is required"),
+  }),
+});

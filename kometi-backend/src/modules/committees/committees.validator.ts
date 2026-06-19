@@ -26,3 +26,9 @@ export const joinByCodeSchema = z.object({
     inviteCode: z.string().min(8, "Invite code must be 8 characters").max(8, "Invite code must be 8 characters"),
   }),
 });
+
+export const adjustCommitteeSizeSchema = z.object({
+  body: z.object({
+    newTotalSlots: z.number().int().min(2, "Committee must have at least 2 members").max(50),
+  }),
+});

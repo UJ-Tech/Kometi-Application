@@ -68,4 +68,13 @@ export const paymentsApi = {
 
   verifyPayment: (payload: VerifyPaymentPayload) =>
     apiClient.post<ApiResponse<{ success: boolean; contribution: any }>>("/payments/verify-payment", payload),
+
+  // ─── Wallet Contribution Payment ───────────────────────────────────────
+
+  payFromWallet: (committeeId: string, monthId: string, memberId: string) =>
+    apiClient.post<ApiResponse<{ success: boolean; contribution: any }>>("/payments/pay-from-wallet", {
+      committeeId,
+      monthId,
+      memberId,
+    }),
 };

@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, FlatList, TouchableOpacity, RefreshControl, Alert, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useWalletStore } from "../../../stores/wallet.store";
 import { formatINR } from "../../../utils/currency";
 import { COLORS } from "../../../constants/theme";
@@ -14,9 +15,11 @@ import ScreenHeader from "../../../components/shared/ScreenHeader";
 import { AmountInput } from "../../../components/ui/AmountInput";
 import { openRazorpayCheckout, loadRazorpayScript } from "../../../utils/razorpay";
 import { useAuthStore } from "../../../stores/auth.store";
+import type { Withdrawal } from "../../../types";
 
 export default function Wallet() {
-  const { balancePaise, transactions, isLoading, fetchWalletData, topupWallet, verifyTopupPayment } = useWalletStore();
+  const router = useRouter();
+  const { balancePaise, transactions, withdrawals, isLoading, fetchWalletData, fetchWithdrawals, topupWallet, verifyTopupPayment } = useWalletStore();
   const currentUser = useAuthStore((s: any) => s.user);
   const [refreshing, setRefreshing] = useState(false);
   const [topupAmount, setTopupAmount] = useState<bigint>(0n);
@@ -33,7 +36,7 @@ export default function Wallet() {
 
   const loadData = async () => {
     setRefreshing(true);
-    await fetchWalletData();
+    await Promise.all([fetchWalletData(), fetchWithdrawals()]);
     setRefreshing(false);
   };
 
@@ -148,17 +151,53 @@ export default function Wallet() {
                   {formatINR(balancePaise)}
                 </Text>
 
-                <TouchableOpacity
-                  onPress={() => setShowTopupInput(!showTopupInput)}
-                  className="bg-white/10 hover:bg-white/20 h-12 rounded-xl items-center justify-center flex-row border border-white/5"
-                >
-                  <Ionicons name={showTopupInput ? "close" : "add"} size={20} color="#fff" />
-                  <Text className="text-white font-bold ml-1.5 text-sm">
-                    {showTopupInput ? "Cancel" : "Add Funds"}
-                  </Text>
-                </TouchableOpacity>
+                <View className="flex-row gap-3">
+                  <TouchableOpacity
+                    onPress={() => setShowTopupInput(!showTopupInput)}
+                    className="bg-white/10 hover:bg-white/20 h-12 rounded-xl items-center justify-center flex-row border border-white/5 flex-1"
+                  >
+                    <Ionicons name={showTopupInput ? "close" : "add"} size={20} color="#fff" />
+                    <Text className="text-white font-bold ml-1.5 text-sm">
+                      {showTopupInput ? "Cancel" : "Add Funds"}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => router.push("/wallet/withdraw" as any)}
+                    className="bg-white/10 hover:bg-white/20 h-12 rounded-xl items-center justify-center flex-row border border-white/5 flex-1"
+                  >
+                    <Ionicons name="arrow-up-outline" size={20} color="#fff" />
+                    <Text className="text-white font-bold ml-1.5 text-sm">Withdraw</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </Card>
+
+            {/* Pending Withdrawals Indicator */}
+            {withdrawals.filter((w: Withdrawal) => w.status === "requested" || w.status === "processing").length > 0 && (
+              <Card style={{ marginBottom: 16, borderColor: "rgba(59,130,246,0.3)" }}>
+                <View className="p-4 flex-row items-center">
+                  <View className="w-8 h-8 rounded-full items-center justify-center bg-blue-500/10">
+                    <Ionicons name="sync-outline" size={16} color="#3b82f6" />
+                  </View>
+                  <View className="ml-3 flex-1">
+                    <Text className="text-blue-400 font-bold text-sm">
+                      {withdrawals.filter((w: Withdrawal) => w.status === "requested" || w.status === "processing").length} pending withdrawal(s)
+                    </Text>
+                    <Text className="text-neutral-500 text-xs mt-0.5">
+                      {formatINR(
+                        withdrawals
+                          .filter((w: Withdrawal) => w.status === "requested" || w.status === "processing")
+                          .reduce((sum: number, w: Withdrawal) => sum + w.amount, 0)
+                      )}{" "}
+                      being processed
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => router.push("/wallet/withdraw" as any)}>
+                    <Ionicons name="chevron-forward" size={18} color="#3b82f6" />
+                  </TouchableOpacity>
+                </View>
+              </Card>
+            )}
 
             {showTopupInput && (
               <Card style={{ marginBottom: 24, borderColor: COLORS.surface.border }}>
