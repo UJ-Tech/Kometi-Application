@@ -27,6 +27,22 @@ router.get(
   CommitteeMonthsController.getMemberEarnings as any
 );
 
+// GET /api/v1/committees/:id/months/overdue
+// Get overdue payment obligations (organiser only)
+router.get(
+  "/overdue",
+  authorize("ADMIN", "ORGANIZER") as any,
+  CommitteeMonthsController.getOverdueObligations as any
+);
+
+// GET /api/v1/committees/:id/months/organiser-advances
+// Get organiser's advance records (organiser only)
+router.get(
+  "/organiser-advances",
+  authorize("ADMIN", "ORGANIZER") as any,
+  CommitteeMonthsController.getOrganiserAdvances as any
+);
+
 // POST /api/v1/committees/:id/months
 // Create a new committee month with pre-calculated values (organizer only)
 router.post(
@@ -70,6 +86,36 @@ router.post(
 router.get(
   "/:monthId/members/:memberId/eligibility",
   CommitteeMonthsController.getEligibility as any
+);
+
+// POST /api/v1/committees/:id/months/:monthId/pay-net
+// Non-winner pays their net obligation after resolution
+router.post(
+  "/:monthId/pay-net",
+  CommitteeMonthsController.payNetAmount as any
+);
+
+// POST /api/v1/committees/:id/months/:monthId/organiser-advance
+// Organiser advances payment for a defaulting member (organizer only)
+router.post(
+  "/:monthId/organiser-advance",
+  authorize("ADMIN", "ORGANIZER") as any,
+  CommitteeMonthsController.organiserAdvance as any
+);
+
+// GET /api/v1/committees/:id/months/:monthId/obligations
+// Get payment obligations for a resolved month
+router.get(
+  "/:monthId/obligations",
+  CommitteeMonthsController.getObligations as any
+);
+
+// POST /api/v1/committees/:id/months/:monthId/settle-payout
+// Manually trigger winner payout settlement (organizer only)
+router.post(
+  "/:monthId/settle-payout",
+  authorize("ADMIN", "ORGANIZER") as any,
+  CommitteeMonthsController.settlePayout as any
 );
 
 export default router;

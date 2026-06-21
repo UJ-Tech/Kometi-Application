@@ -80,10 +80,7 @@ export class AdminService {
     (payoutCycles || []).forEach((cycle: any) => {
       const comm = cycle.committee;
       if (comm) {
-        const totalPot = Number(comm.installmentAmountPaise) * comm.totalSlots;
-        const commRate = Number(comm.commissionRatePct || 5.0);
-        const commission = (totalPot * commRate) / 100;
-        profitOverviewPaise += commission;
+        // No organiser fee in new engine — profit is 0
       }
     });
 
@@ -121,11 +118,8 @@ export class AdminService {
         const date = new Date(cycle.payoutDate);
         const monthKey = date.toLocaleString("en-IN", { month: "short", year: "2-digit" });
         if (monthlyAnalyticsMap.has(monthKey)) {
-          const totalPot = Number(comm.installmentAmountPaise) * comm.totalSlots;
-          const commRate = Number(comm.commissionRatePct || 5.0);
-          const commission = (totalPot * commRate) / 100;
+          // No organiser fee in new engine — profit is 0
           const current = monthlyAnalyticsMap.get(monthKey)!;
-          current.profit += commission;
           monthlyAnalyticsMap.set(monthKey, current);
         }
       }

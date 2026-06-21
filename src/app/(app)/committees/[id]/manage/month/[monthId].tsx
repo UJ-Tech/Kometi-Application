@@ -42,6 +42,7 @@ export default function OrganiserMonthDetail() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
+  const [isSettling, setIsSettling] = useState(false);
 
   const notify = async (title: string, message: string) => {
     if (Platform.OS === "web") {
@@ -79,6 +80,34 @@ export default function OrganiserMonthDetail() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, monthId]);
+
+  // Auto-refresh when month is completed (payments can happen)
+  useEffect(() => {
+    if (!isValid || !month || month.status !== "completed") return;
+    const interval = setInterval(() => {
+      loadData();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [isValid, month?.status, monthId]);
+
+  // Auto-trigger settle payout when month is completed
+  useEffect(() => {
+    if (!month || month.status !== "completed") return;
+    const winnerObl = month.paymentObligations?.find(
+      (o: any) => o.direction === "receive" && o.status === "pending"
+    );
+    if (winnerObl) {
+      committeesApi.settlePayout(id, monthId).then((res) => {
+        const result = res.data?.data;
+        if (result?.settled) {
+          console.log(`[SettlePayout] Auto-settled: ${result.reason}, amount=${result.amount}`);
+        }
+        loadData();
+      }).catch((err) => {
+        console.error("[SettlePayout] Auto-settle failed:", err);
+      });
+    }
+  }, [month?.status, month?.paymentObligations]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -178,6 +207,14 @@ export default function OrganiserMonthDetail() {
   const bidderIds = new Set((month.bids || []).map((b: any) => b.memberId));
   const nonBidders = activeMembers.filter((m: any) => !bidderIds.has(m.id) && !m.hasReceivedPayout);
 
+  // Settle payout helpers
+  const settleWinnerObl = isCompleted && month.paymentObligations?.find(
+    (o: any) => o.direction === "receive" && o.status === "pending"
+  );
+  const settleAllPaid = isCompleted && month.paymentObligations
+    ?.filter((o: any) => o.direction === "pay")
+    ?.every((o: any) => o.status === "paid" || o.status === "organiser_advanced");
+
   return (
     <ScrollView
       className="flex-1 bg-surface-950 px-4"
@@ -249,6 +286,40 @@ export default function OrganiserMonthDetail() {
         </Card>
       )}
 
+      {/* Settle Payout Button — show when winner obligation is still pending */}
+      {isCompleted && settleWinnerObl && (
+          <View className="mt-3 mb-4">
+            <Button
+              label={isSettling ? "Settling..." : settleAllPaid ? "Settle Winner Payout" : "Waiting for members to pay"}
+              variant={settleAllPaid ? "primary" : "secondary"}
+              isLoading={isSettling}
+              disabled={isSettling || !settleAllPaid}
+              onPress={async () => {
+                try {
+                  setIsSettling(true);
+                  const res = await committeesApi.settlePayout(id, monthId);
+                  const result = res.data?.data;
+                  if (result?.settled) {
+                    await notify("Success", `Winner payout of ₹${(result.amount || 0) / 100} settled!`);
+                  } else {
+                    await notify("Info", result?.reason || "Settlement not needed");
+                  }
+                  loadData();
+                } catch (err: any) {
+                  await notify("Error", err?.message || "Failed to settle payout");
+                } finally {
+                  setIsSettling(false);
+                }
+              }}
+            />
+            {!settleAllPaid && (
+              <Text className="text-neutral-500 text-[10px] text-center mt-2 italic">
+                Winner receives payout once all members pay their net amount.
+              </Text>
+            )}
+          </View>
+      )}
+
       {/* Completed Summary Overview */}
       {isCompleted && (
         <View className="mb-6">
@@ -278,12 +349,12 @@ export default function OrganiserMonthDetail() {
                   <Text className="text-white font-bold text-base mt-1">{formatINR(month.interestAmount)}</Text>
                 </View>
                 <View className="w-1/2">
-                  <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">Organiser Fee</Text>
-                  <Text className="text-danger-400 font-bold text-base mt-1">-{formatINR(month.organiserFee)}</Text>
-                </View>
-                <View className="w-1/2 items-end">
                   <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">Remaining Bal.</Text>
                   <Text className="text-white font-bold text-base mt-1">{formatINR(month.remainingBalance)}</Text>
+                </View>
+                <View className="w-1/2 items-end">
+                  <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">Distributable</Text>
+                  <Text className="text-success-400 font-bold text-base mt-1">{formatINR(month.distributableAmount)}</Text>
                 </View>
               </View>
 
@@ -372,6 +443,96 @@ export default function OrganiserMonthDetail() {
                   <Text className="w-24 text-right text-success-400 font-bold text-sm">
                     +{formatINR(dist.distributionAmount)}
                   </Text>
+                </View>
+              ))}
+            </View>
+          </Card>
+        </View>
+      )}
+
+      {/* Payment Obligations (Netted Flow) */}
+      {isCompleted && month.paymentObligations && month.paymentObligations.length > 0 && (
+        <View className="mb-6">
+          <View className="flex-row items-center mb-3">
+            <View className="w-7 h-7 rounded-lg bg-gold-500/15 items-center justify-center mr-2">
+              <Ionicons name="receipt-outline" size={14} color={COLORS.goldPrimary} />
+            </View>
+            <Text className="text-white font-bold text-sm">Payment Obligations</Text>
+          </View>
+
+          {/* Net amounts summary */}
+          <Card style={{ marginBottom: 12 }} padding={0}>
+            <View className="p-4">
+              <View className="flex-row flex-wrap">
+                <View className="w-1/2 mb-2">
+                  <Text className="text-neutral-500 text-[10px] uppercase font-bold">Non-Winner Pays</Text>
+                  <Text className="text-danger-400 font-bold text-sm mt-0.5">
+                    {formatINR(month.nonWinnerNetPayable || 0)} each
+                  </Text>
+                </View>
+                <View className="w-1/2 mb-2 items-end">
+                  <Text className="text-neutral-500 text-[10px] uppercase font-bold">Winner Receives</Text>
+                  <Text className="text-success-400 font-bold text-sm mt-0.5">
+                    +{formatINR(month.winnerNetReceivable || 0)}
+                  </Text>
+                </View>
+                {month.paymentDeadline && (
+                  <View className="w-full mt-2 pt-2 border-t border-brand-primary/10">
+                    <View className="flex-row justify-between items-center">
+                      <Text className="text-neutral-500 text-[10px] uppercase font-bold">Payment Deadline</Text>
+                      <Text className="text-white text-xs font-bold">
+                        {new Date(month.paymentDeadline).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+            </View>
+          </Card>
+
+          {/* Obligations table */}
+          <Card padding={0}>
+            <View className="p-4">
+              <View className="flex-row border-b border-brand-primary/10 pb-2 mb-3">
+                <Text className="flex-1 text-neutral-400 font-bold text-xs">Member</Text>
+                <Text className="w-16 text-center text-neutral-400 font-bold text-xs">Role</Text>
+                <Text className="w-20 text-right text-neutral-400 font-bold text-xs">Net Amount</Text>
+                <Text className="w-20 text-right text-neutral-400 font-bold text-xs">Status</Text>
+              </View>
+              {month.paymentObligations.map((obl: any, idx: number) => (
+                <View key={obl.id || idx} className="flex-row py-2 border-b border-brand-primary/5 items-center">
+                  <Text className="flex-1 text-white font-semibold text-xs">
+                    {month.memberDistributions?.find((d: any) => d.memberId === obl.memberId)?.committeeMember?.user?.name || "Member"}
+                  </Text>
+                  <View className="w-16 items-center">
+                    <Badge
+                      label={obl.role === "winner" ? "Winner" : "Non-Winner"}
+                      variant={obl.role === "winner" ? "success" : "neutral"}
+                      size="sm"
+                    />
+                  </View>
+                  <Text className={`w-20 text-right font-bold text-xs ${
+                    obl.direction === "receive" ? "text-success-400" : "text-danger-400"
+                  }`}>
+                    {obl.direction === "receive" ? "+" : "-"}{formatINR(Math.abs(obl.netAmount))}
+                  </Text>
+                  <View className="w-20 items-end">
+                    <Badge
+                      label={
+                        obl.status === "paid" ? "Paid" :
+                        obl.status === "organiser_advanced" ? "Advanced" :
+                        obl.status === "overdue" ? "Overdue" :
+                        obl.direction === "receive" ? "Awaiting" : "Pending"
+                      }
+                      variant={
+                        obl.status === "paid" ? "success" :
+                        obl.status === "organiser_advanced" ? "warning" :
+                        obl.status === "overdue" ? "danger" :
+                        obl.direction === "receive" ? "info" : "neutral"
+                      }
+                      size="sm"
+                    />
+                  </View>
                 </View>
               ))}
             </View>

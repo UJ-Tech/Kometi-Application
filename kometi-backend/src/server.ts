@@ -17,6 +17,7 @@ import walletRouter from "./modules/wallet/wallet.router";
 import withdrawalRouter from "./modules/wallet/withdrawal.router";
 import adminRouter from "./modules/admin/admin.router";
 import paymentsRouter from "./modules/payments/payments.router";
+import { startOverdueCheckScheduler } from "./jobs/overdue-check";
 
 const app = express();
 const httpServer = createServer(app);
@@ -56,4 +57,7 @@ httpServer.listen(PORT, () => {
   console.log(`🚀 Kometi Server running in ${env.NODE_ENV} mode`);
   console.log(`📍 Endpoint: http://localhost:${PORT}`);
   console.log(`=============================================`);
+
+  // Start daily overdue payment obligations check
+  startOverdueCheckScheduler();
 });

@@ -13,6 +13,10 @@ interface CommitteeState {
   isLoading:       boolean;
   filters:         CommitteeFilters;
   pagination:      PaginationMeta;
+  // Socket-triggered refresh flags (monotonically increasing counters)
+  biddingOpenedVersion:  number;
+  monthResolvedVersion:  number;
+  bidPlacedVersion:      number;
 
   setCommittees:         (list: Committee[]) => void;
   appendCommittees:      (list: Committee[]) => void;
@@ -23,6 +27,9 @@ interface CommitteeState {
   setPagination:         (meta: PaginationMeta) => void;
   setLoading:            (v: boolean) => void;
   fetchCommittees:       () => Promise<void>;
+  markBiddingOpened:     (committeeId: string, monthId: string) => void;
+  markMonthResolved:     (committeeId: string, monthId: string) => void;
+  markBidPlaced:         (committeeId: string, monthId: string) => void;
   reset:                 () => void;
 }
 
@@ -36,6 +43,9 @@ export const useCommitteeStore = create<CommitteeState>((set, get) => ({
   isLoading:       false,
   filters:         {},
   pagination:      defaultPagination,
+  biddingOpenedVersion: 0,
+  monthResolvedVersion: 0,
+  bidPlacedVersion:     0,
 
   setCommittees:      (list)  => set({ committees: list }),
   appendCommittees:   (list)  => set((s) => ({ committees: [...s.committees, ...list] })),
@@ -80,8 +90,21 @@ export const useCommitteeStore = create<CommitteeState>((set, get) => ({
     }
   },
 
+  markBiddingOpened: (committeeId, monthId) => {
+    set((s) => ({ biddingOpenedVersion: s.biddingOpenedVersion + 1 }));
+  },
+
+  markMonthResolved: (committeeId, monthId) => {
+    set((s) => ({ monthResolvedVersion: s.monthResolvedVersion + 1 }));
+  },
+
+  markBidPlaced: (committeeId, monthId) => {
+    set((s) => ({ bidPlacedVersion: s.bidPlacedVersion + 1 }));
+  },
+
   reset: () => set({
     committees: [], activeCommittee: null,
     isLoading: false, filters: {}, pagination: defaultPagination,
+    biddingOpenedVersion: 0, monthResolvedVersion: 0, bidPlacedVersion: 0,
   }),
 }));

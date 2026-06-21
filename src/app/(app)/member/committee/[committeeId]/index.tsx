@@ -15,12 +15,14 @@ import { LinearGradient } from "expo-linear-gradient";
 import { committeesApi } from "../../../../../services/committees.api";
 import { installmentsApi } from "../../../../../services/installments.api";
 import { useAuthStore } from "../../../../../stores/auth.store";
+import { useCommitteeStore } from "../../../../../stores/committee.store";
 import { formatINR } from "../../../../../utils/currency";
 import { COLORS, GRADIENTS } from "../../../../../constants/theme";
 import Card from "../../../../../components/ui/Card";
 import Badge from "../../../../../components/ui/Badge";
 import Button from "../../../../../components/ui/Button";
 import PayNowButton from "../../../../../components/payments/PayNowButton";
+import PayNetButton from "../../../../../components/payments/PayNetButton";
 
 const F = (p: number | bigint | null | undefined) => formatINR(p ?? 0);
 const fmtDate = (d: string) =>
@@ -37,6 +39,9 @@ export default function MemberCommitteeOverview() {
   const [monthsData, setMonthsData] = useState<any>(null);
   const [currentMonthDetail, setCurrentMonthDetail] = useState<any>(null);
   const [installments, setInstallments] = useState<any[]>([]);
+  const [memberStats, setMemberStats] = useState<any>(null);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockedReason, setBlockedReason] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,18 +61,47 @@ export default function MemberCommitteeOverview() {
 
       if (mRes.status === "fulfilled") setMonthsData(mRes.value.data.data);
       if (iRes.status === "fulfilled") setInstallments(iRes.value.data.data || []);
+
+      // Fetch member stats once we have committee data (need myMemberId)
+      const cData = cRes.status === "fulfilled" ? cRes.value.data.data : null;
+      if (cData) {
+        const members: any[] = cData.members || [];
+        const myMembership = members.find((m: any) => m.userId === currentUser?.id);
+        if (myMembership?.id) {
+          const sRes = await committeesApi.getMemberStats(committeeId, myMembership.id).catch(() => null);
+          if (sRes) setMemberStats(sRes.data.data);
+        }
+      }
     } catch {
       setError("Failed to load data.");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [committeeId, isValidId]);
+  }, [committeeId, isValidId, currentUser?.id]);
 
   useEffect(() => {
     if (isValidId) loadData();
     else { setLoading(false); setError("Invalid committee ID"); }
   }, [isValidId, loadData]);
+
+  // Auto-refresh all committee data every 30 seconds (stats, obligations, month detail)
+  useEffect(() => {
+    if (!isValidId) return;
+    const interval = setInterval(() => {
+      loadData();
+      // Also refresh current month detail if available
+      if (monthsData?.months?.length) {
+        const latestMonth = monthsData.months[monthsData.months.length - 1];
+        if (latestMonth?.id) {
+          committeesApi.getMonth(committeeId, latestMonth.id)
+            .then((res: any) => setCurrentMonthDetail(res.data.data))
+            .catch(() => {});
+        }
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [isValidId, loadData, committeeId, monthsData]);
 
   // Load current month detail when months data is available
   useEffect(() => {
@@ -79,6 +113,27 @@ export default function MemberCommitteeOverview() {
         .catch(() => {});
     }
   }, [monthsData, committeeId]);
+
+  // NOTE: Month detail is refreshed in the main interval above (every 30s)
+
+  // Instant refresh when socket events fire (bidding opened, month resolved, bid placed)
+  const biddingVersion = useCommitteeStore((s) => s.biddingOpenedVersion);
+  const resolvedVersion = useCommitteeStore((s) => s.monthResolvedVersion);
+  const bidVersion = useCommitteeStore((s) => s.bidPlacedVersion);
+  useEffect(() => {
+    if (biddingVersion + resolvedVersion + bidVersion > 0) {
+      loadData();
+      // Also refresh month detail
+      if (monthsData?.months?.length) {
+        const latestMonth = monthsData.months[monthsData.months.length - 1];
+        if (latestMonth?.id) {
+          committeesApi.getMonth(committeeId, latestMonth.id)
+            .then((res: any) => setCurrentMonthDetail(res.data.data))
+            .catch(() => {});
+        }
+      }
+    }
+  }, [biddingVersion, resolvedVersion, bidVersion]);
 
   const onRefresh = useCallback(() => { setRefreshing(true); loadData(); }, [loadData]);
 
@@ -128,68 +183,60 @@ export default function MemberCommitteeOverview() {
   const myMemberId = myMembership?.id;
   const hasWon = myMembership?.hasReceivedPayout === true;
   const slotNumber = myMembership?.slotNumber;
+  const memberIsBlocked = myMembership?.is_blocked === true;
+  const memberBlockedReason = myMembership?.blocked_reason || "";
 
   // Current month info
   const currentMonth = months.length > 0 ? months[months.length - 1] : null;
   const latestMonthId = currentMonth?.id;
   const latestMonthStatus = currentMonth?.status || "pending";
 
-  // Calculate my totals from installments
-  let myTotalPaid = 0;
-  let myTotalDue = 0;
+  // ─── Winner detection for current resolved month ──────────────────────
+  const isWinnerOfCurrentMonth = currentMonth?.status === "completed" && currentMonth?.winnerMemberId && myMemberId
+    ? currentMonth.winnerMemberId === myMemberId
+    : false;
+
+  // ─── STATS: Use real data from member_payment_obligations ──────────────
+  // All amounts in paise from the database
+  const myTotalPaid = memberStats?.totalPaidPaise || 0;
+  const myTotalReceived = memberStats?.totalCreditedPaise || 0;
+  const myNetPosition = memberStats?.netPositionPaise || 0;
+  // Progress: total received vs (monthly pool * completed months) — shows how much of total earnings received
+  const completedMonths = monthsData?.completedMonths || months.filter((m: any) => m.status === "completed").length;
+  const totalExpectedPayout = totalPool * Math.max(completedMonths, 1);
+  const progressPercent = totalExpectedPayout > 0 ? Math.min((myTotalReceived / totalExpectedPayout) * 100, 100) : 0;
+
+  // Pending dues count from installments
+  // Exclude organiser's cycle 1 during organiser_commission month (they don't physically pay)
+  const isOrganiser = committee.organizerId === currentUser?.id;
+  const currentResolutionType = currentMonth?.resolutionType;
   let myPendingCount = 0;
-  let myLateCount = 0;
   installments.forEach((inst: any) => {
     if (inst.userId === currentUser?.id) {
-      myTotalDue += inst.amountDuePaise || 0;
-      myTotalPaid += inst.amountPaidPaise || 0;
-      if (inst.status === "PENDING" || inst.status === "OVERDUE" || inst.status === "PARTIAL") myPendingCount++;
-      if (inst.status === "OVERDUE") myLateCount++;
+      if (inst.status === "PENDING" || inst.status === "OVERDUE" || inst.status === "PARTIAL") {
+        // Skip organiser's cycle 1 during organiser_commission month
+        if (isOrganiser && inst.cycleNo === 1 && currentResolutionType === "organiser_commission") return;
+        // Skip winner's winning month installment (netted from payout, not paid physically)
+        if (isWinnerOfCurrentMonth && inst.cycleNo === currentMonth.monthNumber) return;
+        myPendingCount++;
+      }
     }
   });
 
-  // My distributions from current month detail
+  // Current month distribution from detail
   let myCurrentDistribution = 0;
   if (currentMonthDetail && myMemberId) {
     const dist = (currentMonthDetail.memberDistributions || []).find((d: any) => d.memberId === myMemberId);
     if (dist) myCurrentDistribution = dist.distributionAmount || 0;
   }
 
-  // Total received across all months (from distributions loaded so far)
-  let myTotalReceived = 0;
-  // For each completed month, every member gets perMemberDistribution.
-  // If the current user WON a month, they also receive winningBidAmount - interestAmount.
-  months.forEach((m: any) => {
-    if (m.perMemberDistribution) {
-      myTotalReceived += m.perMemberDistribution;
-    }
-    if (m.status === "completed" && m.winnerMemberId === myMemberId) {
-      const netBidPayout = (m.winningBidAmount || 0) - (m.interestAmount || 0);
-      myTotalReceived += netBidPayout;
-    }
-  });
-
-  // If we have the current month detail with my actual distribution, override
-  if (currentMonthDetail && myMemberId) {
-    const dist = (currentMonthDetail.memberDistributions || []).find((d: any) => d.memberId === myMemberId);
-    if (dist) {
-      // Remove the approx we added and use actual
-      myTotalReceived = myTotalReceived - (currentMonth?.perMemberDistribution || 0) + myCurrentDistribution;
-    }
-  }
-
-  const myNetPosition = myTotalReceived - myTotalPaid;
-  const progressPercent = totalPool > 0 ? Math.min((myTotalReceived / totalPool) * 100, 100) : 0;
-
   // Bidding info
-  const canBid = !hasWon && latestMonthStatus === "bidding_open";
-  const myCurrentBid = currentMonthDetail?.bids?.find((b: any) => b.committeeMemberId === myMemberId);
+  const canBid = !hasWon && !memberIsBlocked && latestMonthStatus === "bidding_open";
+  const myCurrentBid = currentMonthDetail?.bids?.find((b: any) => b.memberId === myMemberId);
   const allBids: any[] = currentMonthDetail?.bids || [];
   const sortedBids = [...allBids].sort((a: any, b: any) => (a.bidAmount || 0) - (b.bidAmount || 0));
   const lowestBid = sortedBids.length > 0 ? sortedBids[0] : null;
-  const myBidRank = myCurrentBid ? sortedBids.findIndex((b: any) => b.committeeMemberId === myMemberId) + 1 : 0;
-  const interestAmount = installment * 0.02 * (totalMembers - (months.filter((m: any) => m.status === "completed").length));
-  const maxBidAllowed = totalPool - interestAmount;
+  const myBidRank = myCurrentBid ? sortedBids.findIndex((b: any) => b.memberId === myMemberId) + 1 : 0;
 
   return (
     <ScrollView
@@ -291,6 +338,26 @@ export default function MemberCommitteeOverview() {
       </View>
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* Blocked Status Card                                               */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {memberIsBlocked && (
+        <View className="px-4 mb-4">
+          <View className="bg-danger-500/10 border border-danger-500/20 rounded-xl p-4">
+            <View className="flex-row items-center mb-2">
+              <Ionicons name="lock-closed" size={20} color="#ef4444" />
+              <Text className="text-danger-400 font-bold text-sm ml-2">Account Blocked</Text>
+            </View>
+            <Text className="text-neutral-500 text-xs">
+              {memberBlockedReason || "Your account is blocked due to overdue payment."}
+            </Text>
+            <Text className="text-neutral-500 text-xs mt-2">
+              Please pay the organiser to unblock your account.
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* Current Month Status                                              */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       <View className="px-4 mb-5">
@@ -300,7 +367,7 @@ export default function MemberCommitteeOverview() {
           </View>
           <Text className="text-white font-bold text-sm">Current Month</Text>
           {currentMonth && (
-            <Text className="text-neutral-500 text-xs ml-2">#{currentMonth.monthNumber}</Text>
+            <Text className="text-neutral-500 text-xs ml-2">#{currentMonth.monthNumber || months.length}</Text>
           )}
         </View>
 
@@ -314,7 +381,7 @@ export default function MemberCommitteeOverview() {
             <View>
               <View className="flex-row items-center justify-between mb-3">
                 <Badge label="Contribution Due" variant="warning" size="md" />
-                <Text className="text-neutral-500 text-[10px]">Month #{currentMonth.monthNumber}</Text>
+                <Text className="text-neutral-500 text-[10px]">Month #{currentMonth.monthNumber || months.length}</Text>
               </View>
 
               {/* Projected Pool & Distribution */}
@@ -334,7 +401,7 @@ export default function MemberCommitteeOverview() {
               </View>
 
               <Text className="text-neutral-500 text-[10px] text-center mt-1">
-                Pay your contribution to unlock bidding
+                Waiting for organizer to open bidding
               </Text>
             </View>
           ) : latestMonthStatus === "bidding_open" ? (
@@ -418,15 +485,96 @@ export default function MemberCommitteeOverview() {
                 </View>
               )}
 
+              {/* Net payment obligation for current member */}
+              {isWinnerOfCurrentMonth ? (
+                <View className="bg-success-500/10 rounded-xl p-3 mt-2">
+                  <View className="flex-row items-center mb-1">
+                    <Ionicons name="checkmark-circle" size={16} color={COLORS.success.light} />
+                    <Text className="text-success-400 text-xs font-bold ml-1.5">Winner — Contribution Netted</Text>
+                  </View>
+                  <Text className="text-neutral-400 text-[10px] leading-5">
+                    You won this month. Your {F(installment)} contribution has been adjusted against your payout of {F(currentMonth.winningBidAmount)}. No payment needed.
+                  </Text>
+                </View>
+              ) : currentMonthDetail?.paymentObligations && myMemberId && (() => {
+                const myObligation = currentMonthDetail.paymentObligations.find(
+                  (o: any) => o.memberId === myMemberId
+                );
+                if (!myObligation) return null;
+
+                if (myObligation.direction === "pay" && (myObligation.status === "pending" || myObligation.status === "overdue")) {
+                  return (
+                    <View className="mt-2">
+                      <PayNetButton
+                        committeeId={committeeId}
+                        monthId={currentMonth.id}
+                        memberId={myMemberId}
+                        monthNumber={currentMonth.monthNumber || months.length}
+                        netAmountPaise={Math.abs(myObligation.netAmount)}
+                        dueDate={myObligation.dueDate}
+                        contributionAmount={myObligation.contributionAmount}
+                        distributionShare={myObligation.distributionShare}
+                        isBlocked={memberIsBlocked}
+                        onPaymentSuccess={loadData}
+                      />
+                    </View>
+                  );
+                }
+
+                if (myObligation.direction === "receive" && myObligation.status === "pending") {
+                  return (
+                    <View className="bg-success-500/10 rounded-xl p-3 mt-2">
+                      <Text className="text-neutral-500 text-[10px] uppercase font-bold mb-1">Your Payout — Expected</Text>
+                      <Text className="text-success-400 font-bold text-lg">+{F(Math.abs(myObligation.netAmount))}</Text>
+                      <Text className="text-neutral-500 text-[10px] mt-1">
+                        Credited to wallet after all members pay
+                      </Text>
+                    </View>
+                  );
+                }
+
+                if (myObligation.status === "paid") {
+                  return (
+                    <View className="bg-success-500/10 rounded-xl p-3 mt-2">
+                      <View className="flex-row items-center">
+                        <Ionicons name="checkmark-circle" size={16} color={COLORS.success.light} />
+                        <Text className="text-success-400 text-xs font-bold ml-1.5">Payment Completed</Text>
+                      </View>
+                    </View>
+                  );
+                }
+
+                if (myObligation.status === "organiser_advanced") {
+                  return (
+                    <View className="bg-warning-500/10 rounded-xl p-3 mt-2">
+                      <View className="flex-row items-center">
+                        <Ionicons name="person-outline" size={16} color={COLORS.warning.light} />
+                        <Text className="text-warning-400 text-xs font-bold ml-1.5">Paid by Organizer</Text>
+                      </View>
+                      <Text className="text-neutral-500 text-[10px] mt-1">
+                        Organizer advanced {F(Math.abs(myObligation.netAmount))} on your behalf
+                      </Text>
+                      {memberIsBlocked && (
+                        <Text className="text-danger-400 text-[10px] mt-1">
+                          Pay this amount to the organiser to unblock your account.
+                        </Text>
+                      )}
+                    </View>
+                  );
+                }
+
+                return null;
+              })()}
+
               {myCurrentDistribution > 0 && (
-                <View className="bg-success-500/10 rounded-xl p-3">
+                <View className="bg-success-500/10 rounded-xl p-3 mt-2">
                   <Text className="text-neutral-500 text-[10px] uppercase font-bold mb-1">Your Distribution</Text>
                   <Text className="text-success-400 font-bold text-lg">+{F(myCurrentDistribution)}</Text>
                 </View>
               )}
 
               {currentMonth.perMemberDistribution > 0 && !myCurrentDistribution && (
-                <View className="bg-success-500/10 rounded-xl p-3">
+                <View className="bg-success-500/10 rounded-xl p-3 mt-2">
                   <Text className="text-neutral-500 text-[10px] uppercase font-bold mb-1">Per-Member Distribution</Text>
                   <Text className="text-success-400 font-bold text-lg">+{F(currentMonth.perMemberDistribution)}</Text>
                 </View>
@@ -479,7 +627,7 @@ export default function MemberCommitteeOverview() {
             <View className="mb-3">
               <View className="flex-row justify-between mb-1.5">
                 <Text className="text-neutral-400 text-xs">Distributions received</Text>
-                <Text className="text-success-400 text-xs font-bold">{F(myTotalReceived)} / {F(totalPool)}</Text>
+                <Text className="text-success-400 text-xs font-bold">{F(myTotalReceived)} / {F(totalExpectedPayout)}</Text>
               </View>
               {/* Progress bar */}
               <View className="h-3 bg-surface-950 rounded-full overflow-hidden">
@@ -491,7 +639,7 @@ export default function MemberCommitteeOverview() {
                 />
               </View>
               <Text className="text-neutral-500 text-[10px] mt-1.5 text-right">
-                {progressPercent.toFixed(1)}% of final payout ({F(totalPool)})
+                {progressPercent.toFixed(1)}% of expected total ({F(totalExpectedPayout)})
               </Text>
             </View>
           </Card>
@@ -499,15 +647,45 @@ export default function MemberCommitteeOverview() {
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* Pay Contribution (Razorpay)                                      */}
+      {/* Pay Contribution (Razorpay) — disabled for winner of resolved month */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {(() => {
+        // Show winner message for resolved month where user won
+        if (isWinnerOfCurrentMonth) {
+          return (
+            <View className="px-4 mb-5">
+              <View className="flex-row items-center mb-3">
+                <View className="w-7 h-7 rounded-lg bg-success-500/15 items-center justify-center mr-2">
+                  <Ionicons name="checkmark-circle-outline" size={14} color={COLORS.success.light} />
+                </View>
+                <Text className="text-white font-bold text-sm">Payment Status</Text>
+              </View>
+              <Card>
+                <View className="bg-success-500/10 rounded-xl p-4">
+                  <View className="flex-row items-center mb-2">
+                    <Ionicons name="checkmark-circle" size={20} color={COLORS.success.light} />
+                    <Text className="text-success-400 font-bold text-sm ml-2">Winner — No Payment Needed</Text>
+                  </View>
+                  <Text className="text-neutral-400 text-xs leading-5">
+                    You are the winner of Month #{currentMonth.monthNumber}. Your contribution of {F(installment)} has been netted from your payout. No physical payment is required.
+                  </Text>
+                </View>
+              </Card>
+            </View>
+          );
+        }
+
         // Find latest pending contribution for current member
         const myPendingInst = installments
           .filter((i: any) => i.userId === currentUser?.id && (i.status === "PENDING" || i.status === "OVERDUE" || i.status === "PARTIAL"))
           .sort((a: any, b: any) => a.cycleNo - b.cycleNo)[0];
 
         if (!myPendingInst || !myMemberId || !currentMonth) return null;
+
+        // Don't show Pay Contribution for organiser during organiser_commission month (Month 1)
+        const isOrganiser = committee.organizerId === currentUser?.id;
+        const isOrganiserCommissionMonth = currentMonth.resolutionType === "organiser_commission";
+        if (isOrganiser && isOrganiserCommissionMonth) return null;
 
         const totalDue = (myPendingInst.amountDuePaise || 0) + (myPendingInst.penaltyPaise || 0);
         if (totalDue <= 0) return null;
@@ -576,7 +754,15 @@ export default function MemberCommitteeOverview() {
 
           <Card padding={0}>
             {installments
-              .filter((i: any) => i.userId === currentUser?.id && (i.status === "PENDING" || i.status === "OVERDUE" || i.status === "PARTIAL"))
+              .filter((i: any) => {
+                if (i.userId !== currentUser?.id) return false;
+                if (i.status !== "PENDING" && i.status !== "OVERDUE" && i.status !== "PARTIAL") return false;
+                // Exclude organiser's cycle 1 during organiser_commission month
+                if (isOrganiser && i.cycleNo === 1 && currentResolutionType === "organiser_commission") return false;
+                // Exclude winner's winning month installment (netted from payout)
+                if (isWinnerOfCurrentMonth && i.cycleNo === currentMonth.monthNumber) return false;
+                return true;
+              })
               .slice(0, 5)
               .map((inst: any) => (
                 <View key={inst.id} className="flex-row items-center px-3.5 py-2.5 border-b border-brand-primary/5">

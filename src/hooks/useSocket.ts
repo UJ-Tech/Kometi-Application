@@ -69,6 +69,18 @@ export function useSocket(): Socket | null {
       updateCommitteeStatus(data.committeeId, "COMPLETED");
     });
 
+    socket.on("committee:bidding_opened", (data: { committeeId: string; monthId: string; monthNumber: number }) => {
+      useCommitteeStore.getState().markBiddingOpened(data.committeeId, data.monthId);
+    });
+
+    socket.on("committee:month_resolved", (data: { committeeId: string; monthId: string; monthNumber: number }) => {
+      useCommitteeStore.getState().markMonthResolved(data.committeeId, data.monthId);
+    });
+
+    socket.on("committee:bid_placed", (data: { committeeId: string; monthId: string }) => {
+      useCommitteeStore.getState().markBidPlaced(data.committeeId, data.monthId);
+    });
+
     return () => {
       socket.disconnect();
       socketRef.current = null;

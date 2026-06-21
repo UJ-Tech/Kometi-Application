@@ -19,7 +19,6 @@ export class CommitteesService {
     totalSlots: number,
     installmentAmountPaise: bigint,
     cycleDurationDays: number,
-    commissionRatePct?: number,
     maxDiscountPct?: number,
     includeOrganizerAsMember?: boolean
   ) {
@@ -49,7 +48,6 @@ export class CommitteesService {
         filledSlots: includeOrganizerAsMember ? 1 : 0,
         installmentAmountPaise: Number(installmentAmountPaise),
         cycleDurationDays,
-        commissionRatePct: commissionRatePct ?? 5.0,
         maxDiscountPct: maxDiscountPct ?? 30.0,
         status: "DRAFT",
       })
@@ -272,22 +270,20 @@ export class CommitteesService {
 
     if (memberError || !member) throw new Error("You are not a member of this committee");
     if (member.hasReceivedPayout) throw new Error("You have already received a payout for this committee");
+    if (member.is_blocked) throw new Error("Your account is blocked. Please contact the organiser.");
 
     const totalPot = Number(committee.installmentAmountPaise) * committee.totalSlots;
-    const commissionRate = Number(committee.commissionRatePct || 5);
-    const maxDiscountRate = Number(committee.maxDiscountPct || 30);
+    const maxDiscRate = Number(committee.maxDiscountPct || 30);
+    const maxDiscountPaise = (totalPot * maxDiscRate) / 100;
 
-    const commission = (totalPot * commissionRate) / 100;
-    const maxDiscount = (totalPot * maxDiscountRate) / 100;
+    const minPayoutAllowed = totalPot - maxDiscountPaise;
+    const maxPayoutAllowed = totalPot; // No organiser fee — full pool is available
 
-    const minPayout = totalPot - maxDiscount;
-    const maxPayout = totalPot - commission;
-
-    if (bidAmountPaise < minPayout) {
-      throw new Error(`Bid payout amount cannot be lower than the minimum allowed payout (${minPayout / 100} INR)`);
+    if (bidAmountPaise < minPayoutAllowed) {
+      throw new Error(`Bid payout amount cannot be lower than the minimum allowed payout (${minPayoutAllowed / 100} INR)`);
     }
-    if (bidAmountPaise > maxPayout) {
-      throw new Error(`Bid payout amount cannot exceed the maximum allowed payout (${maxPayout / 100} INR)`);
+    if (bidAmountPaise > maxPayoutAllowed) {
+      throw new Error(`Bid payout amount cannot exceed the maximum allowed payout (${maxPayoutAllowed / 100} INR)`);
     }
 
     // Look up the current committee_month record by cycleNo (month_number)
@@ -768,7 +764,7 @@ export class CommitteesService {
     );
 
     const eligibleMembers = (members ?? []).filter(
-      (m) => !m.hasReceivedPayout && paidMemberIds.has(m.id)
+      (m) => !m.hasReceivedPayout && paidMemberIds.has(m.id) && !(m as any).is_blocked
     );
 
     if (eligibleMembers.length === 0) {
@@ -812,7 +808,7 @@ export class CommitteesService {
   static async drawLotteryWinner(committeeId: string, userId: string) {
     const { data: committee, error: commError } = await supabase
       .from("committees")
-      .select("id, organizerId, status, type, currentCycleNo, totalSlots, installmentAmountPaise, commissionRatePct")
+      .select("id, organizerId, status, type, currentCycleNo, totalSlots, installmentAmountPaise")
       .eq("id", committeeId)
       .single();
 
@@ -840,24 +836,28 @@ export class CommitteesService {
 
     const lockedMemberIds = payoutCycle.lockedMembers as string[];
 
-    // Fetch member details for locked members
+    // Fetch member details for locked members (exclude blocked)
     const { data: lockedMembers, error: lmError } = await supabase
       .from("committee_members")
-      .select("id, userId, slotNumber, user:users(id, name, phone)")
+      .select("id, userId, slotNumber, is_blocked, user:users(id, name, phone)")
       .in("id", lockedMemberIds);
 
     if (lmError || !lockedMembers || lockedMembers.length === 0) {
       throw new Error("Locked members not found");
     }
 
+    // Filter out blocked members
+    const eligibleLockedMembers = lockedMembers.filter((m: any) => !m.is_blocked);
+    if (eligibleLockedMembers.length === 0) {
+      throw new Error("All locked members are blocked. Cannot draw lottery.");
+    }
+
     // Randomly select winner
-    const winnerIndex = Math.floor(Math.random() * lockedMembers.length);
-    const winner = lockedMembers[winnerIndex];
+    const winnerIndex = Math.floor(Math.random() * eligibleLockedMembers.length);
+    const winner = eligibleLockedMembers[winnerIndex];
 
     const totalPot = Number(committee.installmentAmountPaise) * committee.totalSlots;
-    const commissionRate = Number(committee.commissionRatePct || 5);
-    const commissionPaise = Math.floor((totalPot * commissionRate) / 100);
-    const winningPayoutPaise = totalPot - commissionPaise;
+    const winningPayoutPaise = totalPot; // No organiser fee — winner gets full pool
 
     // Update payout cycle with winner
     const { error: updateErr } = await supabase
@@ -877,7 +877,6 @@ export class CommitteesService {
       winnerPhone: (winner.user as any)?.phone || "",
       winnerSlot: winner.slotNumber,
       payoutAmtPaise: winningPayoutPaise,
-      commissionPaise,
       totalPot,
       lockedCount: lockedMemberIds.length,
     };
@@ -914,8 +913,14 @@ export class CommitteesService {
 
     const winningBidAmountPaise = Number(payoutCycle.payoutAmtPaise);
     const totalPot = Number(committee.installmentAmountPaise) * totalSlots;
-    const commissionRate = Number(committee.commissionRatePct || 5);
-    const commissionPaise = Math.floor((totalPot * commissionRate) / 100);
+
+    // Conservation check: totalPot must equal payout (no organiser fee in new engine)
+    if (winningBidAmountPaise !== totalPot) {
+      throw new Error(
+        `Conservation check failed: totalPot=${totalPot} but payout=${winningBidAmountPaise}. ` +
+        `These must be equal (no organiser fee). Refusing to complete payout.`
+      );
+    }
 
     // Generate receipt number
     const receiptNumber = `RCP-${committeeId.slice(0, 4).toUpperCase()}-${cycleNo}-${Date.now()}`;
@@ -954,46 +959,7 @@ export class CommitteesService {
         idempotencyKey: `lottery-payout-${committeeId}-${cycleNo}-${Date.now()}`,
       });
 
-    // 2. Credit organizer commission
-    const { data: organizerWallet } = await supabase
-      .from("wallets")
-      .select("*")
-      .eq("userId", committee.organizerId)
-      .single();
-
-    if (organizerWallet) {
-      const orgBalanceBefore = Number(organizerWallet.balancePaise);
-      const orgBalanceAfter = orgBalanceBefore + commissionPaise;
-
-      await supabase
-        .from("wallets")
-        .update({ balancePaise: orgBalanceAfter })
-        .eq("id", organizerWallet.id);
-
-      await supabase
-        .from("transactions")
-        .insert({
-          walletId: organizerWallet.id,
-          userId: committee.organizerId,
-          type: "CREDIT",
-          category: "COMMISSION",
-          status: "COMPLETED",
-          amountPaise: commissionPaise,
-          balanceBefore: orgBalanceBefore,
-          balanceAfter: orgBalanceAfter,
-          description: `Lottery Foreman Commission - ${committee.name} Cycle #${cycleNo}`,
-          referenceId: payoutCycle.id,
-          referenceType: "PayoutCycle",
-          idempotencyKey: `lottery-commission-${committeeId}-${cycleNo}-${Date.now()}`,
-        });
-
-      emitToUser(committee.organizerId, "wallet:credited", {
-        amountPaise: commissionPaise,
-        newBalance: orgBalanceAfter,
-      });
-    }
-
-    // 3. Mark winner as having received payout
+    // 2. Mark winner as having received payout
     const winnerMember = committee.members?.find((m: any) => m.userId === payoutCycle.winnerId);
     if (winnerMember) {
       await supabase
@@ -1079,17 +1045,85 @@ export class CommitteesService {
       winnerName: winnerUser,
       winnerSlot: payoutCycle.winnerSlot,
       payoutAmtPaise: winningBidAmountPaise,
-      commissionPaise,
       receiptNumber,
       nextCycleNo: nextStatus === "COMPLETED" ? null : nextCycleNo,
       isCompleted: nextStatus === "COMPLETED",
     };
   }
 
+  // ─── MEMBER STATS (from member_payment_obligations) ─────────────────────
+  static async getMemberStats(committeeId: string, memberId: string) {
+    // Verify committee exists
+    const { data: committee, error: cErr } = await supabase
+      .from("committees")
+      .select("id, totalSlots, installmentAmountPaise")
+      .eq("id", committeeId)
+      .single();
+
+    if (cErr || !committee) throw new Error("Committee not found");
+
+    // Fetch all payment obligations for this member in this committee
+    const { data: obligations, error: oblErr } = await supabase
+      .from("member_payment_obligations")
+      .select("net_amount, direction, role, status, contribution_amount, distribution_share, interest_charged, month_id")
+      .eq("committee_id", committeeId)
+      .eq("member_id", memberId);
+
+    if (oblErr) throw oblErr;
+
+    const allObligations = obligations || [];
+
+    // Calculate totals from obligations
+    let totalContributedPaise = 0;  // sum of contribution_amount (what they owe the pool)
+    let totalReceivedPaise = 0;     // sum of distribution_share (what they get back from the pool)
+    let totalPaidPaise = 0;         // sum of net_amount where direction=pay AND status in [paid, organiser_advanced]
+    let totalCreditedPaise = 0;     // sum of net_amount where direction=receive (winner payout)
+    let totalInterestPaise = 0;     // sum of interest_charged
+    let monthsCompleted = 0;
+    let monthsWon = 0;
+
+    const monthIds = new Set<string>();
+
+    for (const o of allObligations) {
+      monthIds.add(o.month_id);
+      totalContributedPaise += Number(o.contribution_amount || 0);
+      totalReceivedPaise += Number(o.distribution_share || 0);
+      totalInterestPaise += Number(o.interest_charged || 0);
+
+      if (o.direction === "pay" && (o.status === "paid" || o.status === "organiser_advanced")) {
+        totalPaidPaise += Number(o.net_amount || 0);
+      }
+      if (o.direction === "receive") {
+        totalCreditedPaise += Number(o.net_amount || 0);
+        if (o.role === "winner") monthsWon++;
+      }
+    }
+
+    monthsCompleted = monthIds.size;
+
+    // Net position: what they've actually received minus what they've actually paid
+    // In netted flow: winners get credited, non-winners pay later
+    const netPositionPaise = totalCreditedPaise - totalPaidPaise;
+
+    return {
+      committeeId,
+      memberId,
+      totalContributedPaise,
+      totalReceivedPaise,
+      totalPaidPaise,       // actual payments made (non-winners after resolution)
+      totalCreditedPaise,   // actual credits received (winners after resolution)
+      totalInterestPaise,
+      netPositionPaise,
+      monthsCompleted,
+      monthsWon,
+      totalMonths: committee.totalSlots,
+    };
+  }
+
   static async getLotteryReceipt(committeeId: string, cycleNo: number, userId: string) {
     const { data: committee, error: commError } = await supabase
       .from("committees")
-      .select("id, name, organizerId, totalSlots, installmentAmountPaise, commissionRatePct, type")
+      .select("id, name, organizerId, totalSlots, installmentAmountPaise, type")
       .eq("id", committeeId)
       .single();
 
@@ -1126,8 +1160,6 @@ export class CommitteesService {
       .single();
 
     const totalPot = Number(committee.installmentAmountPaise) * committee.totalSlots;
-    const commissionRate = Number(committee.commissionRatePct || 5);
-    const commissionPaise = Math.floor((totalPot * commissionRate) / 100);
 
     return {
       receiptNumber: payoutCycle.receiptNumber,
@@ -1143,10 +1175,256 @@ export class CommitteesService {
         slot: payoutCycle.winnerSlot,
       },
       payoutAmtPaise: Number(payoutCycle.payoutAmtPaise),
-      commissionPaise,
       payoutDate: payoutCycle.payoutDate,
       createdAt: payoutCycle.createdAt,
       lockedMembers: payoutCycle.lockedMembers,
     };
+  }
+
+  // ─── Block/Unblock Members ──────────────────────────────────────────────
+
+  static async blockMember(committeeId: string, memberId: string, organiserId: string, reason: string) {
+    // 1. Verify organiser owns committee
+    const { data: committee, error: cErr } = await supabase
+      .from("committees")
+      .select("organizerId")
+      .eq("id", committeeId)
+      .single();
+
+    if (cErr || !committee) throw new Error("Committee not found");
+    if (committee.organizerId !== organiserId) throw new Error("Only the organiser can block members");
+
+    // 2. Verify member belongs to committee
+    const { data: member, error: mErr } = await supabase
+      .from("committee_members")
+      .select("id, userId, user:users(name)")
+      .eq("id", memberId)
+      .eq("committeeId", committeeId)
+      .single();
+
+    if (mErr || !member) throw new Error("Member not found in this committee");
+    if ((member as any).is_blocked) throw new Error("Member is already blocked");
+
+    // 3. Block member
+    const { error: blockErr } = await supabase
+      .from("committee_members")
+      .update({
+        is_blocked: true,
+        blocked_at: new Date().toISOString(),
+        blocked_reason: reason || "Blocked by organiser",
+      })
+      .eq("id", memberId);
+
+    if (blockErr) throw blockErr;
+
+    return {
+      success: true,
+      member: {
+        id: memberId,
+        name: (member as any).user?.name || "Member",
+        blockedAt: new Date().toISOString(),
+        blockedReason: reason || "Blocked by organiser",
+      },
+    };
+  }
+
+  static async unblockMember(committeeId: string, memberId: string, organiserId: string) {
+    // 1. Verify organiser owns committee
+    const { data: committee, error: cErr } = await supabase
+      .from("committees")
+      .select("organizerId")
+      .eq("id", committeeId)
+      .single();
+
+    if (cErr || !committee) throw new Error("Committee not found");
+    if (committee.organizerId !== organiserId) throw new Error("Only the organiser can unblock members");
+
+    // 2. Verify member is blocked
+    const { data: member, error: mErr } = await supabase
+      .from("committee_members")
+      .select("id, userId, is_blocked, user:users(name)")
+      .eq("id", memberId)
+      .eq("committeeId", committeeId)
+      .single();
+
+    if (mErr || !member) throw new Error("Member not found in this committee");
+    if (!(member as any).is_blocked) throw new Error("Member is not blocked");
+
+    // 3. Verify all obligations are settled (paid or organiser_advanced)
+    const { data: unpaidObligations } = await supabase
+      .from("member_payment_obligations")
+      .select("id")
+      .eq("member_id", memberId)
+      .eq("committee_id", committeeId)
+      .in("status", ["pending", "overdue"]);
+
+    if (unpaidObligations && unpaidObligations.length > 0) {
+      throw new Error("Member has unpaid obligations. All debts must be settled before unblocking.");
+    }
+
+    // 4. Unblock member
+    const { error: unblockErr } = await supabase
+      .from("committee_members")
+      .update({
+        is_blocked: false,
+        blocked_at: null,
+        blocked_reason: null,
+      })
+      .eq("id", memberId);
+
+    if (unblockErr) throw unblockErr;
+
+    return {
+      success: true,
+      member: {
+        id: memberId,
+        name: (member as any).user?.name || "Member",
+      },
+    };
+  }
+
+  static async getBlockedMembers(committeeId: string) {
+    const { data: members, error } = await supabase
+      .from("committee_members")
+      .select("id, userId, slotNumber, is_blocked, blocked_at, blocked_reason, user:users(name, phone)")
+      .eq("committeeId", committeeId)
+      .eq("is_blocked", true)
+      .order("blocked_at", { ascending: false });
+
+    if (error) throw error;
+
+    return (members || []).map((m: any) => ({
+      id: m.id,
+      userId: m.userId,
+      slotNumber: m.slotNumber,
+      name: m.user?.name || "Member",
+      phone: m.user?.phone || "",
+      blockedAt: m.blocked_at,
+      blockedReason: m.blocked_reason,
+    }));
+  }
+
+  // ─── Remove Member ────────────────────────────────────────────────────
+
+  static async removeMember(committeeId: string, memberId: string, organiserId: string) {
+    const { data: committee, error: cErr } = await supabase
+      .from("committees")
+      .select("organizerId, status, filledSlots")
+      .eq("id", committeeId)
+      .single();
+
+    if (cErr || !committee) throw new Error("Committee not found");
+    if (committee.organizerId !== organiserId) throw new Error("Only the organiser can remove members");
+
+    const { data: member, error: mErr } = await supabase
+      .from("committee_members")
+      .select("id, userId, user:users(name)")
+      .eq("id", memberId)
+      .eq("committeeId", committeeId)
+      .single();
+
+    if (mErr || !member) throw new Error("Member not found in this committee");
+
+    // Check if member has won a payout
+    const { data: wonMonth } = await supabase
+      .from("committee_months")
+      .select("id")
+      .eq("winner_member_id", memberId)
+      .limit(1)
+      .maybeSingle();
+
+    if (wonMonth) throw new Error("Cannot remove a member who has already won a payout");
+
+    // Check if member has any unpaid obligations
+    const { data: unpaidObligations } = await supabase
+      .from("member_payment_obligations")
+      .select("id")
+      .eq("member_id", memberId)
+      .in("status", ["pending", "overdue"]);
+
+    if (unpaidObligations && unpaidObligations.length > 0) {
+      throw new Error("Cannot remove a member with unpaid obligations. Settle or advance first.");
+    }
+
+    // Delete the member
+    const { error: delErr } = await supabase
+      .from("committee_members")
+      .delete()
+      .eq("id", memberId);
+
+    if (delErr) throw delErr;
+
+    // Decrement filledSlots
+    await supabase
+      .from("committees")
+      .update({ filledSlots: Math.max(0, committee.filledSlots - 1) })
+      .eq("id", committeeId);
+
+    return {
+      success: true,
+      member: {
+        id: memberId,
+        name: (member as any).user?.name || "Member",
+      },
+    };
+  }
+
+  // ─── Re-add Member to Active Committee ────────────────────────────────
+
+  static async addMemberToActiveCommittee(committeeId: string, userId: string, organiserId: string) {
+    const { data: committee, error: cErr } = await supabase
+      .from("committees")
+      .select("organizerId, filledSlots, totalSlots")
+      .eq("id", committeeId)
+      .single();
+
+    if (cErr || !committee) throw new Error("Committee not found");
+    if (committee.organizerId !== organiserId) throw new Error("Only the organiser can add members");
+
+    if (committee.filledSlots >= committee.totalSlots) {
+      throw new Error("Committee is full. Adjust committee size first.");
+    }
+
+    // Check if user is already a member
+    const { data: existingMember } = await supabase
+      .from("committee_members")
+      .select("id")
+      .eq("committeeId", committeeId)
+      .eq("userId", userId)
+      .maybeSingle();
+
+    if (existingMember) throw new Error("User is already a member of this committee");
+
+    // Find next available slot number
+    const { data: existingSlots } = await supabase
+      .from("committee_members")
+      .select("slotNumber")
+      .eq("committeeId", committeeId)
+      .order("slotNumber", { ascending: true });
+
+    const usedSlots = new Set((existingSlots || []).map((s: any) => s.slotNumber));
+    let nextSlot = 1;
+    while (usedSlots.has(nextSlot)) nextSlot++;
+
+    const { data: member, error: mErr } = await supabase
+      .from("committee_members")
+      .insert({
+        committeeId,
+        userId,
+        slotNumber: nextSlot,
+        isActive: true,
+      })
+      .select()
+      .single();
+
+    if (mErr) throw mErr;
+
+    // Increment filledSlots
+    await supabase
+      .from("committees")
+      .update({ filledSlots: committee.filledSlots + 1 })
+      .eq("id", committeeId);
+
+    return member;
   }
 }

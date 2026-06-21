@@ -120,6 +120,9 @@ model User {
   walletTopupOrders       WalletTopupOrder[]
   withdrawalRequests      WithdrawalRequest[]
   ledgerAuditLogs         LedgerAuditLog[]
+  paymentObligations      MemberPaymentObligation[]
+  organiserAdvancesOwned  OrganiserAdvance[] @relation("OrganiserAdvanceOrganiser")
+  organiserAdvancesDebtor OrganiserAdvance[] @relation("OrganiserAdvanceUser")
 
   @@index([phone])
   @@map("users")
@@ -194,9 +197,11 @@ model Committee {
   memberDistributions  MemberDistribution[]
   paymentTransactions  PaymentTransaction[]
   payoutRequests       PayoutRequest[]
-  WalletLedgerEntry    WalletLedgerEntry[]
-  WalletBalancesCache  WalletBalancesCache[]
-  WithdrawalRequest    WithdrawalRequest[]
+   WalletLedgerEntry    WalletLedgerEntry[]
+   WalletBalancesCache  WalletBalancesCache[]
+   WithdrawalRequest    WithdrawalRequest[]
+   organiserAdvances    OrganiserAdvance[]
+   paymentObligations   MemberPaymentObligation[]
 
   @@index([organizerId, status])
   @@index([inviteCode])
@@ -211,6 +216,9 @@ model CommitteeMember {
   joinedAt          DateTime @default(now())
   isActive          Boolean  @default(true)
   hasReceivedPayout Boolean  @default(false)
+  isBlocked         Boolean  @default(false) @map("is_blocked")
+  blockedAt         DateTime? @map("blocked_at")
+  blockedReason     String?  @map("blocked_reason")
 
   committee            Committee             @relation(fields: [committeeId], references: [id], onDelete: Cascade)
   user                 User                  @relation(fields: [userId], references: [id])
@@ -222,6 +230,8 @@ model CommitteeMember {
   memberDistributions  MemberDistribution[]
   paymentTransactions  PaymentTransaction[]
   payoutRequests       PayoutRequest[]
+  paymentObligations   MemberPaymentObligation[]
+  organiserAdvances    OrganiserAdvance[]
 
   @@unique([committeeId, userId])
   @@unique([committeeId, slotNumber])
@@ -386,6 +396,7 @@ enum ResolutionType {
   bid_single
   bid_auction
   lottery
+  organiser_commission
 }
 
 enum BidStatus {
@@ -405,6 +416,7 @@ enum ContributionStatus {
 enum DisbursementType {
   bid_payout
   lottery_payout
+  organiser_commission
 }
 
 // ─── Append-Only Wallet Ledger Enums ───────────────────────────────────
@@ -452,6 +464,23 @@ enum LedgerAuditAction {
   disputed
 }
 
+enum ObligationRole {
+  winner
+  non_winner
+}
+
+enum PaymentDirection {
+  pay
+  receive
+}
+
+enum ObligationStatus {
+  pending
+  paid
+  overdue
+  organiser_advanced
+}
+
 model CommitteeMonth {
   id                    String               @id @default(dbgenerated("gen_random_uuid()::text"))
   committeeId           String               @map("committee_id")
@@ -463,11 +492,13 @@ model CommitteeMonth {
   winningBidAmount      BigInt?              @map("winning_bid_amount")
   remainingBalance      BigInt               @default(0) @map("remaining_balance")
   biddingDeadline       DateTime?            @map("bidding_deadline")
-  organiserFee          BigInt               @default(0) @map("organiser_fee")
   distributableAmount   BigInt               @default(0) @map("distributable_amount")
   interestAmount        BigInt               @default(0) @map("interest_amount")
   perMemberDistribution BigInt               @default(0) @map("per_member_distribution")
   resolutionType        ResolutionType       @map("resolution_type")
+  nonWinnerNetPayable   BigInt               @default(0) @map("non_winner_net_payable")
+  winnerNetReceivable   BigInt               @default(0) @map("winner_net_receivable")
+  paymentDeadline       DateTime?            @map("payment_deadline")
 
   committee            Committee             @relation(fields: [committeeId], references: [id], onDelete: Cascade)
   winnerMember         CommitteeMember?      @relation(fields: [winnerMemberId], references: [id])
@@ -478,6 +509,8 @@ model CommitteeMonth {
   paymentTransactions  PaymentTransaction[]
   payoutRequests       PayoutRequest[]
   walletLedgerEntries  WalletLedgerEntry[]
+  paymentObligations   MemberPaymentObligation[]
+  organiserAdvances    OrganiserAdvance[]
 
   @@unique([committeeId, monthNumber])
   @@index([committeeId])
@@ -527,6 +560,64 @@ model MonthlyContribution {
   @@map("monthly_contributions")
 }
 
+model MemberPaymentObligation {
+  id                   String            @id @default(dbgenerated("gen_random_uuid()::text"))
+  committeeId          String            @map("committee_id")
+  monthId              String            @map("month_id")
+  memberId             String            @map("member_id")
+  userId               String            @map("user_id")
+  role                 ObligationRole    @default(non_winner)
+  contributionAmount   BigInt            @map("contribution_amount")
+  distributionShare    BigInt            @map("distribution_share")
+  netAmount            BigInt            @map("net_amount")
+  direction            PaymentDirection
+  interestCharged      BigInt            @default(0) @map("interest_charged")
+  dueDate              DateTime          @map("due_date")
+  status               ObligationStatus  @default(pending)
+  paidAt               DateTime?         @map("paid_at")
+  paymentTransactionId String?           @map("payment_transaction_id")
+  advancedByOrganiser  Boolean           @default(false) @map("advanced_by_organiser")
+  organiserId          String?           @map("organiser_id")
+  organiserAdvancedAt  DateTime?         @map("organiser_advanced_at")
+  createdAt            DateTime          @default(now()) @map("created_at")
+
+  committee      Committee       @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  committeeMonth CommitteeMonth  @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  committeeMember CommitteeMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([monthId, memberId])
+  @@index([committeeId, monthId])
+  @@index([userId, status])
+  @@index([dueDate, status])
+  @@map("member_payment_obligations")
+}
+
+model OrganiserAdvance {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()::text"))
+  committeeId          String   @map("committee_id")
+  monthId              String   @map("month_id")
+  memberId             String   @map("member_id")
+  userId               String   @map("user_id")
+  organiserId          String   @map("organiser_id")
+  originalAmountOwed   BigInt   @map("original_amount_owed")
+  latePenalty          BigInt   @default(0) @map("late_penalty")
+  totalOwedToOrganiser BigInt   @map("total_owed_to_organiser")
+  advancedAt           DateTime @default(now()) @map("advanced_at")
+  repaidStatus         String   @default("pending") @map("repaid_status") // pending | partial | repaid
+  repaidAt             DateTime? @map("repaid_at")
+
+  committee      Committee       @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  committeeMonth CommitteeMonth  @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  committeeMember CommitteeMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  user           User            @relation("OrganiserAdvanceUser", fields: [userId], references: [id], onDelete: Cascade)
+  organiser      User            @relation("OrganiserAdvanceOrganiser", fields: [organiserId], references: [id], onDelete: Cascade)
+
+  @@index([committeeId, monthId])
+  @@index([memberId, repaidStatus])
+  @@map("organiser_advances")
+}
+
 model FundDisbursement {
   id               String           @id @default(dbgenerated("gen_random_uuid()::text"))
   committeeId      String           @map("committee_id")
@@ -552,7 +643,6 @@ model MemberDistribution {
   memberId           String   @map("member_id")
   distributionAmount BigInt   @map("distribution_amount")
   interestShare      BigInt   @default(0) @map("interest_share")
-  organiserFeeShare  BigInt   @default(0) @map("organiser_fee_share")
   distributedAt      DateTime @default(now()) @map("distributed_at")
 
   committee       Committee       @relation(fields: [committeeId], references: [id], onDelete: Cascade)

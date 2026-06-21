@@ -290,10 +290,22 @@ export default function CommitteeDetail() {
       const res = await committeesApi.resolveMonth(id, currentMonth.id);
       const result = res.data.data;
       const winner = committee.members.find((m: any) => m.userId === result.winnerMemberId)?.user?.name || "Member";
+      const summary = result.summary;
+
+      let message = `Winner: ${winner}\n`;
+      if (summary?.winnerNetReceivable) {
+        message += `Winner receives: ₹${(summary.winnerNetReceivable).toFixed(0)}\n`;
+      }
+      if (summary?.nonWinnerNetPayable) {
+        message += `Non-winners pay: ₹${(summary.nonWinnerNetPayable).toFixed(0)} each\n`;
+      }
+      if (summary?.paymentDeadline) {
+        message += `Payment deadline: ${new Date(summary.paymentDeadline).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
+      }
 
       await confirmAction(
         "Month Resolved",
-        `Winner: ${winner}\nMonth #${currentMonth.monthNumber} has been resolved.`,
+        message || `Month #${currentMonth.monthNumber} has been resolved.`,
         "OK"
       );
       loadCommittee();
@@ -424,12 +436,10 @@ export default function CommitteeDetail() {
   const leadingBid = activeBids[0];
 
   // Calculate bidding limits
-  const commRate = Number(committee.commissionRatePct || 5);
   const maxDiscRate = Number(committee.maxDiscountPct || 30);
-  const commissionPaise = (totalPot * commRate) / 100;
   const maxDiscountPaise = (totalPot * maxDiscRate) / 100;
   const minPayoutAllowed = totalPot - maxDiscountPaise;
-  const maxPayoutAllowed = totalPot - commissionPaise;
+  const maxPayoutAllowed = totalPot; // No organiser fee — full pool available
   const pendingJoinRequests = joinRequests.filter((request) => request.status === "PENDING");
 
   return (
@@ -978,13 +988,10 @@ export default function CommitteeDetail() {
               <View className="bg-surface-elevated/40 border border-brand-primary/5 p-3.5 rounded-xl mb-4">
                 <Text className="text-neutral-400 text-xs font-semibold">Bidding Rules (Reverse Auction):</Text>
                 <Text className="text-neutral-300 text-xs mt-1">
-                  • Commission: {commRate}% ({formatINR(commissionPaise)})
-                </Text>
-                <Text className="text-neutral-300 text-xs mt-0.5">
                   • Min Allowed Payout: {formatINR(minPayoutAllowed)} (max {maxDiscRate}% discount)
                 </Text>
                 <Text className="text-neutral-300 text-xs mt-0.5">
-                  • Max Allowed Payout: {formatINR(maxPayoutAllowed)} (minus commission)
+                  • Max Allowed Payout: {formatINR(maxPayoutAllowed)} (full pool)
                 </Text>
               </View>
 

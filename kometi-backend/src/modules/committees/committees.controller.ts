@@ -18,7 +18,6 @@ export class CommitteesController {
         installmentAmountPaise,
         cycleDurationDays,
         undefined,
-        undefined,
         includeOrganizerAsMember
       );
 
@@ -244,6 +243,86 @@ export class CommitteesController {
       const { id, cycleNo } = req.params;
       const receipt = await CommitteesService.getLotteryReceipt(id, Number(cycleNo), userId);
       res.status(200).json({ success: true, data: receipt });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async getMemberStats(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) throw new Error("Unauthorized");
+
+      const { id, memberId } = req.params;
+      const stats = await CommitteesService.getMemberStats(id, memberId);
+      res.status(200).json({ success: true, data: stats });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async blockMember(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const organiserId = req.user?.id;
+      if (!organiserId) throw new Error("Unauthorized");
+
+      const { id, memberId } = req.params;
+      const { reason } = req.body;
+      const result = await CommitteesService.blockMember(id, memberId, organiserId, reason);
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async unblockMember(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const organiserId = req.user?.id;
+      if (!organiserId) throw new Error("Unauthorized");
+
+      const { id, memberId } = req.params;
+      const result = await CommitteesService.unblockMember(id, memberId, organiserId);
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async getBlockedMembers(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const organiserId = req.user?.id;
+      if (!organiserId) throw new Error("Unauthorized");
+
+      const { id } = req.params;
+      const members = await CommitteesService.getBlockedMembers(id);
+      res.status(200).json({ success: true, data: { members } });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async removeMember(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const organiserId = req.user?.id;
+      if (!organiserId) throw new Error("Unauthorized");
+
+      const { id, memberId } = req.params;
+      const result = await CommitteesService.removeMember(id, memberId, organiserId);
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async addMemberToActive(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const organiserId = req.user?.id;
+      if (!organiserId) throw new Error("Unauthorized");
+
+      const { id } = req.params;
+      const { userId } = req.body;
+      const member = await CommitteesService.addMemberToActiveCommittee(id, userId, organiserId);
+      res.status(201).json({ success: true, data: member });
     } catch (err) {
       next(err);
     }

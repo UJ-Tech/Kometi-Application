@@ -123,12 +123,10 @@ export default function PlaceBidScreen() {
   // interestAmount     = 0.02 * contributionPerPerson * remainingNonWinners
   // maxBidAllowed      = totalPool - interestAmount
   // remainingBalance   = totalPool - winningBidAmount
-  // organiserFee       = remainingBalance * 0.05
-  // distributableAmount = remainingBalance - organiserFee + interestAmount
+  // distributableAmount = remainingBalance + interestAmount
   // perMemberDistribution = distributableAmount / totalMembers
   const interestAmount = installment * 0.02 * remainingNonWinners; // paise
   const maxBidAllowed = totalPool - interestAmount; // paise
-  const organiserFeeRate = 0.05;
 
   const myMembership = members.find((m: any) => m.userId === currentUser?.id);
   const myMemberId = myMembership?.id;
@@ -154,8 +152,7 @@ export default function PlaceBidScreen() {
   // Live preview calculations (all in paise)
   // If user wins with this bid:
   const remainingBalance = totalPool - bidPaise; // paise
-  const previewOrganiserFee = remainingBalance * organiserFeeRate; // paise
-  const distributableAmount = remainingBalance - previewOrganiserFee + interestAmount; // paise
+  const distributableAmount = remainingBalance + interestAmount; // paise
   const perMemberDistribution = totalMembers > 0 ? distributableAmount / totalMembers : 0; // paise
 
   // Savings comparison

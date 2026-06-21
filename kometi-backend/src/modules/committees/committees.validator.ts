@@ -8,7 +8,6 @@ export const createCommitteeSchema = z.object({
     totalSlots: z.number().int().min(2).max(50),
     installmentAmountPaise: z.union([z.string(), z.number()]).transform((val) => BigInt(val)),
     cycleDurationDays: z.number().int().min(1),
-    commissionRatePct: z.number().min(0).max(100).optional(),
     maxDiscountPct: z.number().min(0).max(100).optional(),
     includeOrganizerAsMember: z.boolean().optional(),
   }),

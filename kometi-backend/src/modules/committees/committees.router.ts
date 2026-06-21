@@ -118,4 +118,43 @@ router.get(
   CommitteesController.getLotteryReceipt as any
 );
 
+router.get(
+  "/:id/members/:memberId/stats",
+  CommitteesController.getMemberStats as any
+);
+
+// ─── BLOCK/UNBLOCK ROUTES ──────────────────────────────────────────────
+
+router.post(
+  "/:id/members/:memberId/block",
+  authorize("ADMIN", "ORGANIZER") as any,
+  CommitteesController.blockMember as any
+);
+
+router.post(
+  "/:id/members/:memberId/unblock",
+  authorize("ADMIN", "ORGANIZER") as any,
+  CommitteesController.unblockMember as any
+);
+
+router.get(
+  "/:id/blocked-members",
+  authorize("ADMIN", "ORGANIZER") as any,
+  CommitteesController.getBlockedMembers as any
+);
+
+// ─── REMOVE / RE-ADD MEMBER ────────────────────────────────────────────
+
+router.delete(
+  "/:id/members/:memberId",
+  authorize("ADMIN", "ORGANIZER") as any,
+  CommitteesController.removeMember as any
+);
+
+router.post(
+  "/:id/members/add-active",
+  authorize("ADMIN", "ORGANIZER") as any,
+  CommitteesController.addMemberToActive as any
+);
+
 export default router;

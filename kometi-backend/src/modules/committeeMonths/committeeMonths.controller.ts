@@ -117,7 +117,7 @@ export class CommitteeMonthsController {
       const { id, monthId } = req.params;
 
       const data = await CommitteeMonthsService.resolveMonth(id, monthId);
-      res.status(200).json(data);
+      res.status(200).json({ success: true, data });
     } catch (err) {
       next(err);
     }
@@ -164,6 +164,89 @@ export class CommitteeMonthsController {
     try {
       const { id, memberId } = req.params;
       const data = await CommitteeMonthsService.getLastMemberEarnings(id, memberId);
+      res.status(200).json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // POST /api/v1/committees/:id/months/:monthId/pay-net
+  // Non-winner pays their net obligation after resolution
+  static async payNetAmount(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { id, monthId } = req.params;
+      const { memberId } = req.body;
+      const data = await CommitteeMonthsService.payNetAmount(id, monthId, memberId);
+      res.status(200).json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // POST /api/v1/committees/:id/months/:monthId/organiser-advance
+  // Organiser advances payment for a defaulting member
+  static async organiserAdvance(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { id, monthId } = req.params;
+      const { memberId } = req.body;
+      const organiserId = req.user?.id;
+      if (!organiserId) {
+        res.status(401).json({ success: false, message: "Unauthorized" });
+        return;
+      }
+      const data = await CommitteeMonthsService.organiserAdvance(id, monthId, memberId, organiserId);
+      res.status(200).json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // GET /api/v1/committees/:id/months/:monthId/obligations
+  // Get payment obligations for a resolved month
+  static async getObligations(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { id, monthId } = req.params;
+      const data = await CommitteeMonthsService.getObligations(id, monthId);
+      res.status(200).json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // POST /api/v1/committees/:id/months/:monthId/settle-payout
+  static async settlePayout(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { id, monthId } = req.params;
+      const result = await CommitteeMonthsService.settleWinnerPayoutIfNeeded(id, monthId);
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // GET /api/v1/committees/:id/months/overdue
+  // Get overdue payment obligations (organiser only)
+  static async getOverdueObligations(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const data = await CommitteeMonthsService.getOverdueObligations(id);
+      res.status(200).json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // GET /api/v1/committees/:id/months/organiser-advances
+  // Get organiser's advance records (organiser only)
+  static async getOrganiserAdvances(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const organiserId = req.user?.id;
+      if (!organiserId) {
+        res.status(401).json({ success: false, error: "Unauthorized" });
+        return;
+      }
+      const data = await CommitteeMonthsService.getOrganiserAdvances(id, organiserId);
       res.status(200).json({ success: true, data });
     } catch (err) {
       next(err);

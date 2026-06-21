@@ -101,7 +101,7 @@ export const committeesApi = {
   createMonth: (committeeId: string, payload: {
     monthNumber: number;
     monthDate: string;
-    resolutionType: "bid_single" | "bid_auction" | "lottery";
+    resolutionType: "bid_single" | "bid_auction" | "lottery" | "organiser_commission";
     winningBidAmount?: number;
   }) =>
     apiClient.post<ApiResponse<any>>(`/committees/${committeeId}/months`, payload),
@@ -124,4 +124,66 @@ export const committeesApi = {
       memberId,
       bidAmount: bidAmountPaise,
     }),
+
+  // ─── Netted Payment Flow ────────────────────────────────────────────────
+  payNetAmount: (committeeId: string, monthId: string, memberId: string) =>
+    apiClient.post<ApiResponse<any>>(`/committees/${committeeId}/months/${monthId}/pay-net`, {
+      memberId,
+    }),
+
+  organiserAdvance: (committeeId: string, monthId: string, memberId: string) =>
+    apiClient.post<ApiResponse<any>>(`/committees/${committeeId}/months/${monthId}/organiser-advance`, {
+      memberId,
+    }),
+
+  getObligations: (committeeId: string, monthId: string) =>
+    apiClient.get<ApiResponse<any>>(`/committees/${committeeId}/months/${monthId}/obligations`),
+
+  settlePayout: (committeeId: string, monthId: string) =>
+    apiClient.post<ApiResponse<any>>(`/committees/${committeeId}/months/${monthId}/settle-payout`),
+
+  getOverdueObligations: (committeeId: string) =>
+    apiClient.get<ApiResponse<any>>(`/committees/${committeeId}/months/overdue`),
+
+  getOrganiserAdvances: (committeeId: string) =>
+    apiClient.get<ApiResponse<any>>(`/committees/${committeeId}/months/organiser-advances`),
+
+  // ─── Member Stats ────────────────────────────────────────────────────
+  getMemberStats: (committeeId: string, memberId: string) =>
+    apiClient.get<ApiResponse<{
+      committeeId: string;
+      memberId: string;
+      totalContributedPaise: number;
+      totalReceivedPaise: number;
+      totalPaidPaise: number;
+      totalCreditedPaise: number;
+      totalInterestPaise: number;
+      netPositionPaise: number;
+      monthsCompleted: number;
+      monthsWon: number;
+      totalMonths: number;
+    }>>(`/committees/${committeeId}/members/${memberId}/stats`),
+
+  // ─── Block/Unblock Members ────────────────────────────────────────────
+  blockMember: (committeeId: string, memberId: string, reason: string) =>
+    apiClient.post<ApiResponse<{ success: boolean; member: any }>>(
+      `/committees/${committeeId}/members/${memberId}/block`,
+      { reason }
+    ),
+
+  unblockMember: (committeeId: string, memberId: string) =>
+    apiClient.post<ApiResponse<{ success: boolean; member: any }>>(
+      `/committees/${committeeId}/members/${memberId}/unblock`
+    ),
+
+  getBlockedMembers: (committeeId: string) =>
+    apiClient.get<ApiResponse<{ members: any[] }>>(
+      `/committees/${committeeId}/blocked-members`
+    ),
+
+  addMemberToActive: (committeeId: string, userId: string) =>
+    apiClient.post<ApiResponse<any>>(
+      `/committees/${committeeId}/members/add-active`,
+      { userId }
+    ),
 };

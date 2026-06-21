@@ -42,6 +42,11 @@ export default function OrganiserManageTimeline() {
   const [newMonthDate, setNewMonthDate] = useState("");
   const [newMonthResolution, setNewMonthResolution] = useState<"bid_single" | "bid_auction" | "lottery">("bid_auction");
   const [isCreating, setIsCreating] = useState(false);
+  const [overdueObligations, setOverdueObligations] = useState<any[]>([]);
+  const [organiserAdvances, setOrganiserAdvances] = useState<any[]>([]);
+  const [blockedMembers, setBlockedMembers] = useState<any[]>([]);
+  const [removingMember, setRemovingMember] = useState<string | null>(null);
+  const [advancingMember, setAdvancingMember] = useState<string | null>(null);
 
   const notify = async (title: string, message: string) => {
     if (Platform.OS === "web") {
@@ -71,6 +76,20 @@ export default function OrganiserManageTimeline() {
     } catch (err: any) {
       console.error("[OrganiserManageTimeline] Months load failed:", err);
       setError("Failed to load months data. Pull down to retry.");
+    }
+
+    // Fetch overdue obligations, organiser advances, and blocked members (non-blocking)
+    try {
+      const [overdueRes, advancesRes, blockedRes] = await Promise.all([
+        committeesApi.getOverdueObligations(id),
+        committeesApi.getOrganiserAdvances(id),
+        committeesApi.getBlockedMembers(id),
+      ]);
+      setOverdueObligations(overdueRes.data.data || []);
+      setOrganiserAdvances(advancesRes.data.data || []);
+      setBlockedMembers(blockedRes.data.data?.members || []);
+    } catch (err: any) {
+      console.error("[OrganiserManageTimeline] Obligations/advances/blocked load failed:", err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -84,6 +103,15 @@ export default function OrganiserManageTimeline() {
       setLoading(false);
       setError("Invalid committee ID");
     }
+  }, [isValidId, loadData]);
+
+  // Auto-refresh committee data every 15 seconds (payments, obligations, etc.)
+  useEffect(() => {
+    if (!isValidId) return;
+    const interval = setInterval(() => {
+      loadData();
+    }, 15000);
+    return () => clearInterval(interval);
   }, [isValidId, loadData]);
 
   const handleRefresh = useCallback(() => {
@@ -121,7 +149,7 @@ export default function OrganiserManageTimeline() {
       await committeesApi.createMonth(id, {
         monthNumber: monthNum,
         monthDate: newMonthDate.trim(),
-        resolutionType: newMonthResolution,
+        resolutionType: monthNum === 1 ? "organiser_commission" : "bid_auction",
       });
       await notify("Success", `Month ${monthNum} created successfully!`);
       setNewMonthNumber("");
@@ -133,6 +161,43 @@ export default function OrganiserManageTimeline() {
     } finally {
       setIsCreating(false);
     }
+  };
+
+  const handleAdvancePayment = async (monthId: string, memberId: string, memberName: string) => {
+    try {
+      setAdvancingMember(memberId);
+      await committeesApi.organiserAdvance(id, monthId, memberId);
+      await notify("Success", `Payment advanced for ${memberName}. They now owe you this amount.`);
+      loadData();
+    } catch (err: any) {
+      const msg = err?.message || "Failed to advance payment";
+      await notify("Error", msg);
+    } finally {
+      setAdvancingMember(null);
+    }
+  };
+
+  const handleUnblock = async (memberId: string, memberName: string) => {
+    Alert.alert(
+      "Unblock Member",
+      `Are you sure you want to unblock ${memberName}? They must have paid you directly.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Unblock",
+          onPress: async () => {
+            try {
+              await committeesApi.unblockMember(id, memberId);
+              await notify("Success", `${memberName} has been unblocked.`);
+              loadData();
+            } catch (err: any) {
+              const msg = err?.message || "Failed to unblock member";
+              await notify("Error", msg);
+            }
+          },
+        },
+      ]
+    );
   };
 
   // ─── Invalid ID ─────────────────────────────────────────────────────────
@@ -224,8 +289,8 @@ export default function OrganiserManageTimeline() {
   const months = Array.isArray(monthsData.months) ? monthsData.months : [];
   const totalMembers = monthsData.totalMembers || 0;
   const totalPool = monthsData.totalPool || 0;
-  const feePercent = monthsData.feePercent || 0;
   const completedMonths = monthsData.completedMonths || 0;
+  const members: any[] = committee.members || [];
 
   const currentMonthIndex = months.findIndex((m: any) => m.status !== "completed");
   const currentMonth = currentMonthIndex !== -1 ? months[currentMonthIndex] : null;
@@ -290,8 +355,8 @@ export default function OrganiserManageTimeline() {
                 <Text className="text-gold-400 font-bold text-base mt-1">{formatINR(totalPool)}</Text>
               </View>
               <View className="w-1/2 mb-4 items-end">
-                <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">Organiser Fee</Text>
-                <Text className="text-white font-bold text-base mt-1">{feePercent}%</Text>
+                <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">Organiser Reward</Text>
+                <Text className="text-gold-400 font-bold text-base mt-1">Month 1</Text>
               </View>
               <View className="w-1/2">
                 <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">Members</Text>
@@ -308,12 +373,258 @@ export default function OrganiserManageTimeline() {
         </Card>
       </View>
 
+      {/* Overdue Payment Obligations */}
+
+      {/* Members List with Remove */}
+      <View className="px-4 mb-4">
+        <Card>
+          <View className="p-5">
+            <View className="flex-row items-center justify-between mb-4">
+              <View className="flex-row items-center">
+                <View className="w-8 h-8 rounded-lg bg-brand-500/15 items-center justify-center mr-3">
+                  <Ionicons name="people-outline" size={16} color={COLORS.brandPrimary} />
+                </View>
+                <Text className="text-white font-bold text-sm">
+                  Committee Members ({members.length})
+                </Text>
+              </View>
+            </View>
+            {members.length === 0 ? (
+              <View className="bg-danger-500/10 rounded-xl p-3">
+                <Text className="text-danger-400 text-xs text-center">
+                  No members found in database. Re-add members to continue.
+                </Text>
+              </View>
+            ) : (
+              members.map((member: any) => {
+                const userName = member.user?.name || "Unknown";
+                const isBlocked = member.is_blocked;
+                return (
+                  <View key={member.id} className={`border rounded-xl p-3 mb-2 ${isBlocked ? "bg-danger-500/5 border-danger-500/10" : "bg-surface-950 border-brand-primary/10"}`}>
+                    <View className="flex-row justify-between items-center">
+                      <View className="flex-1">
+                        <View className="flex-row items-center">
+                          <Text className="text-white font-semibold text-xs">{userName}</Text>
+                          {isBlocked && <Badge label="Blocked" variant="danger" size="sm" />}
+                        </View>
+                        <Text className="text-neutral-500 text-[10px]">Slot #{member.slotNumber}</Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => {
+                          Alert.alert(
+                            "Remove Member",
+                            `Remove ${userName} from this committee?`,
+                            [
+                              { text: "Cancel", style: "cancel" },
+                              {
+                                text: "Remove",
+                                style: "destructive",
+                                onPress: async () => {
+                                  try {
+                                    setRemovingMember(member.id);
+                                    await committeesApi.removeMember(id, member.id);
+                                    await notify("Success", `${userName} removed from committee.`);
+                                    loadData();
+                                  } catch (err: any) {
+                                    await notify("Error", err?.message || "Failed to remove member");
+                                  } finally {
+                                    setRemovingMember(null);
+                                  }
+                                },
+                              },
+                            ]
+                          );
+                        }}
+                        disabled={removingMember === member.id}
+                        style={{ opacity: removingMember === member.id ? 0.5 : 1 }}
+                        className="bg-danger-500/15 border border-danger-500/20 px-3 py-1.5 rounded-lg"
+                      >
+                        {removingMember === member.id ? (
+                          <ActivityIndicator size="small" color="#ef4444" />
+                        ) : (
+                          <Ionicons name="trash-outline" size={14} color="#ef4444" />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </View>
+        </Card>
+      </View>
+
+      {/* Overdue Payment Obligations */}
+      {overdueObligations.length > 0 && (
+        <View className="px-4 mb-4">
+          <Card>
+            <View className="p-5">
+              <View className="flex-row items-center mb-4">
+                <View className="w-8 h-8 rounded-lg bg-danger-500/15 items-center justify-center mr-3">
+                  <Ionicons name="warning-outline" size={16} color={COLORS.danger.light} />
+                </View>
+                <Text className="text-danger-400 font-bold text-sm">Overdue Payments ({overdueObligations.length})</Text>
+              </View>
+              {overdueObligations.map((obl: any) => {
+                const memberName = obl.committeeMember?.user?.name || "Member";
+                const daysOverdue = obl.daysOverdue || 0;
+                const canAdvance = daysOverdue >= 3 && obl.direction === "pay";
+                return (
+                  <View key={obl.id} className="bg-danger-500/5 border border-danger-500/10 rounded-xl p-3 mb-2">
+                    <View className="flex-row justify-between items-center mb-1">
+                      <Text className="text-white font-semibold text-xs">{memberName}</Text>
+                      <Text className="text-danger-400 font-bold text-xs">{formatINR(obl.netAmount / 100)}</Text>
+                    </View>
+                    <View className="flex-row justify-between items-center mb-2">
+                      <Text className="text-neutral-500 text-[10px]">Month {obl.committeeMonth?.month_number || "?"}</Text>
+                      <Text className="text-danger-400 text-[10px] font-semibold">{daysOverdue} day{daysOverdue !== 1 ? "s" : ""} overdue</Text>
+                    </View>
+                    {canAdvance && (
+                      <TouchableOpacity
+                        onPress={() => handleAdvancePayment(obl.committeeMonth?.id, obl.memberId, memberName)}
+                        disabled={advancingMember === obl.memberId}
+                        className="bg-warning-500/15 border border-warning-500/20 px-3 py-2 rounded-lg flex-row items-center justify-center"
+                        style={{ opacity: advancingMember === obl.memberId ? 0.6 : 1 }}
+                      >
+                        {advancingMember === obl.memberId ? (
+                          <ActivityIndicator size="small" color={COLORS.warning?.light || "#f59e0b"} />
+                        ) : (
+                          <>
+                            <Ionicons name="cash-outline" size={14} color={COLORS.warning?.light || "#f59e0b"} />
+                            <Text className="text-warning-400 font-bold text-[11px] ml-1.5">Advance Payment for {memberName}</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    )}
+                    {!canAdvance && (
+                      <Text className="text-neutral-500 text-[10px] italic text-center">
+                        Advance available after 3-day deadline
+                      </Text>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          </Card>
+        </View>
+      )}
+
+      {/* Organiser Advances Made */}
+      {organiserAdvances.length > 0 && (
+        <View className="px-4 mb-4">
+          <Card>
+            <View className="p-5">
+              <View className="flex-row items-center mb-4">
+                <View className="w-8 h-8 rounded-lg bg-gold-500/15 items-center justify-center mr-3">
+                  <Ionicons name="wallet-outline" size={16} color={COLORS.goldPrimary} />
+                </View>
+                <Text className="text-white font-bold text-sm">My Advances ({organiserAdvances.length})</Text>
+              </View>
+              {organiserAdvances.map((adv: any) => {
+                const memberName = adv.committeeMember?.user?.name || "Member";
+                const isRepaid = adv.repaidStatus === "repaid";
+                return (
+                  <View key={adv.id} className={`border rounded-xl p-3 mb-2 ${isRepaid ? "bg-success-500/5 border-success-500/10" : "bg-surface-elevated border-brand-primary/10"}`}>
+                    <View className="flex-row justify-between items-center mb-1">
+                      <Text className="text-white font-semibold text-xs">{memberName}</Text>
+                      <Text className={`font-bold text-xs ${isRepaid ? "text-success-400" : "text-gold-400"}`}>{formatINR(adv.netAmount / 100)}</Text>
+                    </View>
+                    <View className="flex-row justify-between items-center">
+                      <Text className="text-neutral-500 text-[10px]">Month {adv.committeeMonth?.month_number || "?"}</Text>
+                      <Badge
+                        label={isRepaid ? "Repaid" : "Pending"}
+                        variant={isRepaid ? "success" : "warning"}
+                        dot
+                      />
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </Card>
+        </View>
+      )}
+
+      {/* Blocked Members */}
+      {blockedMembers.length > 0 && (
+        <View className="px-4 mb-4">
+          <Card>
+            <View className="p-5">
+              <View className="flex-row items-center mb-4">
+                <View className="w-8 h-8 rounded-lg bg-danger-500/15 items-center justify-center mr-3">
+                  <Ionicons name="lock-closed" size={16} color="#ef4444" />
+                </View>
+                <Text className="text-danger-400 font-bold text-sm">
+                  Blocked Members ({blockedMembers.length})
+                </Text>
+              </View>
+              {blockedMembers.map((member: any) => (
+                <View key={member.id} className="bg-danger-500/5 border border-danger-500/10 rounded-xl p-3 mb-2">
+                  <View className="flex-row justify-between items-center mb-1">
+                    <Text className="text-white font-semibold text-xs">{member.name}</Text>
+                    <Text className="text-danger-400 text-[10px]">
+                      Slot #{member.slotNumber}
+                    </Text>
+                  </View>
+                  <Text className="text-neutral-500 text-[10px] mb-1">
+                    {member.blockedReason}
+                  </Text>
+                  {member.blockedAt && (
+                    <Text className="text-neutral-500 text-[10px] mb-2">
+                      Blocked: {new Date(member.blockedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                    </Text>
+                  )}
+                  <TouchableOpacity
+                    onPress={() => handleUnblock(member.id, member.name)}
+                    className="bg-success-500/15 border border-success-500/20 px-3 py-2 rounded-lg"
+                  >
+                    <Text className="text-success-400 font-bold text-[11px] text-center">
+                      Unblock {member.name}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          </Card>
+        </View>
+      )}
+
       <View className="px-4 mb-3 flex-row items-center justify-between">
         <Text className="text-white text-base font-bold">Monthly Timeline</Text>
         {months.length > 0 && (
           <Text className="text-neutral-500 text-xs">{months.length} months</Text>
         )}
       </View>
+
+      {/* Delete Month Button (local only — not wired to DB yet) */}
+      {months.length > 0 && (
+        <View className="px-4 mb-4">
+          <TouchableOpacity
+            onPress={() => {
+              Alert.alert(
+                "Delete Month (Local)",
+                `Remove Month ${months[months.length - 1]?.monthNumber} from view? This is local only — the DB record still exists.`,
+                [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: () => {
+                      const updatedMonths = months.slice(0, -1);
+                      setMonthsData({ ...monthsData, months: updatedMonths });
+                      Alert.alert("Done", "Month removed from view. Recreate it from the app.");
+                    },
+                  },
+                ]
+              );
+            }}
+            className="bg-danger-500/10 border border-danger-500/20 px-4 py-3 rounded-xl flex-row items-center justify-center"
+          >
+            <Ionicons name="trash-outline" size={16} color="#ef4444" />
+            <Text className="text-danger-400 font-bold text-sm ml-2">Delete Last Month (Local Only)</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Create Month Button */}
       <View className="px-4 mb-4">
@@ -363,28 +674,9 @@ export default function OrganiserManageTimeline() {
                   />
                 </View>
 
-                <Text className="text-neutral-400 text-xs font-semibold mb-2">Resolution Type</Text>
-                <View className="flex-row gap-2 mb-4">
-                  {(["bid_auction", "bid_single", "lottery"] as const).map((type) => (
-                    <TouchableOpacity
-                      key={type}
-                      onPress={() => setNewMonthResolution(type)}
-                      className={`flex-1 h-10 rounded-xl items-center justify-center border ${
-                        newMonthResolution === type
-                          ? "bg-brand-500 border-brand-500"
-                          : "bg-surface-950 border-brand-primary/10"
-                      }`}
-                    >
-                      <Text
-                        className={`font-bold text-xs ${
-                          newMonthResolution === type ? "text-white" : "text-neutral-400"
-                        }`}
-                      >
-                        {type === "bid_auction" ? "Auction" : type === "bid_single" ? "Single Bid" : "Lottery"}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <Text className="text-neutral-500 text-[10px] mb-4">
+                  Month 1 = Organiser commission. Months 2+ = Auto-detected based on bids.
+                </Text>
 
                 <View className="flex-row gap-3">
                   <TouchableOpacity
@@ -506,14 +798,20 @@ export default function OrganiserManageTimeline() {
                             <Text className="text-neutral-400 text-xs">Winner Payout</Text>
                             <Text className="text-gold-400 font-bold text-xs">{formatINR(month.winningBidAmount || 0)}</Text>
                           </View>
-                          <View className="flex-row justify-between">
+                          <View className="flex-row justify-between mb-2">
                             <Text className="text-neutral-400 text-xs">Member Dividend</Text>
                             <Text className="text-success-400 font-bold text-xs">+{formatINR(month.perMemberDistribution || 0)}</Text>
                           </View>
+                          {month.nonWinnerNetPayable > 0 && (
+                            <View className="flex-row justify-between pt-2 border-t border-brand-primary/10">
+                              <Text className="text-neutral-400 text-xs">Non-Winner Net Pay</Text>
+                              <Text className="text-danger-400 font-bold text-xs">{formatINR(month.nonWinnerNetPayable)}</Text>
+                            </View>
+                          )}
                         </View>
                       )}
 
-                      {isCurrent && isPending && (
+                      {isCurrent && isPending && month.monthNumber < totalMembers && (
                         <View className="mt-3">
                           <Button
                             label={processingOpen === month.monthNumber ? "Opening..." : "Open Bidding"}
@@ -524,7 +822,7 @@ export default function OrganiserManageTimeline() {
                             onPress={() => handleOpenBidding(month.monthNumber)}
                           />
                           <Text className="text-neutral-500 text-[10px] text-center mt-2 italic">
-                            Ensure all members have paid before opening bidding.
+                            Members pay after resolution (netted flow).
                           </Text>
                         </View>
                       )}
@@ -546,6 +844,17 @@ export default function OrganiserManageTimeline() {
                         <View className="mt-3 bg-surface-elevated/50 p-3 rounded-lg">
                           <Text className="text-neutral-500 text-xs text-center italic">
                             Month is not yet active. Create a new month above.
+                          </Text>
+                        </View>
+                      )}
+
+                      {isCurrent && isPending && month.monthNumber === totalMembers && (
+                        <View className="mt-3 bg-gold-500/10 p-3 rounded-lg">
+                          <Text className="text-gold-400 text-xs text-center font-bold">
+                            Last month — auto-resolves when created
+                          </Text>
+                          <Text className="text-neutral-500 text-[10px] text-center mt-1">
+                            Only 1 member remains, no bidding needed
                           </Text>
                         </View>
                       )}

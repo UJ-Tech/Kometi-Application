@@ -575,6 +575,33 @@ export class PaymentsService {
       amount: tx.amount,
     });
 
+    // 8. Update member_payment_obligations → paid (if obligation exists for this month)
+    //    This is critical: without this, settleWinnerPayoutIfNeeded never credits the winner.
+    try {
+      const { data: obligation } = await supabase
+        .from("member_payment_obligations")
+        .select("id, direction")
+        .eq("committee_id", tx.committee_id)
+        .eq("month_id", tx.month_id)
+        .eq("member_id", tx.member_id)
+        .eq("status", "pending")
+        .single();
+
+      if (obligation && obligation.direction === "pay") {
+        await supabase
+          .from("member_payment_obligations")
+          .update({ status: "paid", paid_at: new Date().toISOString(), payment_transaction_id: tx.id })
+          .eq("id", obligation.id);
+
+        // Check if all obligations settled → credit winner payout
+        const { CommitteeMonthsService } = require("../committeeMonths/committeeMonths.service");
+        await CommitteeMonthsService.settleWinnerPayoutIfNeeded(tx.committee_id, tx.month_id);
+      }
+    } catch (err) {
+      console.error("[PaymentsService] Failed to update obligation or settle winner:", err);
+      // Non-fatal — contribution is already marked paid
+    }
+
     // Notify organizer
     const { data: committee } = await supabase
       .from("committees")
@@ -649,7 +676,7 @@ export class PaymentsService {
       throw new Error("Invalid amount — nothing to pay");
     }
 
-    // ── 4. Validate wallet has sufficient balance (READ ONLY) ─────────────
+    // ── 4. Validate wallet has sufficient balance (combined: raw + committee ledger) ──
     const { data: wallet, error: walletError } = await supabase
       .from("wallets")
       .select("id, balancePaise")
@@ -660,7 +687,21 @@ export class PaymentsService {
       throw new Error("Wallet not found — please top up your wallet first");
     }
 
-    const walletBalance = Number(wallet.balancePaise);
+    const rawBalance = Number(wallet.balancePaise);
+
+    // Add committee ledger credits (same logic as WalletService.getWalletData)
+    const { data: ledgerEntries } = await supabase
+      .from("wallet_ledger_entries")
+      .select("amount, direction, entry_type")
+      .eq("member_id", userId)
+      .eq("status", "confirmed");
+
+    const committeeBalance = (ledgerEntries || []).reduce((sum: number, entry: any) => {
+      if (entry.entry_type === "contribution_made") return sum;
+      return sum + (entry.direction === "credit" ? Number(entry.amount) : -Number(entry.amount));
+    }, 0);
+
+    const walletBalance = rawBalance + committeeBalance;
     if (walletBalance < totalAmountPaise) {
       throw new Error(
         `Insufficient wallet balance. You have ₹${(walletBalance / 100).toFixed(0)} but need ₹${(totalAmountPaise / 100).toFixed(0)}`
@@ -762,39 +803,81 @@ export class PaymentsService {
     }
 
     // ── 10. DEBIT WALLET (LAST — all DB updates above succeeded) ──────────
+    //    Debit from raw wallet first, then from committee ledger if needed.
     const idempotencyKey = `wallet_contrib_${committeeId}_${monthId}_${memberId}`;
-    const balanceAfter = walletBalance - totalAmountPaise;
+    const rawDebit = Math.min(rawBalance, totalAmountPaise);
+    const ledgerDebit = totalAmountPaise - rawDebit;
 
-    const { error: debitError } = await supabase
-      .from("wallets")
-      .update({ balancePaise: balanceAfter })
-      .eq("id", wallet.id);
+    // 10a. Debit raw wallet
+    if (rawDebit > 0) {
+      const rawBalanceAfter = rawBalance - rawDebit;
+      const { error: debitError } = await supabase
+        .from("wallets")
+        .update({ balancePaise: rawBalanceAfter })
+        .eq("id", wallet.id);
 
-    if (debitError) {
-      console.error("[PaymentsService] Wallet debit failed:", debitError);
-      throw new Error("Failed to debit wallet — payment not processed");
+      if (debitError) {
+        console.error("[PaymentsService] Wallet debit failed:", debitError);
+        throw new Error("Failed to debit wallet — payment not processed");
+      }
+
+      // Record debit in legacy transactions
+      try {
+        await supabase
+          .from("transactions")
+          .insert({
+            walletId: wallet.id,
+            userId,
+            type: "DEBIT",
+            category: "INSTALLMENT_PAYMENT",
+            status: "COMPLETED",
+            amountPaise: rawDebit,
+            balanceBefore: rawBalance,
+            balanceAfter: rawBalanceAfter,
+            description: `Committee contribution — Month ${cycleNo} (wallet)`,
+            paymentMethod: "WALLET",
+            idempotencyKey,
+          });
+      } catch {
+        // Non-fatal
+      }
     }
 
-    // Record debit transaction in legacy ledger
-    const { error: txnError } = await supabase
-      .from("transactions")
-      .insert({
-        walletId: wallet.id,
-        userId,
-        type: "DEBIT",
-        category: "INSTALLMENT_PAYMENT",
-        status: "COMPLETED",
-        amountPaise: totalAmountPaise,
-        balanceBefore: walletBalance,
-        balanceAfter,
-        description: `Committee contribution — Month ${cycleNo}`,
-        paymentMethod: "WALLET",
-        idempotencyKey,
-      });
+    // 10b. If remainder, debit from committee ledger
+    if (ledgerDebit > 0) {
+      try {
+        const { data: lastLedgerEntry } = await supabase
+          .from("wallet_ledger_entries")
+          .select("balance_after")
+          .eq("member_id", userId)
+          .eq("committee_id", committeeId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
 
-    if (txnError) {
-      console.error("[PaymentsService] transactions insert failed:", txnError);
-      // Non-fatal — wallet already debited, contribution is recorded
+        const prevBalance = lastLedgerEntry ? Number(lastLedgerEntry.balance_after) : 0;
+        const newBalance = prevBalance - ledgerDebit;
+
+        await supabase
+          .from("wallet_ledger_entries")
+          .insert({
+            member_id: userId,
+            committee_id: committeeId,
+            entry_type: "contribution_made",
+            amount: ledgerDebit,
+            direction: "debit",
+            reference_type: "monthly_contributions",
+            reference_id: contribution.id,
+            balance_after: newBalance,
+            status: "confirmed",
+            idempotency_key: `wallet_contrib_ledger_${committeeId}_${monthId}_${memberId}`,
+            created_by: "system",
+            notes: `Month ${cycleNo} contribution (from committee credits)`,
+          });
+      } catch (err) {
+        console.error("[PaymentsService] Ledger debit failed:", err);
+        // Non-fatal — raw wallet already debited
+      }
     }
 
     // ── 11. Emit real-time events ─────────────────────────────────────────
@@ -803,6 +886,33 @@ export class PaymentsService {
       monthId,
       amount: totalAmountPaise,
     });
+
+    // 12. Update member_payment_obligations → paid (if obligation exists for this month)
+    //     Critical: without this, settleWinnerPayoutIfNeeded never credits the winner.
+    try {
+      const { data: obligation } = await supabase
+        .from("member_payment_obligations")
+        .select("id, direction")
+        .eq("committee_id", committeeId)
+        .eq("month_id", monthId)
+        .eq("member_id", memberId)
+        .eq("status", "pending")
+        .single();
+
+      if (obligation && obligation.direction === "pay") {
+        await supabase
+          .from("member_payment_obligations")
+          .update({ status: "paid", paid_at: new Date().toISOString(), payment_transaction_id: tx.id })
+          .eq("id", obligation.id);
+
+        // Check if all obligations settled → credit winner payout
+        const { CommitteeMonthsService } = require("../committeeMonths/committeeMonths.service");
+        await CommitteeMonthsService.settleWinnerPayoutIfNeeded(committeeId, monthId);
+      }
+    } catch (err) {
+      console.error("[PaymentsService] Failed to update obligation or settle winner:", err);
+      // Non-fatal — contribution is already marked paid
+    }
 
     const { data: committee } = await supabase
       .from("committees")
@@ -827,7 +937,7 @@ export class PaymentsService {
 
     emitToUser(userId, "wallet:debited", {
       amountPaise: totalAmountPaise,
-      newBalance: balanceAfter,
+      newBalance: walletBalance - totalAmountPaise,
     });
 
     return { success: true, contribution };

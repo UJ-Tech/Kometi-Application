@@ -220,7 +220,6 @@ export default function AuditLogScreen() {
   <table>
     <tr><td>Total Pool</td><td class="amount">${F(monthData.totalPool)}</td></tr>
     <tr><td>Winning Bid</td><td class="amount">${F(monthData.winningBidAmount)}</td></tr>
-    <tr><td>Organiser Fee</td><td class="amount">${F(monthData.organiserFee)}</td></tr>
     <tr><td>Interest Amount</td><td class="amount">${F(monthData.interestAmount)}</td></tr>
     <tr><td>Per-Member Distribution</td><td class="amount">${F(monthData.perMemberDistribution)}</td></tr>
     <tr><td>Remaining Balance</td><td class="amount">${F(monthData.remainingBalance)}</td></tr>
@@ -350,7 +349,6 @@ export default function AuditLogScreen() {
                       <View className="flex-row flex-wrap gap-x-4 gap-y-1">
                         <Text className="text-neutral-400 text-[10px]">Winner: <Text className="text-white font-semibold">{winner?.user?.name || "N/A"}</Text></Text>
                         <Text className="text-neutral-400 text-[10px]">Bid: <Text className="text-gold-400 font-semibold">{F(month.winningBidAmount)}</Text></Text>
-                        <Text className="text-neutral-400 text-[10px]">Fee: <Text className="text-white font-semibold">{F(month.organiserFee)}</Text></Text>
                         <Text className="text-neutral-400 text-[10px]">Interest: <Text className="text-white font-semibold">{F(month.interestAmount)}</Text></Text>
                         <Text className="text-neutral-400 text-[10px]">/share: <Text className="text-success-400 font-semibold">{F(month.perMemberDistribution)}</Text></Text>
                       </View>

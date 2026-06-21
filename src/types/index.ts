@@ -75,7 +75,6 @@ export interface Committee {
   currentCycleNo:        number;
   penaltyRatePct:        number;
   gracePeriodDays:       number;
-  commissionRatePct:     number;
   maxDiscountPct:        number;
   createdAt:             string;
   updatedAt:             string;
@@ -219,7 +218,7 @@ export interface JoinRequest {
 
 // ─── Committee Months (Phase 2) ──────────────────────────────────────────────
 export type CommitteeMonthStatus = "pending" | "bidding_open" | "completed";
-export type ResolutionType = "bid_single" | "bid_auction" | "lottery";
+export type ResolutionType = "bid_single" | "bid_auction" | "lottery" | "organiser_commission";
 
 export interface CommitteeMonth {
   id:                    string;
@@ -232,7 +231,6 @@ export interface CommitteeMonth {
   winningBidAmount:      number | null;
   remainingBalance:      number;
   biddingDeadline:       string | null;
-  organiserFee:          number;
   distributableAmount:   number;
   interestAmount:        number;
   perMemberDistribution: number;
@@ -246,7 +244,6 @@ export interface MemberDistribution {
   memberId:           string;
   distributionAmount: number;
   interestShare:      number;
-  organiserFeeShare:  number;
   distributedAt:      string;
   member?:            CommitteeMember;
 }
