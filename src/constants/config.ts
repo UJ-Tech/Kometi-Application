@@ -24,8 +24,8 @@ export const APP_CONFIG = {
   scheme:  "kometi",
 
   // API
-  API_BASE_URL:    __DEV__ ? getDevApiBaseUrl() : "https://api.kometi.app/api/v1",
-  SOCKET_URL:      __DEV__ ? getDevSocketUrl() : "https://api.kometi.app",
+  API_BASE_URL:    __DEV__ ? getDevApiBaseUrl() : "https://kometi-application.onrender.com/api/v1",
+  SOCKET_URL:      __DEV__ ? getDevSocketUrl() : "https://kometi-application.onrender.com",
   API_TIMEOUT_MS:  30_000,
 
   // Auth
