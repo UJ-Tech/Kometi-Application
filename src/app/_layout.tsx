@@ -2,14 +2,17 @@
 // Root layout — wraps the entire app with all global providers.
 
 import "../global.css";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import * as SplashScreen from "expo-splash-screen";
 import { useAuthStore } from "../stores/auth.store";
 import NetworkBanner from "../components/shared/NetworkBanner";
+
+SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,9 +26,30 @@ const queryClient = new QueryClient({
 
 export default function RootLayout() {
   const hydrate   = useAuthStore((s) => s.hydrate);
+  const [appReady, setAppReady] = useState(false);
 
-  // Rehydrate tokens from SecureStore on app start
-  useEffect(() => { hydrate(); }, []);
+  useEffect(() => {
+    async function prepare() {
+      try {
+        await hydrate();
+      } catch (e) {
+        console.warn("Hydration error:", e);
+      } finally {
+        setAppReady(true);
+      }
+    }
+    prepare();
+  }, []);
+
+  useEffect(() => {
+    if (appReady) {
+      SplashScreen.hide();
+    }
+  }, [appReady]);
+
+  if (!appReady) {
+    return null;
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

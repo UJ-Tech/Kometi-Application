@@ -1,12 +1,12 @@
 // src/components/ui/Card.tsx
 import React from "react";
-import { View, type ViewStyle } from "react-native";
+import { View, type StyleProp, type ViewStyle } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { COLORS, BORDER_RADIUS, SHADOWS, GRADIENTS } from "../../constants/theme";
 
 interface CardProps {
   children:      React.ReactNode;
-  style?:        ViewStyle;
+  style?:        StyleProp<ViewStyle>;
   gradient?:     boolean;
   elevated?:     boolean;
   borderGlow?:   boolean;
@@ -32,7 +32,7 @@ export default function Card({
   if (gradient) {
     return (
       <LinearGradient
-        colors={GRADIENTS.darkElevated as any}
+        colors={GRADIENTS.darkElevated}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[base, style]}
