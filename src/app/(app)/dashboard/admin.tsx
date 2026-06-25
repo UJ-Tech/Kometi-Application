@@ -7,12 +7,11 @@ import {
   RefreshControl,
   TextInput,
   Modal,
-  Alert,
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
+
 import { Ionicons } from "@expo/vector-icons";
 import { adminApi, type AdminDashboardStats } from "../../../services/admin.api";
 import { membersApi } from "../../../services/members.api";
@@ -23,6 +22,7 @@ import { formatINR } from "../../../utils/currency";
 import { COLORS } from "../../../constants/theme";
 import Card from "../../../components/ui/Card";
 import Badge from "../../../components/ui/Badge";
+import { useAlertModal } from "../../../components/ui/AlertModal";
 
 type TabKey = "overview" | "users" | "committees" | "wallets" | "transactions";
 
@@ -47,6 +47,7 @@ export default function AdminDashboard() {
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [roleModalVisible, setRoleModalVisible] = useState(false);
+  const { alert, confirm, AlertComponent } = useAlertModal();
 
   useEffect(() => {
     if (user && !canOpenAdminPanel) {
@@ -71,7 +72,7 @@ export default function AdminDashboard() {
       setUsers(usersRes.data.data);
     } catch (err) {
       console.error("[AdminDashboard] loadData failed:", err);
-      Alert.alert("Error", err instanceof Error ? err.message : "Failed to load dashboard data");
+      await alert("Error", err instanceof Error ? err.message : "Failed to load dashboard data");
     } finally {
       setRefreshing(false);
       setIsLoading(false);
@@ -95,11 +96,11 @@ export default function AdminDashboard() {
       setRoleModalVisible(false);
       setIsLoading(true);
       await adminApi.updateUserRole(selectedUser.id, role);
-      Alert.alert("Success", `User role updated to ${role} successfully`);
+      await alert("Success", `User role updated to ${role} successfully`);
       loadData();
     } catch (err) {
       console.error("[AdminDashboard] handleRoleUpdate failed:", err);
-      Alert.alert("Error", err instanceof Error ? err.message : "Failed to update user role");
+      await alert("Error", err instanceof Error ? err.message : "Failed to update user role");
       setIsLoading(false);
     }
   };
@@ -137,35 +138,35 @@ export default function AdminDashboard() {
 
   if (isLoading && !refreshing) {
     return (
-      <View className="flex-1 bg-surface-950 items-center justify-center">
+      <View className="flex-1 bg-surface-bg items-center justify-center">
         <ActivityIndicator size="large" color={COLORS.brandPrimary} />
-        <Text className="text-neutral-400 mt-4 font-semibold">Loading admin dashboard...</Text>
+        <Text className="text-slate-500 mt-4 font-semibold">Loading admin dashboard...</Text>
       </View>
     );
   }
 
   return (
-    <View className="flex-1 bg-surface-950">
+    <View className="flex-1 bg-surface-bg">
       {/* Header */}
       <View className="px-4 pt-14 pb-3">
         <View className="flex-row items-center justify-between mb-4">
           <View className="flex-row items-center">
             <TouchableOpacity
               onPress={() => router.back()}
-              className="w-10 h-10 bg-surface-card rounded-full items-center justify-center border border-brand-primary/10 mr-3"
+              className="w-10 h-10 bg-surface-card rounded-full items-center justify-center border border-slate-100 mr-3"
             >
-              <Ionicons name="arrow-back" size={20} color="#fff" />
+              <Ionicons name="arrow-back" size={20} color="#64748b" />
             </TouchableOpacity>
             <View>
-              <Text className="text-neutral-400 text-xs font-semibold uppercase tracking-widest">Kometi Panel</Text>
-              <Text className="text-white text-xl font-bold">Admin Dashboard</Text>
+              <Text className="text-slate-500 text-xs font-semibold uppercase tracking-widest">Kometi Panel</Text>
+              <Text className="text-slate-900 text-xl font-bold">Admin Dashboard</Text>
             </View>
           </View>
           <TouchableOpacity
             onPress={loadData}
-            className="w-10 h-10 bg-surface-card rounded-full items-center justify-center border border-brand-primary/10"
+            className="w-10 h-10 bg-surface-card rounded-full items-center justify-center border border-slate-100"
           >
-            <Ionicons name="refresh-outline" size={20} color="#fff" />
+            <Ionicons name="refresh-outline" size={20} color="#64748b" />
           </TouchableOpacity>
         </View>
 
@@ -178,17 +179,17 @@ export default function AdminDashboard() {
               className={`flex-row items-center px-4 py-2 rounded-full ${
                 activeTab === tab.key
                   ? "bg-brand-500"
-                  : "bg-surface-card border border-brand-primary/10"
+                  : "bg-surface-card border border-slate-100"
               }`}
             >
               <Ionicons
                 name={tab.icon as any}
                 size={14}
-                color={activeTab === tab.key ? "#fff" : "#a3a3a3"}
+                color={activeTab === tab.key ? "#fff" : "#64748b"}
               />
               <Text
                 className={`ml-1.5 text-xs font-bold ${
-                  activeTab === tab.key ? "text-white" : "text-neutral-400"
+                  activeTab === tab.key ? "text-white" : "text-slate-500"
                 }`}
               >
                 {tab.label}
@@ -210,18 +211,13 @@ export default function AdminDashboard() {
           />
         }
       >
-        <LinearGradient
-          colors={[COLORS.brandPrimary + "15", "transparent"]}
-          className="absolute inset-0 h-96"
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-        />
-
         {activeTab === "overview" && renderOverview()}
         {activeTab === "users" && renderUsers()}
         {activeTab === "committees" && renderCommittees()}
         {activeTab === "wallets" && renderWallets()}
         {activeTab === "transactions" && renderTransactions()}
+
+        <AlertComponent />
       </ScrollView>
 
       {/* Role Modal */}
@@ -235,14 +231,14 @@ export default function AdminDashboard() {
           <Card style={styles.modalCard}>
             <View className="p-6">
               <View className="flex-row justify-between items-center mb-5">
-                <Text className="text-white font-bold text-lg">Change User Role</Text>
+                <Text className="text-slate-900 font-bold text-lg">Change User Role</Text>
                 <TouchableOpacity onPress={() => setRoleModalVisible(false)}>
-                  <Ionicons name="close" size={24} color="#fff" />
+                  <Ionicons name="close" size={24} color="#64748b" />
                 </TouchableOpacity>
               </View>
-              <Text className="text-neutral-400 text-xs font-semibold mb-1">USER</Text>
-              <Text className="text-white font-bold text-sm mb-4">{selectedUser?.name}</Text>
-              <Text className="text-neutral-400 text-xs font-semibold mb-3">SELECT ROLE</Text>
+              <Text className="text-slate-500 text-xs font-semibold mb-1">USER</Text>
+              <Text className="text-slate-900 font-bold text-sm mb-4">{selectedUser?.name}</Text>
+              <Text className="text-slate-500 text-xs font-semibold mb-3">SELECT ROLE</Text>
               <View className="gap-2.5">
                 {(["ADMIN", "MANAGER", "ACCOUNTANT", "AGENT", "ORGANIZER", "MEMBER"] as UserRole[]).map((role) => (
                   <TouchableOpacity
@@ -259,7 +255,7 @@ export default function AdminDashboard() {
                     <View className="flex-row items-center justify-between">
                       <Text
                         className="font-bold text-sm"
-                        style={{ color: selectedUser?.role === role ? getRoleColor(role) : "#fff" }}
+                        style={{ color: selectedUser?.role === role ? getRoleColor(role) : COLORS.text.primary }}
                       >
                         {role}
                       </Text>
@@ -285,29 +281,29 @@ export default function AdminDashboard() {
           <Card style={styles.statCard} padding={0}>
             <View className="p-4">
               <Ionicons name="cash-outline" size={24} color={COLORS.success.DEFAULT} />
-              <Text className="text-neutral-400 text-xs font-semibold mt-2">Total Collection</Text>
-              <Text className="text-white text-lg font-bold mt-1">{formatINR(stats?.totalCollectionPaise || 0)}</Text>
+              <Text className="text-slate-500 text-xs font-semibold mt-2">Total Collection</Text>
+              <Text className="text-slate-900 text-lg font-bold mt-1">{formatINR(stats?.totalCollectionPaise || 0)}</Text>
             </View>
           </Card>
           <Card style={styles.statCard} padding={0}>
             <View className="p-4">
               <Ionicons name="pie-chart-outline" size={24} color={COLORS.goldPrimary} />
-              <Text className="text-neutral-400 text-xs font-semibold mt-2">Foreman Commission</Text>
-              <Text className="text-gold-500 text-lg font-bold mt-1">{formatINR(stats?.profitOverviewPaise || 0)}</Text>
+              <Text className="text-slate-500 text-xs font-semibold mt-2">Foreman Commission</Text>
+              <Text className="text-gold-600 text-lg font-bold mt-1">{formatINR(stats?.profitOverviewPaise || 0)}</Text>
             </View>
           </Card>
           <Card style={styles.statCard} padding={0}>
             <View className="p-4">
               <Ionicons name="time-outline" size={24} color={COLORS.danger.DEFAULT} />
-              <Text className="text-neutral-400 text-xs font-semibold mt-2">Pending Payments</Text>
-              <Text className="text-white text-lg font-bold mt-1">{formatINR(stats?.pendingPaymentsPaise || 0)}</Text>
+              <Text className="text-slate-500 text-xs font-semibold mt-2">Pending Payments</Text>
+              <Text className="text-slate-900 text-lg font-bold mt-1">{formatINR(stats?.pendingPaymentsPaise || 0)}</Text>
             </View>
           </Card>
           <Card style={styles.statCard} padding={0}>
             <View className="p-4">
               <Ionicons name="wallet-outline" size={24} color={COLORS.brandPrimary} />
-              <Text className="text-neutral-400 text-xs font-semibold mt-2">Total Wallet Balance</Text>
-              <Text className="text-white text-lg font-bold mt-1">{formatINR(stats?.totalWalletBalancePaise || 0)}</Text>
+              <Text className="text-slate-500 text-xs font-semibold mt-2">Total Wallet Balance</Text>
+              <Text className="text-slate-900 text-lg font-bold mt-1">{formatINR(stats?.totalWalletBalancePaise || 0)}</Text>
             </View>
           </Card>
         </View>
@@ -316,20 +312,20 @@ export default function AdminDashboard() {
         <View className="flex-row gap-4 mb-6">
           <Card style={{ flex: 1 }} padding={0}>
             <View className="p-4 items-center">
-              <Text className="text-white text-2xl font-bold">{stats?.totalUsersCount || 0}</Text>
-              <Text className="text-neutral-400 text-xs font-semibold mt-1">Total Users</Text>
+              <Text className="text-slate-900 text-2xl font-bold">{stats?.totalUsersCount || 0}</Text>
+              <Text className="text-slate-500 text-xs font-semibold mt-1">Total Users</Text>
             </View>
           </Card>
           <Card style={{ flex: 1 }} padding={0}>
             <View className="p-4 items-center">
-              <Text className="text-white text-2xl font-bold">{stats?.activeCommitteesCount || 0}</Text>
-              <Text className="text-neutral-400 text-xs font-semibold mt-1">Active Chits</Text>
+              <Text className="text-slate-900 text-2xl font-bold">{stats?.activeCommitteesCount || 0}</Text>
+              <Text className="text-slate-500 text-xs font-semibold mt-1">Active Chits</Text>
             </View>
           </Card>
           <Card style={{ flex: 1 }} padding={0}>
             <View className="p-4 items-center">
-              <Text className="text-white text-2xl font-bold">{stats?.allCommittees?.length || 0}</Text>
-              <Text className="text-neutral-400 text-xs font-semibold mt-1">Total Chits</Text>
+              <Text className="text-slate-900 text-2xl font-bold">{stats?.allCommittees?.length || 0}</Text>
+              <Text className="text-slate-500 text-xs font-semibold mt-1">Total Chits</Text>
             </View>
           </Card>
         </View>
@@ -337,16 +333,16 @@ export default function AdminDashboard() {
         {/* Users by Role */}
         {stats?.userStats && Object.keys(stats.userStats).length > 0 && (
           <>
-            <Text className="text-white text-base font-bold mb-3">Users by Role</Text>
+            <Text className="text-slate-900 text-base font-bold mb-3">Users by Role</Text>
             <Card style={{ marginBottom: 24 }} padding={0}>
               <View className="p-4">
                 {Object.entries(stats.userStats).map(([role, count]) => (
-                  <View key={role} className="flex-row items-center justify-between py-2.5 border-b border-brand-primary/5">
+                  <View key={role} className="flex-row items-center justify-between py-2.5 border-b border-slate-100">
                     <View className="flex-row items-center">
                       <View className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: getRoleColor(role as UserRole) }} />
-                      <Text className="text-white font-semibold text-sm">{role}</Text>
+                      <Text className="text-slate-900 font-semibold text-sm">{role}</Text>
                     </View>
-                    <Text className="text-neutral-300 font-bold text-sm">{count}</Text>
+                    <Text className="text-slate-700 font-bold text-sm">{count}</Text>
                   </View>
                 ))}
               </View>
@@ -357,16 +353,16 @@ export default function AdminDashboard() {
         {/* Committees by Status */}
         {stats?.committeeStats && (
           <>
-            <Text className="text-white text-base font-bold mb-3">Chits by Status</Text>
+            <Text className="text-slate-900 text-base font-bold mb-3">Chits by Status</Text>
             <Card style={{ marginBottom: 24 }} padding={0}>
               <View className="p-4">
                 {Object.entries(stats.committeeStats).map(([status, count]) => (
-                  <View key={status} className="flex-row items-center justify-between py-2.5 border-b border-brand-primary/5">
+                  <View key={status} className="flex-row items-center justify-between py-2.5 border-b border-slate-100">
                     <View className="flex-row items-center">
                       <View className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: getStatusColor(status) }} />
-                      <Text className="text-white font-semibold text-sm">{status}</Text>
+                      <Text className="text-slate-900 font-semibold text-sm">{status}</Text>
                     </View>
-                    <Text className="text-neutral-300 font-bold text-sm">{count}</Text>
+                    <Text className="text-slate-700 font-bold text-sm">{count}</Text>
                   </View>
                 ))}
               </View>
@@ -377,16 +373,16 @@ export default function AdminDashboard() {
         {/* Installments by Status */}
         {stats?.installmentStats && Object.keys(stats.installmentStats).length > 0 && (
           <>
-            <Text className="text-white text-base font-bold mb-3">Installments by Status</Text>
+            <Text className="text-slate-900 text-base font-bold mb-3">Installments by Status</Text>
             <Card style={{ marginBottom: 24 }} padding={0}>
               <View className="p-4">
                 {Object.entries(stats.installmentStats).map(([status, count]) => (
-                  <View key={status} className="flex-row items-center justify-between py-2.5 border-b border-brand-primary/5">
+                  <View key={status} className="flex-row items-center justify-between py-2.5 border-b border-slate-100">
                     <View className="flex-row items-center">
                       <View className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: getStatusColor(status) }} />
-                      <Text className="text-white font-semibold text-sm">{status}</Text>
+                      <Text className="text-slate-900 font-semibold text-sm">{status}</Text>
                     </View>
-                    <Text className="text-neutral-300 font-bold text-sm">{count}</Text>
+                    <Text className="text-slate-700 font-bold text-sm">{count}</Text>
                   </View>
                 ))}
               </View>
@@ -395,23 +391,23 @@ export default function AdminDashboard() {
         )}
 
         {/* Monthly Analytics */}
-        <Text className="text-white text-base font-bold mb-3">Monthly Analytics</Text>
+        <Text className="text-slate-900 text-base font-bold mb-3">Monthly Analytics</Text>
         <Card style={{ marginBottom: 24 }} padding={0}>
           <View className="p-5">
-            <View className="flex-row border-b border-brand-primary/10 pb-2 mb-3">
-              <Text className="flex-1 text-neutral-400 font-bold text-xs">Month</Text>
-              <Text className="w-28 text-right text-neutral-400 font-bold text-xs">Collection</Text>
-              <Text className="w-24 text-right text-neutral-400 font-bold text-xs">Profit</Text>
+            <View className="flex-row border-b border-slate-100 pb-2 mb-3">
+              <Text className="flex-1 text-slate-500 font-bold text-xs">Month</Text>
+              <Text className="w-28 text-right text-slate-500 font-bold text-xs">Collection</Text>
+              <Text className="w-24 text-right text-slate-500 font-bold text-xs">Profit</Text>
             </View>
             {(stats?.monthlyAnalytics || []).map((item, idx) => (
-              <View key={idx} className="flex-row py-2.5 border-b border-brand-primary/5 items-center">
-                <Text className="flex-1 text-white font-semibold text-sm">{item.month}</Text>
-                <Text className="w-28 text-right text-white font-bold text-sm">{formatINR(item.collectionPaise)}</Text>
-                <Text className="w-24 text-right text-gold-500 font-bold text-sm">{formatINR(item.profitPaise)}</Text>
+              <View key={idx} className="flex-row py-2.5 border-b border-slate-100 items-center">
+                <Text className="flex-1 text-slate-900 font-semibold text-sm">{item.month}</Text>
+                <Text className="w-28 text-right text-slate-900 font-bold text-sm">{formatINR(item.collectionPaise)}</Text>
+                <Text className="w-24 text-right text-gold-600 font-bold text-sm">{formatINR(item.profitPaise)}</Text>
               </View>
             ))}
             {(!stats?.monthlyAnalytics || stats.monthlyAnalytics.length === 0) && (
-              <Text className="text-center text-neutral-500 py-4 text-xs">No analytics data available</Text>
+              <Text className="text-center text-slate-500 py-4 text-xs">No analytics data available</Text>
             )}
           </View>
         </Card>
@@ -423,22 +419,22 @@ export default function AdminDashboard() {
     return (
       <View style={{ paddingTop: 16 }}>
         <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-white text-base font-bold">User Management</Text>
+          <Text className="text-slate-900 text-base font-bold">User Management</Text>
           <Badge label={`${users.length} Users`} variant="info" />
         </View>
 
-        <View className="flex-row bg-surface-card border border-brand-primary/10 rounded-xl px-4 items-center mb-4 h-11">
-          <Ionicons name="search-outline" size={18} color="#a3a3a3" />
+        <View className="flex-row bg-white border border-slate-200 rounded-xl px-4 items-center mb-4 h-11">
+          <Ionicons name="search-outline" size={18} color="#64748b" />
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="Search by name, phone or email..."
-            placeholderTextColor="#a3a3a3"
-            className="flex-1 text-white text-sm ml-2.5"
+            placeholderTextColor="#94a3b8"
+            className="flex-1 text-slate-900 text-sm ml-2.5"
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <Ionicons name="close-circle" size={16} color="#a3a3a3" />
+              <Ionicons name="close-circle" size={16} color="#64748b" />
             </TouchableOpacity>
           )}
         </View>
@@ -447,12 +443,12 @@ export default function AdminDashboard() {
           <Card key={userItem.id} style={{ marginBottom: 12 }}>
             <View className="p-4 flex-row items-center justify-between">
               <View className="flex-1 pr-4">
-                <Text className="text-white font-bold text-sm">{userItem.name}</Text>
-                <Text className="text-neutral-400 text-xs mt-0.5">{userItem.phone}</Text>
+                <Text className="text-slate-900 font-bold text-sm">{userItem.name}</Text>
+                <Text className="text-slate-500 text-xs mt-0.5">{userItem.phone}</Text>
                 {userItem.email ? (
-                  <Text className="text-neutral-500 text-[10px] mt-0.5">{userItem.email}</Text>
+                  <Text className="text-slate-500 text-[10px] mt-0.5">{userItem.email}</Text>
                 ) : null}
-                <Text className="text-neutral-600 text-[10px] mt-1">ID: {userItem.id.slice(0, 8)}...</Text>
+                <Text className="text-slate-500 text-[10px] mt-1">ID: {userItem.id.slice(0, 8)}...</Text>
               </View>
               <View className="items-end">
                 <View className="mb-2">
@@ -472,9 +468,9 @@ export default function AdminDashboard() {
                     setSelectedUser(userItem);
                     setRoleModalVisible(true);
                   }}
-                  className="bg-brand-500/10 border border-brand-500/30 px-3 py-1.5 rounded-lg"
+                  className="bg-brand-50 border border-brand-200/50 px-3 py-1.5 rounded-lg"
                 >
-                  <Text className="text-brand-500 text-xs font-bold">Assign Role</Text>
+                  <Text className="text-brand-600 text-xs font-bold">Assign Role</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -482,8 +478,8 @@ export default function AdminDashboard() {
         ))}
 
         {filteredUsers.length === 0 && (
-          <View className="items-center py-8 bg-surface-card/20 border border-dashed border-neutral-800 rounded-xl">
-            <Text className="text-neutral-500 text-xs">No users found matching query</Text>
+          <View className="items-center py-8 bg-slate-50/50 border border-dashed border-slate-200 rounded-xl">
+            <Text className="text-slate-500 text-xs">No users found matching query</Text>
           </View>
         )}
       </View>
@@ -495,7 +491,7 @@ export default function AdminDashboard() {
     return (
       <View style={{ paddingTop: 16 }}>
         <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-white text-base font-bold">All Chits</Text>
+          <Text className="text-slate-900 text-base font-bold">All Chits</Text>
           <Badge label={`${committees.length} Total`} variant="info" />
         </View>
 
@@ -503,7 +499,7 @@ export default function AdminDashboard() {
           <Card key={committee.id} style={{ marginBottom: 12 }}>
             <View className="p-4">
               <View className="flex-row items-center justify-between mb-2">
-                <Text className="text-white font-bold text-sm flex-1" numberOfLines={1}>{committee.name}</Text>
+                <Text className="text-slate-900 font-bold text-sm flex-1" numberOfLines={1}>{committee.name}</Text>
                 <Badge
                   label={committee.status}
                   variant="brand"
@@ -517,28 +513,28 @@ export default function AdminDashboard() {
               </View>
               <View className="flex-row items-center gap-4 mt-2">
                 <View className="flex-row items-center">
-                  <Ionicons name="people-outline" size={12} color="#a3a3a3" />
-                  <Text className="text-neutral-400 text-xs ml-1">
+                  <Ionicons name="people-outline" size={12} color="#64748b" />
+                  <Text className="text-slate-500 text-xs ml-1">
                     {committee.filledSlots}/{committee.totalSlots}
                   </Text>
                 </View>
                 <View className="flex-row items-center">
-                  <Ionicons name="cash-outline" size={12} color="#a3a3a3" />
-                  <Text className="text-neutral-400 text-xs ml-1">{formatINR(committee.installmentAmountPaise)}</Text>
+                  <Ionicons name="cash-outline" size={12} color="#64748b" />
+                  <Text className="text-slate-500 text-xs ml-1">{formatINR(committee.installmentAmountPaise)}</Text>
                 </View>
                 <View className="flex-row items-center">
-                  <Ionicons name="person-outline" size={12} color="#a3a3a3" />
-                  <Text className="text-neutral-400 text-xs ml-1">{committee.organizer?.name}</Text>
+                  <Ionicons name="person-outline" size={12} color="#64748b" />
+                  <Text className="text-slate-500 text-xs ml-1">{committee.organizer?.name}</Text>
                 </View>
               </View>
-              <Text className="text-neutral-600 text-[10px] mt-2">ID: {committee.id.slice(0, 8)}...</Text>
+              <Text className="text-slate-500 text-[10px] mt-2">ID: {committee.id.slice(0, 8)}...</Text>
             </View>
           </Card>
         ))}
 
         {committees.length === 0 && (
-          <View className="items-center py-8 bg-surface-card/20 border border-dashed border-neutral-800 rounded-xl">
-            <Text className="text-neutral-500 text-xs">No committees found</Text>
+          <View className="items-center py-8 bg-slate-50/50 border border-dashed border-slate-200 rounded-xl">
+            <Text className="text-slate-500 text-xs">No committees found</Text>
           </View>
         )}
       </View>
@@ -550,14 +546,14 @@ export default function AdminDashboard() {
     return (
       <View style={{ paddingTop: 16 }}>
         <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-white text-base font-bold">All Wallets</Text>
+          <Text className="text-slate-900 text-base font-bold">All Wallets</Text>
           <Badge label={`${wallets.length} Wallets`} variant="info" />
         </View>
 
         <Card style={{ marginBottom: 16 }} padding={0}>
           <View className="p-4 items-center">
-            <Text className="text-neutral-400 text-xs font-semibold">Total System Balance</Text>
-            <Text className="text-white text-2xl font-bold mt-1">{formatINR(stats?.totalWalletBalancePaise || 0)}</Text>
+            <Text className="text-slate-500 text-xs font-semibold">Total System Balance</Text>
+            <Text className="text-slate-900 text-2xl font-bold mt-1">{formatINR(stats?.totalWalletBalancePaise || 0)}</Text>
           </View>
         </Card>
 
@@ -565,8 +561,8 @@ export default function AdminDashboard() {
           <Card key={wallet.id} style={{ marginBottom: 12 }}>
             <View className="p-4 flex-row items-center justify-between">
               <View className="flex-1">
-                <Text className="text-white font-bold text-sm">{wallet.user?.name}</Text>
-                <Text className="text-neutral-400 text-xs mt-0.5">{wallet.user?.phone}</Text>
+                <Text className="text-slate-900 font-bold text-sm">{wallet.user?.name}</Text>
+                <Text className="text-slate-500 text-xs mt-0.5">{wallet.user?.phone}</Text>
                 <Badge
                   label={wallet.user?.role || "N/A"}
                   variant="brand"
@@ -580,14 +576,14 @@ export default function AdminDashboard() {
                   textStyle={{ color: getRoleColor(wallet.user?.role as UserRole) }}
                 />
               </View>
-              <Text className="text-white font-bold text-base">{formatINR(wallet.balancePaise)}</Text>
+              <Text className="text-slate-900 font-bold text-base">{formatINR(wallet.balancePaise)}</Text>
             </View>
           </Card>
         ))}
 
         {wallets.length === 0 && (
-          <View className="items-center py-8 bg-surface-card/20 border border-dashed border-neutral-800 rounded-xl">
-            <Text className="text-neutral-500 text-xs">No wallets found</Text>
+          <View className="items-center py-8 bg-slate-50/50 border border-dashed border-slate-200 rounded-xl">
+            <Text className="text-slate-500 text-xs">No wallets found</Text>
           </View>
         )}
       </View>
@@ -599,7 +595,7 @@ export default function AdminDashboard() {
     return (
       <View style={{ paddingTop: 16 }}>
         <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-white text-base font-bold">Recent Transactions</Text>
+          <Text className="text-slate-900 text-base font-bold">Recent Transactions</Text>
           <Badge label={`${txs.length} Latest`} variant="info" />
         </View>
 
@@ -619,13 +615,13 @@ export default function AdminDashboard() {
                   />
                 </View>
                 <View className="ml-3 flex-1">
-                  <Text className="text-white font-bold text-sm" numberOfLines={1}>{tx.description}</Text>
-                  <Text className="text-neutral-400 text-xs mt-0.5">
+                  <Text className="text-slate-900 font-bold text-sm" numberOfLines={1}>{tx.description}</Text>
+                  <Text className="text-slate-500 text-xs mt-0.5">
                     {tx.user?.name || "System"} · {new Date(tx.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })}
                   </Text>
                 </View>
               </View>
-              <Text className={`font-bold text-sm ${tx.type === "CREDIT" ? "text-success-500" : "text-neutral-200"}`}>
+              <Text className={`font-bold text-sm ${tx.type === "CREDIT" ? "text-success-700" : "text-slate-900"}`}>
                 {tx.type === "CREDIT" ? "+" : "-"}{formatINR(tx.amountPaise)}
               </Text>
             </View>
@@ -633,8 +629,8 @@ export default function AdminDashboard() {
         ))}
 
         {txs.length === 0 && (
-          <View className="items-center py-8 bg-surface-card/20 border border-dashed border-neutral-800 rounded-xl">
-            <Text className="text-neutral-500 text-xs">No recent transactions</Text>
+          <View className="items-center py-8 bg-slate-50/50 border border-dashed border-slate-200 rounded-xl">
+            <Text className="text-slate-500 text-xs">No recent transactions</Text>
           </View>
         )}
       </View>
@@ -661,10 +657,10 @@ const styles = StyleSheet.create({
   },
   roleBtn: {
     borderWidth: 1,
-    borderColor: "rgba(111,94,255,0.15)",
+    borderColor: "#e2e8f0",
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
-    backgroundColor: "rgba(26,22,64,0.40)",
+    backgroundColor: "#f8fafc",
   },
 });

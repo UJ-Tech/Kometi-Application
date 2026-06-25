@@ -1,7 +1,5 @@
-// src/app/(auth)/_layout.tsx
-// Auth group layout - stack navigator for welcome, login, register, and MPIN screens.
-
 import { Stack } from "expo-router";
+import { COLORS } from "../../constants/theme";
 
 export default function AuthLayout() {
   return (
@@ -9,7 +7,7 @@ export default function AuthLayout() {
       screenOptions={{
         headerShown:   false,
         animation:     "slide_from_right",
-        contentStyle:  { backgroundColor: "#0f0d23" },
+        contentStyle:  { backgroundColor: COLORS.surface.bg },
       }}
     />
   );

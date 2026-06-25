@@ -1,11 +1,12 @@
 // src/components/ui/EmptyState.tsx
 import React from "react";
 import { View, Text } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { COLORS, FONT_SIZE, SPACING } from "../../constants/theme";
 import Button from "./Button";
 
 interface EmptyStateProps {
-  icon?:        React.ReactNode;
+  icon?:        React.ReactNode | string;
   title:        string;
   description?: string;
   actionLabel?: string;
@@ -32,11 +33,15 @@ export default function EmptyState({
           width:          80,
           height:         80,
           borderRadius:   40,
-          backgroundColor:"rgba(111,94,255,0.10)",
+          backgroundColor:"rgba(13,148,136,0.08)",
           alignItems:     "center",
           justifyContent: "center",
         }}>
-          {icon}
+          {typeof icon === "string" ? (
+            <Ionicons name={icon as any} size={32} color={COLORS.brandPrimary} />
+          ) : (
+            icon
+          )}
         </View>
       )}
 

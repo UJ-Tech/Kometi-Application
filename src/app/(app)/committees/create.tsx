@@ -6,8 +6,6 @@ import {
   View,
   Text,
   ScrollView,
-  Alert,
-  Switch,
 } from "react-native";
 import { useRouter } from "expo-router";
 import ScreenHeader from "../../../components/shared/ScreenHeader";
@@ -19,17 +17,18 @@ import { committeesApi } from "../../../services/committees.api";
 import { useCommitteeStore } from "../../../stores/committee.store";
 import { useAuthStore } from "../../../stores/auth.store";
 import { canCreateCommittee } from "../../../utils/rbac";
+import { useAlertModal } from "../../../components/ui/AlertModal";
 
 export default function CreateCommittee() {
   const router = useRouter();
+  const { alert, confirm, AlertComponent } = useAlertModal();
   const user = useAuthStore((s) => s.user);
   const { upsertCommittee } = useCommitteeStore();
 
   // Guard: Redirect if not allowed to create committees
   useEffect(() => {
     if (user && !canCreateCommittee(user.role)) {
-      Alert.alert("Access Denied", "You do not have permission to create a committee.");
-      router.replace("/dashboard");
+      alert("Access Denied", "You do not have permission to create a committee.").then(() => router.replace("/dashboard"));
     }
   }, [user]);
 
@@ -40,33 +39,29 @@ export default function CreateCommittee() {
     totalSlots: "12",
     installmentAmountPaise: 0n,
     cycleDurationDays: "30",
-    includeOrganizerAsMember: false,
   });
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const validate = async (): Promise<boolean> => {
+    const missing: string[] = [];
+    if (!form.name.trim()) missing.push("Chit name is required");
+    else if (form.name.length < 3) missing.push("Chit name must be at least 3 characters");
+    if (form.installmentAmountPaise <= 0n) missing.push("Installment per slot amount is required");
 
-  const validate = () => {
-    const newErrors: Record<string, string> = {};
-    if (!form.name.trim()) newErrors.name = "Name is required";
-    if (form.name.length < 3) newErrors.name = "Name must be at least 3 characters";
-    if (form.installmentAmountPaise <= 0n) newErrors.installmentAmountPaise = "Amount must be greater than zero";
-    
     const slots = parseInt(form.totalSlots);
-    if (isNaN(slots) || slots < 2 || slots > 50) {
-      newErrors.totalSlots = "Slots must be between 2 and 50";
-    }
+    if (isNaN(slots) || slots < 2 || slots > 50) missing.push("Total slots must be between 2 and 50");
 
     const duration = parseInt(form.cycleDurationDays);
-    if (isNaN(duration) || duration < 1) {
-      newErrors.cycleDurationDays = "Duration must be at least 1 day";
-    }
+    if (isNaN(duration) || duration < 1) missing.push("Cycle duration must be at least 1 day");
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (missing.length > 0) {
+      await alert("Missing Fields", missing.join("\n"));
+      return false;
+    }
+    return true;
   };
 
   const handleCreate = async () => {
-    if (!validate()) return;
+    if (!(await validate())) return;
 
     try {
       setIsLoading(true);
@@ -77,24 +72,24 @@ export default function CreateCommittee() {
         installmentAmountPaise: Number(form.installmentAmountPaise),
         cycleDurationDays: parseInt(form.cycleDurationDays),
         startDate: new Date().toISOString(),
-        includeOrganizerAsMember: form.includeOrganizerAsMember,
+        includeOrganizerAsMember: true,
       });
 
       if (res.data.success) {
         upsertCommittee(res.data.data);
-        Alert.alert("Success", "Committee created successfully in DRAFT mode.");
+        await alert("Success", "Committee created successfully in DRAFT mode.");
         router.back();
       }
     } catch (err) {
       console.error("[CreateCommittee] failed:", err);
-      Alert.alert("Error", err instanceof Error ? err.message : "Failed to create committee");
+      await alert("Error", err instanceof Error ? err.message : "Failed to create committee");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <View className="flex-1 bg-surface-950 px-4">
+    <View className="flex-1 bg-surface-bg px-4">
       <ScreenHeader
         title="Create New Chit"
         subtitle="Setup a new chit fund pool"
@@ -112,7 +107,6 @@ export default function CreateCommittee() {
               placeholder="e.g. Monthly Savings Group A"
               value={form.name}
               onChangeText={(val) => setForm({ ...form, name: val })}
-              error={errors.name}
               required
             />
 
@@ -129,14 +123,13 @@ export default function CreateCommittee() {
           </View>
         </Card>
 
-        <Text className="text-white font-bold text-base mb-3 ml-1">Chit Economics</Text>
+        <Text className="text-slate-900 font-bold text-base mb-3 ml-1">Chit Economics</Text>
         <Card style={{ marginBottom: 24 }}>
           <View className="p-5">
             <AmountInput
               label="Installment Per Slot"
               valuePaise={form.installmentAmountPaise}
               onChangePaise={(val) => setForm({ ...form, installmentAmountPaise: val })}
-              error={errors.installmentAmountPaise}
             />
 
             <View className="flex-row gap-4 mt-2">
@@ -146,7 +139,6 @@ export default function CreateCommittee() {
                   keyboardType="number-pad"
                   value={form.totalSlots}
                   onChangeText={(val) => setForm({ ...form, totalSlots: val })}
-                  error={errors.totalSlots}
                   required
                 />
               </View>
@@ -156,17 +148,16 @@ export default function CreateCommittee() {
                   keyboardType="number-pad"
                   value={form.cycleDurationDays}
                   onChangeText={(val) => setForm({ ...form, cycleDurationDays: val })}
-                  error={errors.cycleDurationDays}
                   hint="e.g. 30 for Monthly"
                   required
                 />
               </View>
             </View>
 
-            <View className="mt-4 bg-brand-500/5 p-3 rounded-lg border border-brand-500/10">
+            <View className="mt-4 bg-brand-50 p-3 rounded-lg border border-brand-200/50">
               <View className="flex-row justify-between items-center">
-                <Text className="text-neutral-400 text-xs font-semibold">Total Pot Value</Text>
-                <Text className="text-gold-500 font-bold">
+                <Text className="text-slate-500 text-xs font-semibold">Total Pot Value</Text>
+                <Text className="text-gold-600 font-bold">
                   {new Intl.NumberFormat("en-IN", {
                     style: "currency",
                     currency: "INR",
@@ -178,30 +169,19 @@ export default function CreateCommittee() {
           </View>
         </Card>
 
-        <Text className="text-white font-bold text-base mb-3 ml-1">Organizer Membership</Text>
         <Card style={{ marginBottom: 24 }}>
           <View className="p-5">
-            <View className="flex-row items-center justify-between">
-              <View className="flex-1 mr-4">
-                <Text className="text-white font-semibold text-sm">Join as Member</Text>
-                <Text className="text-neutral-500 text-[11px] mt-1">
-                  Include yourself as slot #1 in this chit. You will pay installments and be eligible for payouts.
+            <View className="flex-row items-center gap-3">
+              <View className="w-10 h-10 rounded-full bg-brand-50 items-center justify-center border border-brand-200">
+                <Text className="text-brand-600 text-lg font-bold">1</Text>
+              </View>
+              <View className="flex-1">
+                <Text className="text-slate-900 font-semibold text-sm">You are included as slot #1</Text>
+                <Text className="text-slate-500 text-[11px] mt-0.5">
+                  As the organizer, you automatically join this chit. You will pay installments and be eligible for payouts.
                 </Text>
               </View>
-              <Switch
-                value={form.includeOrganizerAsMember}
-                onValueChange={(val) => setForm({ ...form, includeOrganizerAsMember: val })}
-                trackColor={{ false: "#3f3f46", true: "#d4a853" }}
-                thumbColor={form.includeOrganizerAsMember ? "#fff" : "#a1a1aa"}
-              />
             </View>
-            {form.includeOrganizerAsMember && (
-              <View className="mt-3 bg-brand-500/5 p-3 rounded-lg border border-brand-500/10">
-                <Text className="text-neutral-400 text-xs">
-                  You will be added as slot #1. Filled slots: 1/{form.totalSlots || "0"} (remaining: {Math.max(0, parseInt(form.totalSlots || "0") - 1)})
-                </Text>
-              </View>
-            )}
           </View>
         </Card>
 
@@ -215,6 +195,8 @@ export default function CreateCommittee() {
           />
         </View>
       </ScrollView>
+
+      <AlertComponent />
     </View>
   );
 }

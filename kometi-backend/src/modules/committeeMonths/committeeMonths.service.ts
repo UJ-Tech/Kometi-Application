@@ -216,11 +216,21 @@ export class CommitteeMonthsService {
 
     const { data: committee, error: cErr } = await supabase
       .from("committees")
-      .select("totalSlots, installmentAmountPaise, organizerId")
+      .select("totalSlots, installmentAmountPaise, status, filledSlots, organizerId")
       .eq("id", committeeId)
       .single();
 
     if (cErr || !committee) throw new Error("Committee not found");
+
+    if (committee.status !== "ACTIVE") {
+      throw new Error("Committee must be active before creating months. Please start the committee first.");
+    }
+
+    if (committee.filledSlots !== committee.totalSlots) {
+      throw new Error(
+        `Cannot create month until all slots are filled. Filled: ${committee.filledSlots}/${committee.totalSlots}`
+      );
+    }
 
     const totalMembers = committee.totalSlots;
     const contributionPerPerson = Number(committee.installmentAmountPaise);
@@ -401,9 +411,6 @@ export class CommitteeMonthsService {
     // Notify all members that month is resolved
     emitToAll("committee:month_resolved", { committeeId, monthId, monthNumber: month.month_number });
 
-    // NOTE: hasReceivedPayout is NOT set here — it's set in settleWinnerPayoutIfNeeded
-    // when the wallet is actually credited (all non-winners must pay first).
-
     // Create fund disbursement for winner
     const { error: disburseErr } = await supabase
       .from("fund_disbursements")
@@ -485,7 +492,61 @@ export class CommitteeMonthsService {
       if (oblErr) throw oblErr;
     }
 
-    // 5. Post-resolution verification
+    // 5a. Auto-settle organiser commission month (month 1) immediately
+    // Organiser receives full pool as commission — no need to wait for member payments
+    if (resolutionType === "organiser_commission") {
+      try {
+        const { data: orgWinnerObl } = await supabase
+          .from("member_payment_obligations")
+          .select("id, member_id, net_amount")
+          .eq("committee_id", committeeId)
+          .eq("month_id", monthId)
+          .eq("role", "winner")
+          .eq("direction", "receive")
+          .single();
+
+        if (orgWinnerObl) {
+          const { data: orgUser } = await supabase
+            .from("committee_members")
+            .select("userId")
+            .eq("id", orgWinnerObl.member_id)
+            .single();
+
+          if (orgUser) {
+            const payoutAmount = Number(orgWinnerObl.net_amount);
+            if (payoutAmount > 0) {
+              await WalletLedgerService.creditWallet({
+                memberId: orgUser.userId,
+                committeeId,
+                amount: payoutAmount,
+                entryType: "bid_payout",
+                referenceType: "member_payment_obligations",
+                referenceId: orgWinnerObl.id,
+                idempotencyKey: `organiser_commission_${committeeId}_${monthId}`,
+                createdBy: "system",
+                notes: `Month 1 organiser commission — full pool credited`,
+              });
+
+              await supabase
+                .from("member_payment_obligations")
+                .update({ status: "paid", paid_at: new Date().toISOString() })
+                .eq("id", orgWinnerObl.id);
+
+              await supabase
+                .from("committee_members")
+                .update({ hasReceivedPayout: true })
+                .eq("id", orgWinnerObl.member_id);
+
+              console.log(`[resolveMonth] Month 1 organiser commission auto-settled: ${payoutAmount} paise`);
+            }
+          }
+        }
+      } catch (settleErr) {
+        console.error(`[resolveMonth] Month 1 auto-settle failed (non-fatal):`, settleErr);
+      }
+    }
+
+    // 5b. Post-resolution verification
     const integrity = await this.verifyMonthLedgerIntegrity(committeeId, monthId);
     if (integrity.imbalance !== 0) {
       console.warn(
@@ -977,11 +1038,7 @@ export class CommitteeMonthsService {
     const isLastMonth = monthNumber === totalMembers;
     const shouldAutoResolve = monthNumber === 1 || isLastMonth;
     if (shouldAutoResolve) {
-      try {
-        await this.resolveMonth(committeeId, month.id);
-      } catch (err) {
-        console.error(`[createMonth] Failed to auto-resolve Month ${monthNumber} for committee ${committeeId}:`, err);
-      }
+      await this.resolveMonth(committeeId, month.id);
     }
 
     return { ...month, projected: summary };

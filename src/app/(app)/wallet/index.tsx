@@ -2,7 +2,7 @@
 // Kometi Wallet Management, balance ledger and transactions ledger.
 
 import React, { useState, useEffect } from "react";
-import { View, Text, FlatList, TouchableOpacity, RefreshControl, Alert, Platform } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, RefreshControl, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useWalletStore } from "../../../stores/wallet.store";
@@ -16,6 +16,7 @@ import { AmountInput } from "../../../components/ui/AmountInput";
 import { openRazorpayCheckout, loadRazorpayScript } from "../../../utils/razorpay";
 import { useAuthStore } from "../../../stores/auth.store";
 import type { Withdrawal } from "../../../types";
+import { useAlertModal } from "../../../components/ui/AlertModal";
 
 export default function Wallet() {
   const router = useRouter();
@@ -26,6 +27,7 @@ export default function Wallet() {
   const [showTopupInput, setShowTopupInput] = useState(false);
   const [topupLoading, setTopupLoading] = useState(false);
   const [scriptReady, setScriptReady] = useState<boolean | null>(null);
+  const { alert, confirm, AlertComponent } = useAlertModal();
 
   // Pre-load Razorpay script on mount (web only)
   React.useEffect(() => {
@@ -45,15 +47,23 @@ export default function Wallet() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Refetch withdrawals when socket events fire (wallet credited/debited)
+  const walletUpdatedVersion = useWalletStore((s) => s.walletUpdatedVersion);
+  useEffect(() => {
+    if (walletUpdatedVersion > 0) {
+      fetchWithdrawals();
+    }
+  }, [walletUpdatedVersion]);
+
   const handleTopup = async () => {
     if (topupAmount <= 0n) {
-      Alert.alert("Invalid Amount", "Please enter a valid amount to add to your wallet.");
+      await alert("Invalid Amount", "Please enter a valid amount to add to your wallet.");
       return;
     }
 
     const amountPaise = Number(topupAmount);
     if (amountPaise < 100) {
-      Alert.alert("Minimum Amount", "Minimum top-up amount is ₹1.");
+      await alert("Minimum Amount", "Minimum top-up amount is ₹1.");
       return;
     }
 
@@ -86,33 +96,27 @@ export default function Wallet() {
                 response.razorpay_payment_id,
                 response.razorpay_signature
               );
-              Alert.alert("Success", `Added ${formatINR(topupAmount)} to your wallet successfully.`);
+              await alert("Success", `Added ${formatINR(topupAmount)} to your wallet successfully.`);
               setTopupAmount(0n);
               setShowTopupInput(false);
               loadData();
             } catch (verifyErr: any) {
-              Alert.alert(
-                "Payment Received",
-                "Your payment was successful but verification failed. Please contact support if the issue persists."
-              );
+              await alert("Payment Received", "Your payment was successful but verification failed. Please contact support if the issue persists.");
             }
           },
           modal: {
             ondismiss: () => {
-              Alert.alert("Payment Cancelled", "You cancelled the payment. No amount was charged.");
+              alert("Payment Cancelled", "You cancelled the payment. No amount was charged.");
               setTopupLoading(false);
             },
           },
         });
       } else {
         // Mobile fallback — show manual UPI instruction
-        Alert.alert(
-          "Web Only",
-          "Wallet top-up via Razorpay is currently supported on web. Please use the web app to add funds."
-        );
+        await alert("Web Only", "Wallet top-up via Razorpay is currently supported on web. Please use the web app to add funds.");
       }
     } catch (err: any) {
-      Alert.alert("Top-up Failed", err.message || "An error occurred during payment.");
+      await alert("Top-up Failed", err.message || "An error occurred during payment.");
     } finally {
       setTopupLoading(false);
     }
@@ -122,7 +126,7 @@ export default function Wallet() {
   const isScriptLoading = Platform.OS === "web" && scriptReady === null;
 
   return (
-    <View className="flex-1 bg-surface-950 px-4">
+    <View className="flex-1 bg-surface-bg px-4">
       <ScreenHeader
         title="Wallet"
         subtitle="Manage your chit payments balance and history"
@@ -144,7 +148,7 @@ export default function Wallet() {
           <View className="mb-6">
             <Card gradient style={{ marginBottom: 24 }}>
               <View className="p-6">
-                <Text className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-1">
+                <Text className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-1">
                   Available Balance
                 </Text>
                 <Text className="text-white text-3xl font-bold mb-4">
@@ -180,10 +184,10 @@ export default function Wallet() {
                     <Ionicons name="sync-outline" size={16} color="#3b82f6" />
                   </View>
                   <View className="ml-3 flex-1">
-                    <Text className="text-blue-400 font-bold text-sm">
+                    <Text className="text-blue-700 font-bold text-sm">
                       {withdrawals.filter((w: Withdrawal) => w.status === "requested" || w.status === "processing").length} pending withdrawal(s)
                     </Text>
-                    <Text className="text-neutral-500 text-xs mt-0.5">
+                    <Text className="text-slate-500 text-xs mt-0.5">
                       {formatINR(
                         withdrawals
                           .filter((w: Withdrawal) => w.status === "requested" || w.status === "processing")
@@ -202,7 +206,7 @@ export default function Wallet() {
             {showTopupInput && (
               <Card style={{ marginBottom: 24, borderColor: COLORS.surface.border }}>
                 <View className="p-5">
-                  <Text className="text-white font-bold text-sm mb-3">Add Funds to Wallet</Text>
+                  <Text className="text-slate-800 font-bold text-sm mb-3">Add Funds to Wallet</Text>
                   <AmountInput
                     label="Enter Amount"
                     valuePaise={topupAmount}
@@ -234,15 +238,12 @@ export default function Wallet() {
                       <TouchableOpacity
                         disabled={topupLoading}
                         className="bg-surface-card border border-brand-primary/20 rounded-xl h-14 items-center justify-center flex-row"
-                        onPress={() =>
-                          Alert.alert(
-                            "Use Web App",
-                            "Wallet top-up is available on the web app. Please visit kometi.app to add funds."
-                          )
+                        onPress={async () =>
+                          await alert("Use Web App", "Wallet top-up is available on the web app. Please visit kometi.app to add funds.")
                         }
                       >
                         <Ionicons name="phone-portrait-outline" size={18} color={COLORS.brandPrimary} />
-                        <Text className="text-brand-400 font-bold text-sm ml-2">View on Web to Pay</Text>
+                        <Text className="text-brand-600 font-bold text-sm ml-2">View on Web to Pay</Text>
                       </TouchableOpacity>
                     ) : (
                       <Button
@@ -263,7 +264,7 @@ export default function Wallet() {
               </Card>
             )}
 
-            <Text className="text-white text-base font-bold mb-3">Transaction History</Text>
+            <Text className="text-slate-800 text-base font-bold mb-3">Transaction History</Text>
           </View>
         }
         ListEmptyComponent={
@@ -276,7 +277,7 @@ export default function Wallet() {
           ) : null
         }
         renderItem={({ item }) => (
-          <View className="flex-row items-center justify-between bg-surface-card border border-brand-primary/5 rounded-xl p-4 mb-3">
+          <View className="flex-row items-center justify-between bg-white border border-slate-100 rounded-xl p-4 mb-3">
             <View className="flex-row items-center flex-1 pr-4">
               <View
                 className={`w-10 h-10 rounded-full items-center justify-center ${
@@ -290,10 +291,10 @@ export default function Wallet() {
                 />
               </View>
               <View className="ml-3 flex-1">
-                <Text className="text-white font-bold text-sm" numberOfLines={1}>
+                <Text className="text-slate-800 font-bold text-sm" numberOfLines={1}>
                   {item.description}
                 </Text>
-                <Text className="text-neutral-500 text-xs mt-0.5">
+                <Text className="text-slate-400 text-xs mt-0.5">
                   {new Date(item.createdAt).toLocaleDateString("en-IN", {
                     day: "numeric",
                     month: "short",
@@ -311,19 +312,20 @@ export default function Wallet() {
             <View className="items-end">
               <Text
                 className={`font-bold text-base ${
-                  item.type === "CREDIT" ? "text-success-500" : "text-neutral-200"
+                  item.type === "CREDIT" ? "text-emerald-600" : "text-slate-700"
                 }`}
               >
                 {item.type === "CREDIT" ? "+" : "-"}
                 {formatINR(item.amountPaise)}
               </Text>
-              <Text className="text-[10px] text-neutral-500 mt-1 uppercase font-bold tracking-wider">
+              <Text className="text-[10px] text-slate-500 mt-1 uppercase font-bold tracking-wider">
                 {item.status}
               </Text>
             </View>
           </View>
         )}
       />
+      <AlertComponent />
     </View>
   );
 }

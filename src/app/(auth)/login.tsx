@@ -4,7 +4,6 @@
 import React, { useState } from "react";
 import { View, Text, KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Input from "../../components/ui/Input";
@@ -14,7 +13,7 @@ import { authApi } from "../../services/auth.api";
 import { useAuthStore } from "../../stores/auth.store";
 import { tokenStorage } from "../../utils/storage";
 import { isValidEmail, isValidPhone } from "../../utils/validators";
-import { COLORS, FONT_SIZE, SPACING, GRADIENTS } from "../../constants/theme";
+import { COLORS, FONT_SIZE, SPACING, BORDER_RADIUS } from "../../constants/theme";
 
 export default function LoginScreen() {
   const router         = useRouter();
@@ -71,12 +70,6 @@ export default function LoginScreen() {
     >
       <ScreenHeader title="Sign In" showBack />
 
-      {/* Subtle gradient blob */}
-      <LinearGradient
-        colors={["rgba(111,94,255,0.20)", "transparent"]}
-        style={styles.blob}
-      />
-
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -86,11 +79,7 @@ export default function LoginScreen() {
       >
         <View style={styles.topSection}>
           <View style={styles.iconCircle}>
-            <LinearGradient
-              colors={GRADIENTS.brandPrimary as [string, string]}
-              style={StyleSheet.absoluteFill}
-            />
-            <Ionicons name="phone-portrait-outline" size={28} color="#fff" />
+            <Ionicons name="phone-portrait-outline" size={28} color={COLORS.brand[500]} />
           </View>
 
           <Text style={styles.title}>Sign in to{"\n"}your account</Text>
@@ -99,7 +88,7 @@ export default function LoginScreen() {
           </Text>
         </View>
 
-        <View style={styles.form}>
+        <View style={styles.formCard}>
           <Input
             label="Email"
             required
@@ -148,13 +137,15 @@ export default function LoginScreen() {
             <Text style={styles.formError}>{errors.form}</Text>
           ) : null}
 
-          <Button
-            label="Sign In"
-            variant="primary"
-            size="lg"
-            isLoading={isLoading}
-            onPress={handleLogin}
-          />
+          <View style={{ marginTop: SPACING[2] }}>
+            <Button
+              label="Sign In"
+              variant="primary"
+              size="lg"
+              isLoading={isLoading}
+              onPress={handleLogin}
+            />
+          </View>
 
           <Button
             label="Create Account"
@@ -181,30 +172,36 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  blob: {
-    position: "absolute", top: -60, right: -60,
-    width: 250, height: 250, borderRadius: 125,
-  },
   content: {
-    flexGrow: 1, paddingHorizontal: SPACING[6], gap: SPACING[8],
+    flexGrow: 1, paddingHorizontal: SPACING[6], gap: SPACING[6],
   },
-  topSection: { gap: SPACING[3], paddingTop: SPACING[4] },
+  topSection: { gap: SPACING[2.5], paddingTop: SPACING[2] },
   iconCircle: {
-    width: 64, height: 64, borderRadius: 20, overflow: "hidden",
-    alignItems: "center", justifyContent: "center", marginBottom: SPACING[2],
+    width: 56, height: 56, borderRadius: 14,
+    alignItems: "center", justifyContent: "center", marginBottom: SPACING[1],
+    backgroundColor: COLORS.surface.card,
+    borderWidth: 1,
+    borderColor: COLORS.surface.border,
   },
   title: {
-    fontSize: FONT_SIZE["3xl"], fontWeight: "800",
+    fontSize: FONT_SIZE["3xl"], fontWeight: "700",
     color: COLORS.text.primary, lineHeight: 36,
   },
   subtitle: {
     fontSize: FONT_SIZE.base, color: COLORS.text.secondary, lineHeight: 22,
   },
-  form: { gap: SPACING[4] },
+  formCard: {
+    backgroundColor: COLORS.surface.card,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.surface.border,
+    padding: SPACING[5],
+    gap: SPACING[4.5],
+  },
   formError: { fontSize: FONT_SIZE.sm, color: COLORS.danger.light, lineHeight: 20 },
   trustRow: {
     flexDirection: "row", gap: SPACING[5], justifyContent: "center",
-    paddingTop: SPACING[2],
+    paddingTop: SPACING[1],
   },
   trustItem: { flexDirection: "row", alignItems: "center", gap: SPACING[1.5] },
   trustText:  { fontSize: FONT_SIZE.xs, color: COLORS.text.muted, fontWeight: "500" },

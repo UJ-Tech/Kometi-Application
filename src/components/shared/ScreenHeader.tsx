@@ -49,7 +49,7 @@ export default function ScreenHeader({
             width:          38,
             height:         38,
             borderRadius:   12,
-            backgroundColor:"rgba(111,94,255,0.10)",
+            backgroundColor:"rgba(13,148,136,0.08)",
             alignItems:     "center",
             justifyContent: "center",
           }}

@@ -2,7 +2,7 @@
 import React from "react";
 import { View, type StyleProp, type ViewStyle } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { COLORS, BORDER_RADIUS, SHADOWS, GRADIENTS } from "../../constants/theme";
+import { COLORS, BORDER_RADIUS, SHADOWS } from "../../constants/theme";
 
 interface CardProps {
   children:      React.ReactNode;
@@ -21,29 +21,37 @@ export default function Card({
   borderGlow = false,
   padding    = 16,
 }: CardProps) {
-  const base: ViewStyle = {
-    borderRadius:    BORDER_RADIUS.xl,
-    overflow:        "hidden",
-    borderWidth:     1,
-    borderColor:     borderGlow ? COLORS.surface.glow : COLORS.surface.border,
-    ...(elevated ? SHADOWS.card : SHADOWS.cardSm),
-  };
-
   if (gradient) {
     return (
       <LinearGradient
-        colors={GRADIENTS.darkElevated}
+        colors={["#0d9488", "#0f766e"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[base, style]}
+        style={[
+          {
+            borderRadius: BORDER_RADIUS.lg,
+            padding,
+            borderWidth: 1,
+            borderColor: "rgba(13,148,136,0.3)",
+          },
+          style,
+        ]}
       >
-        <View style={{ padding }}>{children}</View>
+        {children}
       </LinearGradient>
     );
   }
 
+  const base: ViewStyle = {
+    borderRadius:    BORDER_RADIUS.lg,
+    borderWidth:     1,
+    borderColor:     COLORS.surface.border,
+    backgroundColor: COLORS.surface.card,
+    ...(elevated ? SHADOWS.card : SHADOWS.cardSm),
+  };
+
   return (
-    <View style={[base, { backgroundColor: COLORS.surface.card, padding }, style]}>
+    <View style={[base, { padding }, style]}>
       {children}
     </View>
   );

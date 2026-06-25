@@ -83,7 +83,8 @@ const Input = forwardRef<TextInput, InputProps>(({
             fontSize:   FONT_SIZE.base,
             color:      COLORS.text.primary,
             paddingVertical: 0,
-          }}
+            outlineStyle: "none",
+          } as any}
           placeholderTextColor={COLORS.text.muted}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}

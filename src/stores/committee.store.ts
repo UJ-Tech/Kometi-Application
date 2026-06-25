@@ -17,6 +17,7 @@ interface CommitteeState {
   biddingOpenedVersion:  number;
   monthResolvedVersion:  number;
   bidPlacedVersion:      number;
+  contributionUpdatedVersion: number;
 
   setCommittees:         (list: Committee[]) => void;
   appendCommittees:      (list: Committee[]) => void;
@@ -30,6 +31,7 @@ interface CommitteeState {
   markBiddingOpened:     (committeeId: string, monthId: string) => void;
   markMonthResolved:     (committeeId: string, monthId: string) => void;
   markBidPlaced:         (committeeId: string, monthId: string) => void;
+  markContributionUpdated: (committeeId: string) => void;
   reset:                 () => void;
 }
 
@@ -46,6 +48,7 @@ export const useCommitteeStore = create<CommitteeState>((set, get) => ({
   biddingOpenedVersion: 0,
   monthResolvedVersion: 0,
   bidPlacedVersion:     0,
+  contributionUpdatedVersion: 0,
 
   setCommittees:      (list)  => set({ committees: list }),
   appendCommittees:   (list)  => set((s) => ({ committees: [...s.committees, ...list] })),
@@ -102,9 +105,14 @@ export const useCommitteeStore = create<CommitteeState>((set, get) => ({
     set((s) => ({ bidPlacedVersion: s.bidPlacedVersion + 1 }));
   },
 
+  markContributionUpdated: (committeeId) => {
+    set((s) => ({ contributionUpdatedVersion: s.contributionUpdatedVersion + 1 }));
+  },
+
   reset: () => set({
     committees: [], activeCommittee: null,
     isLoading: false, filters: {}, pagination: defaultPagination,
     biddingOpenedVersion: 0, monthResolvedVersion: 0, bidPlacedVersion: 0,
+    contributionUpdatedVersion: 0,
   }),
 }));

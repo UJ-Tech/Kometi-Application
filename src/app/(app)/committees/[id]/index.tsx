@@ -9,23 +9,24 @@ import {
   TouchableOpacity,
   RefreshControl,
   TextInput,
-  Alert,
   ActivityIndicator,
-  Platform,
   Share,
   Keyboard,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
+import * as Clipboard from "expo-clipboard";
+
 import { committeesApi } from "../../../../services/committees.api";
 import { useAuthStore } from "../../../../stores/auth.store";
+import { useCommitteeStore } from "../../../../stores/committee.store";
 import { canAccessAdminPanel } from "../../../../utils/rbac";
 import { formatINR } from "../../../../utils/currency";
 import { COLORS } from "../../../../constants/theme";
 import Card from "../../../../components/ui/Card";
 import Badge from "../../../../components/ui/Badge";
 import Button from "../../../../components/ui/Button";
+import { useAlertModal } from "../../../../components/ui/AlertModal";
 
 export default function CommitteeDetail() {
   const rawId = useLocalSearchParams<{ id: string }>().id;
@@ -33,6 +34,7 @@ export default function CommitteeDetail() {
   const isValidId = id && id !== "undefined" && id !== "null";
   const router = useRouter();
   const currentUser = useAuthStore((s) => s.user);
+  const { alert, confirm, AlertComponent } = useAlertModal();
 
   const [committee, setCommittee] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,26 +45,12 @@ export default function CommitteeDetail() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [schedule, setSchedule] = useState<any[] | null>(null);
   const [monthsData, setMonthsData] = useState<any[] | null>(null);
-  const [showCreateMonth, setShowCreateMonth] = useState(false);
-  const [newMonthNumber, setNewMonthNumber] = useState("");
-  const [newMonthDate, setNewMonthDate] = useState("");
-  const [newMonthResolution, setNewMonthResolution] = useState<"bid_single" | "bid_auction" | "lottery">("bid_auction");
   const [showAdjustSize, setShowAdjustSize] = useState(false);
   const [adjustSizeValue, setAdjustSizeValue] = useState("");
   const [isAdjusting, setIsAdjusting] = useState(false);
 
   const confirmAction = async (title: string, message: string, confirmLabel = "Confirm") => {
-    if (Platform.OS === "web") {
-      const confirmed = window.confirm(`${title}\n\n${message}`);
-      return confirmed;
-    }
-
-    return new Promise<boolean>((resolve) => {
-      Alert.alert(title, message, [
-        { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
-        { text: confirmLabel, onPress: () => resolve(true) },
-      ]);
-    });
+    return confirm(title, message, { confirmLabel });
   };
 
   const syncCommitteeData = async () => {
@@ -85,7 +73,7 @@ export default function CommitteeDetail() {
       setCommittee(res.data.data);
     } catch (err) {
       console.error("[CommitteeDetail] Failed to load:", err);
-      Alert.alert("Error", "Failed to load chit committee details");
+      alert("Error", "Failed to load chit committee details");
       router.back();
     } finally {
       setLoading(false);
@@ -99,6 +87,17 @@ export default function CommitteeDetail() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Socket-triggered instant refresh (committee status, bids, join requests)
+  const biddingVersion = useCommitteeStore((s) => s.biddingOpenedVersion);
+  const resolvedVersion = useCommitteeStore((s) => s.monthResolvedVersion);
+  const bidVersion = useCommitteeStore((s) => s.bidPlacedVersion);
+  const contributionVersion = useCommitteeStore((s) => s.contributionUpdatedVersion);
+  useEffect(() => {
+    if (biddingVersion + resolvedVersion + bidVersion + contributionVersion > 0) {
+      syncCommitteeData();
+    }
+  }, [biddingVersion, resolvedVersion, bidVersion, contributionVersion]);
 
   const loadJoinRequests = async () => {
     try {
@@ -147,14 +146,14 @@ export default function CommitteeDetail() {
 
   if (!isValidId) {
     return (
-      <View className="flex-1 bg-surface-950 items-center justify-center px-6">
-        <View className="w-20 h-20 rounded-full bg-surface-card items-center justify-center mb-5 border border-brand-primary/10">
-          <Ionicons name="alert-circle-outline" size={36} color="#71717a" />
+      <View className="flex-1 bg-surface-bg items-center justify-center px-6">
+        <View className="w-20 h-20 rounded-full bg-surface-card items-center justify-center mb-5 border border-slate-100">
+          <Ionicons name="alert-circle-outline" size={36} color="#64748b" />
         </View>
-        <Text className="text-white font-bold text-lg text-center mb-2">
+        <Text className="text-slate-900 font-bold text-lg text-center mb-2">
           Committee Not Found
         </Text>
-        <Text className="text-neutral-500 text-sm text-center mb-6 leading-5">
+        <Text className="text-slate-500 text-sm text-center mb-6 leading-5">
           {"The committee you're looking for doesn't exist or the link is invalid."}
         </Text>
         <TouchableOpacity
@@ -181,14 +180,14 @@ export default function CommitteeDetail() {
       const res = await committeesApi.approveJoinRequest(id, requestId);
       if (res.data.success) {
         markRequestProcessed(requestId, "APPROVED");
-        Alert.alert("Approved", `${userName} has been added to the committee.`);
+        alert("Approved", `${userName} has been added to the committee.`);
         await syncCommitteeData();
       }
     } catch (err) {
       console.error("[CommitteeDetail] Approve failed:", err);
       const message = err instanceof Error ? err.message : "Failed to approve member";
       await syncCommitteeData();
-      Alert.alert("Error", message);
+      alert("Error", message);
     } finally {
       setProcessingId(null);
     }
@@ -207,14 +206,14 @@ export default function CommitteeDetail() {
       const res = await committeesApi.rejectJoinRequest(id, requestId);
       if (res.data.success) {
         markRequestProcessed(requestId, "REJECTED");
-        Alert.alert("Rejected", `${userName}'s request has been rejected.`);
+        alert("Rejected", `${userName}'s request has been rejected.`);
         await syncCommitteeData();
       }
     } catch (err) {
       console.error("[CommitteeDetail] Reject failed:", err);
       const message = err instanceof Error ? err.message : "Failed to reject member";
       await syncCommitteeData();
-      Alert.alert("Error", message);
+      alert("Error", message);
     } finally {
       setProcessingId(null);
     }
@@ -231,10 +230,10 @@ export default function CommitteeDetail() {
     try {
       setLoading(true);
       await committeesApi.start(id);
-      Alert.alert("Success", "Committee has been started successfully!");
+      alert("Success", "Committee has been started successfully!");
       await loadCommittee();
     } catch (err) {
-      Alert.alert("Error", err instanceof Error ? err.message : "Failed to start committee");
+      alert("Error", err instanceof Error ? err.message : "Failed to start committee");
       setLoading(false);
     }
   };
@@ -246,7 +245,7 @@ export default function CommitteeDetail() {
 
   const handlePlaceBid = async () => {
     if (!bidAmount || isNaN(Number(bidAmount))) {
-      Alert.alert("Invalid Input", "Please enter a valid numeric payout amount.");
+      alert("Invalid Input", "Please enter a valid numeric payout amount.");
       return;
     }
 
@@ -256,11 +255,11 @@ export default function CommitteeDetail() {
     try {
       setIsSubmitting(true);
       await committeesApi.submitBid(id, amountPaise);
-      Alert.alert("Success", `Your bid of ${formatINR(amountPaise)} has been submitted!`);
+      alert("Success", `Your bid of ${formatINR(amountPaise)} has been submitted!`);
       setBidAmount("");
       loadCommittee();
     } catch (err) {
-      Alert.alert("Bid Failed", err instanceof Error ? err.message : "Failed to place bid");
+      alert("Bid Failed", err instanceof Error ? err.message : "Failed to place bid");
     } finally {
       setIsSubmitting(false);
     }
@@ -311,6 +310,7 @@ export default function CommitteeDetail() {
       loadCommittee();
     } catch (err) {
       await confirmAction("Resolution Failed", err instanceof Error ? err.message : "Failed to resolve month", "OK");
+    } finally {
       setLoading(false);
     }
   };
@@ -323,58 +323,29 @@ export default function CommitteeDetail() {
     } catch {}
   };
 
-  const handleCopyInviteCode = () => {
+  const handleCopyInviteCode = async () => {
     if (committee.inviteCode) {
-      Alert.alert("Invite Code", `Share this code with members:\n\n${committee.inviteCode}`);
-    }
-  };
-
-  const handleCreateMonth = async () => {
-    const monthNum = Number(newMonthNumber);
-    if (!monthNum || monthNum < 1 || monthNum > committee.totalSlots) {
-      Alert.alert("Invalid Input", `Month number must be between 1 and ${committee.totalSlots}.`);
-      return;
-    }
-    if (!newMonthDate.trim()) {
-      Alert.alert("Invalid Input", "Please enter a month date (YYYY-MM-DD).");
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      await committeesApi.createMonth(id, {
-        monthNumber: monthNum,
-        monthDate: newMonthDate.trim(),
-        resolutionType: newMonthResolution,
-      });
-      Alert.alert("Success", `Month ${monthNum} created successfully!`);
-      setNewMonthNumber("");
-      setNewMonthDate("");
-      setShowCreateMonth(false);
-      await loadMonths();
-    } catch (err) {
-      Alert.alert("Error", err instanceof Error ? err.message : "Failed to create month");
-    } finally {
-      setIsSubmitting(false);
+      await Clipboard.setStringAsync(committee.inviteCode);
+      alert("Copied!", `Invite code copied to clipboard:\n\n${committee.inviteCode}`);
     }
   };
 
   const handleAdjustSize = async () => {
     const newSize = Number(adjustSizeValue);
     if (!newSize || newSize < 2) {
-      Alert.alert("Invalid Input", "Committee must have at least 2 members.");
+      alert("Invalid Input", "Committee must have at least 2 members.");
       return;
     }
     if (newSize > committee.totalSlots) {
-      Alert.alert("Invalid Input", `Cannot increase size beyond original ${committee.totalSlots} slots.`);
+      alert("Invalid Input", `Cannot increase size beyond original ${committee.totalSlots} slots.`);
       return;
     }
     if (newSize < committee.filledSlots) {
-      Alert.alert("Invalid Input", `Cannot reduce below ${committee.filledSlots} — that many members already joined.`);
+      alert("Invalid Input", `Cannot reduce below ${committee.filledSlots} — that many members already joined.`);
       return;
     }
     if (newSize === committee.totalSlots) {
-      Alert.alert("No Change", "New size is the same as current size.");
+      alert("No Change", "New size is the same as current size.");
       return;
     }
 
@@ -393,7 +364,7 @@ export default function CommitteeDetail() {
       setIsAdjusting(true);
       const res = await committeesApi.adjustCommitteeSize(id, newSize);
       if (res.data.success) {
-        Alert.alert(
+        alert(
           "Size Adjusted",
           res.data.data.isNowFull
             ? "All slots are now filled! You can start the committee."
@@ -404,7 +375,7 @@ export default function CommitteeDetail() {
         await loadCommittee();
       }
     } catch (err) {
-      Alert.alert("Error", err instanceof Error ? err.message : "Failed to adjust size");
+      alert("Error", err instanceof Error ? err.message : "Failed to adjust size");
     } finally {
       setIsAdjusting(false);
     }
@@ -412,7 +383,7 @@ export default function CommitteeDetail() {
 
   if (loading && !refreshing) {
     return (
-      <View className="flex-1 bg-surface-950 items-center justify-center">
+      <View className="flex-1 bg-surface-bg items-center justify-center">
         <ActivityIndicator size="large" color={COLORS.brandPrimary} />
       </View>
     );
@@ -444,7 +415,7 @@ export default function CommitteeDetail() {
 
   return (
     <ScrollView
-      className="flex-1 bg-surface-950 px-4"
+      className="flex-1 bg-surface-bg px-4"
       contentContainerStyle={{ paddingTop: 64, paddingBottom: 120 }}
       refreshControl={
         <RefreshControl
@@ -454,20 +425,13 @@ export default function CommitteeDetail() {
         />
       }
     >
-      <LinearGradient
-        colors={[COLORS.brandPrimary + "10", "transparent"]}
-        className="absolute inset-0 h-96"
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-      />
-
       {/* Header */}
       <View className="flex-row items-center justify-between mb-6">
         <TouchableOpacity
           onPress={() => router.back()}
-          className="w-10 h-10 bg-surface-card rounded-full items-center justify-center border border-brand-primary/10"
+          className="w-10 h-10 bg-surface-card rounded-full items-center justify-center border border-slate-100"
         >
-          <Ionicons name="arrow-back" size={20} color="#fff" />
+          <Ionicons name="arrow-back" size={20} color="#64748b" />
         </TouchableOpacity>
 
         <Badge label={committee.status} variant="info" />
@@ -476,33 +440,33 @@ export default function CommitteeDetail() {
       {/* Hero Card */}
       <Card style={{ marginBottom: 20 }} padding={0}>
         <View className="p-6">
-          <Text className="text-neutral-400 text-xs font-semibold uppercase tracking-wider">
+          <Text className="text-slate-500 text-xs font-semibold uppercase tracking-wider">
             Auction Chit
           </Text>
-          <Text className="text-white text-2xl font-bold mt-1">{committee.name}</Text>
+          <Text className="text-slate-900 text-2xl font-bold mt-1">{committee.name}</Text>
           {committee.description ? (
-            <Text className="text-neutral-400 text-sm mt-1">{committee.description}</Text>
+            <Text className="text-slate-500 text-sm mt-1">{committee.description}</Text>
           ) : null}
 
-          <View className="flex-row justify-between mt-5 pt-4 border-t border-brand-primary/10">
+          <View className="flex-row justify-between mt-5 pt-4 border-t border-slate-100">
             <View>
-              <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">Total Value</Text>
-              <Text className="text-gold-500 text-lg font-bold mt-0.5">{formatINR(totalPot)}</Text>
+              <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Total Value</Text>
+              <Text className="text-gold-600 text-lg font-bold mt-0.5">{formatINR(totalPot)}</Text>
             </View>
             <View className="items-end">
-              <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">Installment / Member</Text>
-              <Text className="text-white text-lg font-bold mt-0.5">{formatINR(committee.installmentAmountPaise)}</Text>
+              <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Installment / Member</Text>
+              <Text className="text-slate-900 text-lg font-bold mt-0.5">{formatINR(committee.installmentAmountPaise)}</Text>
             </View>
           </View>
 
           <View className="flex-row justify-between mt-4">
             <View>
-              <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">Cycle duration</Text>
-              <Text className="text-white font-semibold text-sm mt-0.5">{committee.cycleDurationDays} days</Text>
+              <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Cycle duration</Text>
+              <Text className="text-slate-900 font-semibold text-sm mt-0.5">{committee.cycleDurationDays} days</Text>
             </View>
             <View className="items-end">
-              <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">Current Cycle</Text>
-              <Text className="text-white font-semibold text-sm mt-0.5">#{committee.currentCycleNo} / {committee.totalSlots}</Text>
+              <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Current Cycle</Text>
+              <Text className="text-slate-900 font-semibold text-sm mt-0.5">#{committee.currentCycleNo} / {committee.totalSlots}</Text>
             </View>
           </View>
         </View>
@@ -517,7 +481,7 @@ export default function CommitteeDetail() {
             onPress={() => router.push(`/committees/${id}/manage`)}
             icon={<Ionicons name="settings-outline" size={20} color={COLORS.brandPrimary} />}
           />
-          <Text className="text-neutral-500 text-[10px] text-center mt-2 italic">
+          <Text className="text-slate-500 text-[10px] text-center mt-2 italic">
             Manage fund disbursements, bids, and month resolutions.
           </Text>
         </View>
@@ -529,9 +493,9 @@ export default function CommitteeDetail() {
           label="View Audit Log"
           variant="secondary"
           onPress={() => router.push(`/committees/${id}/audit`)}
-          icon={<Ionicons name="document-text-outline" size={20} color={COLORS.success.light} />}
+          icon={<Ionicons name="document-text-outline" size={20} color={COLORS.success.DEFAULT} />}
         />
-        <Text className="text-neutral-500 text-[10px] text-center mt-2 italic">
+        <Text className="text-slate-500 text-[10px] text-center mt-2 italic">
           Transparency panel — view full monthly summary and personal ledger.
         </Text>
       </View>
@@ -550,7 +514,7 @@ export default function CommitteeDetail() {
               onPress={() => router.push(`/member/committee/${id}/bid` as any)}
               icon={<Ionicons name="hammer-outline" size={20} color="#fff" />}
             />
-            <Text className="text-neutral-500 text-[10px] text-center mt-2 italic">
+            <Text className="text-slate-500 text-[10px] text-center mt-2 italic">
               Enter the reverse auction — lowest bidder wins the pool.
             </Text>
           </View>
@@ -565,7 +529,7 @@ export default function CommitteeDetail() {
           onPress={() => router.push(`/member/committee/${id}` as any)}
           icon={<Ionicons name="person-circle-outline" size={20} color={COLORS.brandPrimary} />}
         />
-        <Text className="text-neutral-500 text-[10px] text-center mt-2 italic">
+        <Text className="text-slate-500 text-[10px] text-center mt-2 italic">
           View your contributions, place bids, and track payments.
         </Text>
       </View>
@@ -576,17 +540,17 @@ export default function CommitteeDetail() {
           <Card style={{ marginBottom: 0 }} padding={0}>
             <View className="p-5">
               <View className="flex-row items-center mb-3">
-                <View className="w-10 h-10 rounded-full bg-amber-500/15 border border-amber-500/20 items-center justify-center mr-3">
-                  <Ionicons name="time-outline" size={20} color="#f59e0b" />
+                <View className="w-10 h-10 rounded-full bg-amber-50 border border-amber-200/50 items-center justify-center mr-3">
+                  <Ionicons name="time-outline" size={20} color="#d97706" />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-white font-bold text-sm">Committee Not Ready Yet</Text>
-                  <Text className="text-neutral-400 text-xs mt-0.5">
+                  <Text className="text-slate-900 font-bold text-sm">Committee Not Ready Yet</Text>
+                  <Text className="text-slate-500 text-xs mt-0.5">
                     Waiting for {committee.totalSlots - committee.filledSlots} more member(s) to join.
                   </Text>
                 </View>
               </View>
-              <Text className="text-neutral-400 text-xs">
+              <Text className="text-slate-600 text-xs">
                 The organizer will start the committee once all slots are filled or adjusted.
                 You&apos;ll be notified when it&apos;s active.
               </Text>
@@ -595,142 +559,50 @@ export default function CommitteeDetail() {
         </View>
       )}
 
-      {/* Create Month — Organizer Only */}
+      {/* Committee Months — Organizer Only */}
       {isOrganizer && committee.status === "ACTIVE" && (
         <View className="mb-6">
-          <View className="flex-row items-center justify-between mb-3">
-            <Text className="text-white text-base font-bold">Committee Months</Text>
-            {!showCreateMonth && (
-              <TouchableOpacity
-                onPress={() => {
-                  const nextNum = (monthsData?.length || 0) + 1;
-                  setNewMonthNumber(String(nextNum));
-                  setNewMonthDate(new Date().toISOString().split("T")[0]);
-                  setShowCreateMonth(true);
-                }}
-                className="bg-brand-500/15 border border-brand-500/20 px-4 py-2 rounded-xl flex-row items-center"
-              >
-                <Ionicons name="add" size={16} color={COLORS.brandPrimary} />
-                <Text className="text-brand-400 font-bold text-sm ml-1">Create Month</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <Text className="text-slate-900 text-base font-bold mb-3">Committee Months</Text>
 
-          {showCreateMonth && (
+          {monthsData && monthsData.length > 0 && (
             <Card style={{ marginBottom: 0 }} padding={0}>
               <View className="p-5">
-                <Text className="text-neutral-400 text-xs font-semibold uppercase tracking-wider mb-4">
-                  New Month Details
-                </Text>
-
-                <Text className="text-neutral-400 text-xs font-semibold mb-1.5">Month Number</Text>
-                <View className="bg-surface-bg border border-brand-primary/10 rounded-xl px-4 h-12 justify-center mb-4">
-                  <TextInput
-                    value={newMonthNumber}
-                    onChangeText={setNewMonthNumber}
-                    keyboardType="numeric"
-                    placeholder={`e.g. ${Number(newMonthNumber) || 1}`}
-                    placeholderTextColor="#a3a3a3"
-                    className="text-white font-semibold text-sm"
-                  />
-                </View>
-
-                <Text className="text-neutral-400 text-xs font-semibold mb-1.5">Month Date (YYYY-MM-DD)</Text>
-                <View className="bg-surface-bg border border-brand-primary/10 rounded-xl px-4 h-12 justify-center mb-4">
-                  <TextInput
-                    value={newMonthDate}
-                    onChangeText={setNewMonthDate}
-                    placeholder="2026-01-15"
-                    placeholderTextColor="#a3a3a3"
-                    className="text-white font-semibold text-sm"
-                  />
-                </View>
-
-                <Text className="text-neutral-400 text-xs font-semibold mb-2">Resolution Type</Text>
-                <View className="flex-row gap-2 mb-4">
-                  {(["bid_auction", "bid_single", "lottery"] as const).map((type) => (
-                    <TouchableOpacity
-                      key={type}
-                      onPress={() => setNewMonthResolution(type)}
-                      className={`flex-1 h-10 rounded-xl items-center justify-center border ${
-                        newMonthResolution === type
-                          ? "bg-brand-500 border-brand-500"
-                          : "bg-surface-bg border-brand-primary/10"
-                      }`}
-                    >
-                      <Text
-                        className={`font-bold text-xs ${
-                          newMonthResolution === type ? "text-white" : "text-neutral-400"
-                        }`}
-                      >
-                        {type === "bid_auction" ? "Auction" : type === "bid_single" ? "Single Bid" : "Lottery"}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <View className="flex-row gap-3">
-                  <TouchableOpacity
-                    onPress={() => setShowCreateMonth(false)}
-                    className="flex-1 h-11 rounded-xl items-center justify-center border border-brand-primary/10"
-                  >
-                    <Text className="text-neutral-400 font-bold text-sm">Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={handleCreateMonth}
-                    disabled={isSubmitting}
-                    className="flex-1 bg-brand-500 h-11 rounded-xl items-center justify-center"
-                  >
-                    {isSubmitting ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Text className="text-white font-bold text-sm">Create Month</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </Card>
-          )}
-
-          {!showCreateMonth && monthsData && monthsData.length > 0 && (
-            <Card style={{ marginBottom: 0 }} padding={0}>
-              <View className="p-5">
-                <View className="flex-row border-b border-brand-primary/10 pb-2 mb-3">
-                  <Text className="w-14 text-neutral-400 font-bold text-xs">Month</Text>
-                  <Text className="flex-1 text-neutral-400 font-bold text-xs">Date</Text>
-                  <Text className="w-20 text-right text-neutral-400 font-bold text-xs">Pool</Text>
-                  <Text className="w-20 text-right text-neutral-400 font-bold text-xs">Status</Text>
+                <View className="flex-row border-b border-slate-100 pb-2 mb-3">
+                  <Text className="w-14 text-slate-500 font-bold text-xs">Month</Text>
+                  <Text className="flex-1 text-slate-500 font-bold text-xs">Date</Text>
+                  <Text className="w-20 text-right text-slate-500 font-bold text-xs">Pool</Text>
+                  <Text className="w-20 text-right text-slate-500 font-bold text-xs">Status</Text>
                 </View>
                 {monthsData.map((m: any) => (
                   <TouchableOpacity
                     key={m.id}
                     onPress={() => router.push(`/committees/${id}/manage/month/${m.id}`)}
-                    className="flex-row py-2.5 border-b border-brand-primary/5 items-center"
+                    className="flex-row py-2.5 border-b border-slate-100 items-center"
                   >
-                    <Text className="w-14 text-white font-bold text-sm">#{m.monthNumber}</Text>
-                    <Text className="flex-1 text-neutral-300 font-semibold text-sm">
+                    <Text className="w-14 text-slate-900 font-bold text-sm">#{m.monthNumber}</Text>
+                    <Text className="flex-1 text-slate-700 font-semibold text-sm">
                       {new Date(m.monthDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                     </Text>
-                    <Text className="w-20 text-right text-gold-500 font-bold text-sm">
+                    <Text className="w-20 text-right text-gold-600 font-bold text-sm">
                       {formatINR(Number(m.totalPool))}
                     </Text>
                     <View className="w-20 items-end">
                       <View
                         className={`px-2 py-0.5 rounded ${
                           m.status === "completed"
-                            ? "bg-success-500/15"
+                            ? "bg-green-50"
                             : m.status === "bidding_open"
-                            ? "bg-brand-500/15"
-                            : "bg-neutral-500/15"
+                            ? "bg-brand-50"
+                            : "bg-slate-100"
                         }`}
                       >
                         <Text
                           className={`text-[10px] font-bold ${
                             m.status === "completed"
-                              ? "text-success-500"
+                              ? "text-green-700"
                               : m.status === "bidding_open"
-                              ? "text-brand-500"
-                              : "text-neutral-400"
+                              ? "text-brand-700"
+                              : "text-slate-600"
                           }`}
                         >
                           {m.status === "bidding_open" ? "BIDDING" : m.status.toUpperCase()}
@@ -743,11 +615,11 @@ export default function CommitteeDetail() {
             </Card>
           )}
 
-          {!showCreateMonth && (!monthsData || monthsData.length === 0) && (
-            <View className="items-center py-6 bg-surface-card/30 rounded-xl border border-dashed border-neutral-800">
-              <Ionicons name="calendar-outline" size={28} color="#52525b" />
-              <Text className="text-neutral-500 text-xs mt-2">No months created yet</Text>
-              <Text className="text-neutral-600 text-[10px] mt-1">
+          {(!monthsData || monthsData.length === 0) && (
+            <View className="items-center py-6 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+              <Ionicons name="calendar-outline" size={28} color="#94a3b8" />
+              <Text className="text-slate-500 text-xs mt-2">No months created yet</Text>
+              <Text className="text-slate-600 text-[10px] mt-1">
                 Create the first month to start bidding.
               </Text>
             </View>
@@ -758,34 +630,34 @@ export default function CommitteeDetail() {
       {/* Invite Code — Organizer Only */}
       {isOrganizer && committee.status === "DRAFT" && committee.inviteCode && (
         <View className="mb-6">
-          <Text className="text-white text-base font-bold mb-3">Invite Members</Text>
+          <Text className="text-slate-900 text-base font-bold mb-3">Invite Members</Text>
           <Card style={{ marginBottom: 0 }} padding={0}>
             <View className="p-5">
-              <Text className="text-neutral-400 text-xs font-semibold mb-3">
+              <Text className="text-slate-500 text-xs font-semibold mb-3">
                 Share this code with people you want to add to this chit.
               </Text>
-              <View className="flex-row items-center justify-between bg-surface-bg border border-brand-primary/10 rounded-xl px-4 py-3.5 mb-4">
-                <Text className="text-gold-400 text-xl font-bold tracking-widest">
+              <View className="flex-row items-center justify-between bg-slate-50 border border-slate-100 rounded-xl px-4 py-3.5 mb-4">
+                <Text className="text-gold-600 text-xl font-bold tracking-widest">
                   {committee.inviteCode}
                 </Text>
-                <Text className="text-neutral-500 text-xs">
+                <Text className="text-slate-500 text-xs">
                   {committee.filledSlots}/{committee.totalSlots} filled
                 </Text>
               </View>
               <View className="flex-row gap-3">
                 <TouchableOpacity
                   onPress={handleCopyInviteCode}
-                  className="flex-1 bg-brand-500/15 border border-brand-500/20 h-11 rounded-xl items-center justify-center flex-row"
+                  className="flex-1 bg-brand-50 border border-brand-200/50 h-11 rounded-xl items-center justify-center flex-row"
                 >
                   <Ionicons name="copy-outline" size={16} color={COLORS.brandPrimary} />
-                  <Text className="text-brand-400 font-bold text-sm ml-1.5">View Code</Text>
+                  <Text className="text-brand-700 font-bold text-sm ml-1.5">Copy Code</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={handleShareInviteCode}
-                  className="flex-1 bg-gold-500/15 border border-gold-500/20 h-11 rounded-xl items-center justify-center flex-row"
+                  className="flex-1 bg-amber-50 border border-amber-200/50 h-11 rounded-xl items-center justify-center flex-row"
                 >
                   <Ionicons name="share-outline" size={16} color={COLORS.goldPrimary} />
-                  <Text className="text-gold-400 font-bold text-sm ml-1.5">Share Code</Text>
+                  <Text className="text-amber-700 font-bold text-sm ml-1.5">Share Code</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -799,26 +671,26 @@ export default function CommitteeDetail() {
           <Card style={{ marginBottom: 0 }} padding={0}>
             <View className="p-5">
               <View className="flex-row items-center mb-3">
-                <View className="w-10 h-10 rounded-full bg-amber-500/15 border border-amber-500/20 items-center justify-center mr-3">
-                  <Ionicons name="time-outline" size={20} color="#f59e0b" />
+                <View className="w-10 h-10 rounded-full bg-amber-50 border border-amber-200/50 items-center justify-center mr-3">
+                  <Ionicons name="time-outline" size={20} color="#d97706" />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-white font-bold text-sm">Waiting for Members</Text>
-                  <Text className="text-neutral-400 text-xs mt-0.5">
+                  <Text className="text-slate-900 font-bold text-sm">Waiting for Members</Text>
+                  <Text className="text-slate-500 text-xs mt-0.5">
                     {committee.totalSlots - committee.filledSlots} more slot(s) to fill
                   </Text>
                 </View>
               </View>
 
               {/* Progress bar */}
-              <View className="bg-surface-bg rounded-full h-2.5 mb-4">
+              <View className="bg-slate-200 rounded-full h-2.5 mb-4">
                 <View
                   className="bg-amber-500 h-2.5 rounded-full"
                   style={{ width: `${(committee.filledSlots / committee.totalSlots) * 100}%` }}
                 />
               </View>
 
-              <Text className="text-neutral-400 text-xs mb-4">
+              <Text className="text-slate-600 text-xs mb-4">
                 No actions (starting, bidding, payouts) can be performed until all slots are filled.
                 Ask members to join using the invite code, or adjust the committee size below.
               </Text>
@@ -830,18 +702,18 @@ export default function CommitteeDetail() {
                     setAdjustSizeValue(String(committee.filledSlots));
                     setShowAdjustSize(true);
                   }}
-                  className="bg-brand-500/15 border border-brand-500/20 h-11 rounded-xl items-center justify-center flex-row"
+                  className="bg-brand-50 border border-brand-200/50 h-11 rounded-xl items-center justify-center flex-row"
                 >
                   <Ionicons name="resize-outline" size={16} color={COLORS.brandPrimary} />
-                  <Text className="text-brand-400 font-bold text-sm ml-1.5">Adjust Committee Size</Text>
+                  <Text className="text-brand-700 font-bold text-sm ml-1.5">Adjust Committee Size</Text>
                 </TouchableOpacity>
               ) : (
-                <View className="bg-surface-bg border border-brand-primary/10 rounded-xl p-4">
-                  <Text className="text-neutral-400 text-xs font-semibold mb-2">
+                <View className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+                  <Text className="text-slate-500 text-xs font-semibold mb-2">
                     New Total Slots (min: {committee.filledSlots})
                   </Text>
                   <View className="flex-row gap-3 mb-3">
-                    <View className="flex-1 bg-surface-card border border-brand-primary/10 rounded-xl px-4 h-12 justify-center">
+                    <View className="flex-1 bg-white border border-slate-200 rounded-xl px-4 h-12 justify-center">
                       <TextInput
                         value={adjustSizeValue}
                         onChangeText={setAdjustSizeValue}
@@ -850,34 +722,34 @@ export default function CommitteeDetail() {
                         blurOnSubmit={true}
                         onSubmitEditing={() => Keyboard.dismiss()}
                         placeholder={`${committee.filledSlots}`}
-                        placeholderTextColor="#a3a3a3"
-                        className="text-white font-semibold text-sm"
+                        placeholderTextColor="#94a3b8"
+                        className="text-slate-900 font-semibold text-sm"
                       />
                     </View>
                     <View className="flex-row gap-2">
                       <TouchableOpacity
                         onPress={() => { Keyboard.dismiss(); setAdjustSizeValue(String(committee.filledSlots)); }}
-                        className="bg-surface-card border border-brand-primary/10 h-12 px-3 rounded-xl items-center justify-center"
+                        className="bg-white border border-slate-200 h-12 px-3 rounded-xl items-center justify-center"
                       >
-                        <Text className="text-neutral-400 font-bold text-xs">Min</Text>
+                        <Text className="text-slate-600 font-bold text-xs">Min</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => { Keyboard.dismiss(); setAdjustSizeValue(String(committee.totalSlots)); }}
-                        className="bg-surface-card border border-brand-primary/10 h-12 px-3 rounded-xl items-center justify-center"
+                        className="bg-white border border-slate-200 h-12 px-3 rounded-xl items-center justify-center"
                       >
-                        <Text className="text-neutral-400 font-bold text-xs">Max</Text>
+                        <Text className="text-slate-600 font-bold text-xs">Max</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
-                  <Text className="text-neutral-500 text-[10px] mb-3">
+                  <Text className="text-slate-500 text-[10px] mb-3">
                     Set to {committee.filledSlots} to immediately unlock the committee.
                   </Text>
                   <View className="flex-row gap-3">
                     <TouchableOpacity
                       onPress={() => { Keyboard.dismiss(); setShowAdjustSize(false); }}
-                      className="flex-1 h-10 rounded-xl items-center justify-center border border-brand-primary/10"
+                      className="flex-1 h-10 rounded-xl items-center justify-center border border-slate-200"
                     >
-                      <Text className="text-neutral-400 font-bold text-sm">Cancel</Text>
+                      <Text className="text-slate-500 font-bold text-sm">Cancel</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => {
@@ -912,7 +784,7 @@ export default function CommitteeDetail() {
             onPress={handleStartCommittee}
             icon={<Ionicons name="play-circle-outline" size={20} color="#fff" />}
           />
-          <Text className="text-neutral-500 text-[10px] text-center mt-2 italic">
+          <Text className="text-slate-500 text-[10px] text-center mt-2 italic">
             All slots are filled. You can now activate this chit.
           </Text>
         </View>
@@ -921,23 +793,23 @@ export default function CommitteeDetail() {
       {/* Pending Join Requests — Organizer Only */}
       {isOrganizer && committee.status === "DRAFT" && pendingJoinRequests.length > 0 && (
         <View className="mb-6">
-          <Text className="text-white text-base font-bold mb-3">
+          <Text className="text-slate-900 text-base font-bold mb-3">
             Join Requests ({pendingJoinRequests.length} pending)
           </Text>
           {pendingJoinRequests.map((request: any) => (
               <View
                 key={request.id}
-                className="bg-surface-card border border-brand-primary/5 rounded-xl p-4 mb-2.5"
+                className="bg-surface-card border border-slate-100 rounded-xl p-4 mb-2.5"
               >
                 <View className="flex-row items-center justify-between">
                   <View className="flex-row items-center flex-1">
-                    <View className="w-10 h-10 rounded-full bg-gold-500/15 border border-gold-500/20 items-center justify-center mr-3">
+                    <View className="w-10 h-10 rounded-full bg-amber-55 border border-amber-200/50 items-center justify-center mr-3">
                       <Ionicons name="person-outline" size={18} color={COLORS.goldPrimary} />
                     </View>
                     <View className="flex-1">
-                      <Text className="text-white font-bold text-sm">{request.user?.name || "Unknown"}</Text>
-                      <Text className="text-neutral-500 text-[10px] mt-0.5">{request.user?.phone}</Text>
-                      <Text className="text-neutral-600 text-[10px] mt-0.5">
+                      <Text className="text-slate-900 font-bold text-sm">{request.user?.name || "Unknown"}</Text>
+                      <Text className="text-slate-500 text-[10px] mt-0.5">{request.user?.phone}</Text>
+                      <Text className="text-slate-600 text-[10px] mt-0.5">
                         Requested {new Date(request.createdAt).toLocaleDateString()}
                       </Text>
                     </View>
@@ -975,34 +847,34 @@ export default function CommitteeDetail() {
         const isMonthBiddingOpen = latestMonth?.status === "bidding_open";
         return (
         <View className="mb-6">
-          <Text className="text-white text-base font-bold mb-3">Live Auction</Text>
+          <Text className="text-slate-900 text-base font-bold mb-3">Live Auction</Text>
           <Card style={{ marginBottom: 16 }} padding={0}>
             <View className="p-5">
               <View className="flex-row justify-between mb-4">
-                <Text className="text-neutral-400 font-semibold text-sm">Leading Lowest Payout</Text>
-                <Text className="text-white font-bold text-sm">
+                <Text className="text-slate-500 font-semibold text-sm">Leading Lowest Payout</Text>
+                <Text className="text-slate-900 font-bold text-sm">
                   {leadingBid ? formatINR(leadingBid.bidAmountPaise) : "No bids yet"}
                 </Text>
               </View>
 
-              <View className="bg-surface-elevated/40 border border-brand-primary/5 p-3.5 rounded-xl mb-4">
-                <Text className="text-neutral-400 text-xs font-semibold">Bidding Rules (Reverse Auction):</Text>
-                <Text className="text-neutral-300 text-xs mt-1">
+              <View className="bg-slate-50 border border-slate-100 p-3.5 rounded-xl mb-4">
+                <Text className="text-slate-600 text-xs font-semibold">Bidding Rules (Reverse Auction):</Text>
+                <Text className="text-slate-600 text-xs mt-1">
                   • Min Allowed Payout: {formatINR(minPayoutAllowed)} (max {maxDiscRate}% discount)
                 </Text>
-                <Text className="text-neutral-300 text-xs mt-0.5">
+                <Text className="text-slate-600 text-xs mt-0.5">
                   • Max Allowed Payout: {formatINR(maxPayoutAllowed)} (full pool)
                 </Text>
               </View>
 
               {!isOrganizer && isMonthBiddingOpen && myMembership && !userHasWon ? (
                 <View>
-                  <View className="bg-gold-500/10 border border-gold-500/20 rounded-xl p-4 mb-3">
+                  <View className="bg-amber-50 border border-amber-200/50 rounded-xl p-4 mb-3">
                     <View className="flex-row items-center mb-2">
                       <Ionicons name="hammer-outline" size={16} color={COLORS.goldPrimary} />
-                      <Text className="text-gold-400 font-bold text-sm ml-2">Bidding is Open!</Text>
+                      <Text className="text-amber-700 font-bold text-sm ml-2">Bidding is Open!</Text>
                     </View>
-                    <Text className="text-neutral-300 text-xs">
+                    <Text className="text-slate-700 text-xs">
                       Place your bid in the reverse auction. Lowest bidder wins the full pool.
                     </Text>
                   </View>
@@ -1015,16 +887,16 @@ export default function CommitteeDetail() {
                 </View>
               ) : myMembership && !userHasWon ? (
                 <View>
-                  <Text className="text-neutral-400 text-xs font-semibold mb-2">PLACE YOUR BID (Payout Request)</Text>
+                  <Text className="text-slate-500 text-xs font-semibold mb-2">PLACE YOUR BID (Payout Request)</Text>
                   <View className="flex-row gap-3">
-                    <View className="flex-1 bg-surface-bg border border-brand-primary/10 rounded-xl px-4 justify-center h-12">
+                    <View className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 justify-center h-12">
                       <TextInput
                         value={bidAmount}
                         onChangeText={setBidAmount}
                         keyboardType="numeric"
                         placeholder={`e.g. ${maxPayoutAllowed / 100 - 500}`}
-                        placeholderTextColor="#a3a3a3"
-                        className="text-white font-semibold text-sm"
+                        placeholderTextColor="#94a3b8"
+                        className="text-slate-900 font-semibold text-sm"
                       />
                     </View>
                     <TouchableOpacity
@@ -1041,8 +913,8 @@ export default function CommitteeDetail() {
                   </View>
                 </View>
               ) : (
-                <View className="bg-danger-500/5 border border-danger-500/10 p-3.5 rounded-xl">
-                  <Text className="text-danger-500 text-xs font-semibold text-center">
+                <View className="bg-red-50 border border-red-150 p-3.5 rounded-xl">
+                  <Text className="text-red-700 text-xs font-semibold text-center">
                     {userHasWon
                       ? "You have already received a payout, so you are ineligible to bid."
                       : "Only chit members can place bids."}
@@ -1050,37 +922,44 @@ export default function CommitteeDetail() {
                 </View>
               )}
 
-              {(isOrganizer || isAdminOrManager) && (
+              {(isOrganizer || isAdminOrManager) && monthsData && monthsData.some((m: any) => m.status !== "completed") && (
                 <TouchableOpacity
                   onPress={handleResolveMonth}
-                  className="bg-gold-500/80 hover:bg-gold-500 h-11 rounded-xl items-center justify-center flex-row mt-4"
+                  disabled={loading}
+                  className={`h-11 rounded-xl items-center justify-center flex-row mt-4 ${loading ? "bg-gold-500/50" : "bg-gold-500/80 hover:bg-gold-500"}`}
                 >
-                  <Ionicons name="flash-outline" size={16} color="#fff" />
-                  <Text className="text-white font-bold ml-1.5 text-sm">Resolve Cycle & Distribute Payout</Text>
+                  {loading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name="flash-outline" size={16} color="#fff" />
+                  )}
+                  <Text className="text-white font-bold ml-1.5 text-sm">
+                    {loading ? "Resolving..." : "Resolve Cycle & Distribute Payout"}
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
           </Card>
 
-          <Text className="text-white text-sm font-bold mb-2">Active Bids (Cycle #{committee.currentCycleNo})</Text>
+          <Text className="text-slate-900 text-sm font-bold mb-2">Active Bids (Cycle #{committee.currentCycleNo})</Text>
           {activeBids.map((bid: any, idx: number) => (
             <View
               key={bid.id}
-              className="flex-row items-center justify-between bg-surface-card border border-brand-primary/5 rounded-xl p-3.5 mb-2.5"
+              className="flex-row items-center justify-between bg-surface-card border border-slate-100 rounded-xl p-3.5 mb-2.5"
             >
               <View className="flex-row items-center">
-                <View className="w-8 h-8 rounded-full bg-brand-500/10 items-center justify-center border border-brand-500/20 mr-3">
-                  <Text className="text-brand-500 font-bold text-xs">#{idx + 1}</Text>
+                <View className="w-8 h-8 rounded-full bg-brand-50 items-center justify-center border border-brand-200/60 mr-3">
+                  <Text className="text-brand-700 font-bold text-xs">#{idx + 1}</Text>
                 </View>
                 <View>
-                  <Text className="text-white font-bold text-sm">{bid.user?.name || "Anonymous"}</Text>
-                  <Text className="text-neutral-500 text-[10px] mt-0.5">Requested payout</Text>
+                  <Text className="text-slate-900 font-bold text-sm">{bid.user?.name || "Anonymous"}</Text>
+                  <Text className="text-slate-500 text-[10px] mt-0.5">Requested payout</Text>
                 </View>
               </View>
 
               <View className="items-end">
-                <Text className="text-white font-bold text-sm">{formatINR(bid.bidAmountPaise)}</Text>
-                <Text className="text-neutral-400 text-[10px] mt-0.5">
+                <Text className="text-slate-900 font-bold text-sm">{formatINR(bid.bidAmountPaise)}</Text>
+                <Text className="text-slate-500 text-[10px] mt-0.5">
                   Discount: {formatINR(totalPot - Number(bid.bidAmountPaise))}
                 </Text>
               </View>
@@ -1088,8 +967,8 @@ export default function CommitteeDetail() {
           ))}
 
           {activeBids.length === 0 && (
-            <View className="items-center py-6 bg-surface-card/30 rounded-xl border border-dashed border-neutral-800">
-              <Text className="text-neutral-500 text-xs">No bids placed yet for this cycle</Text>
+            <View className="items-center py-6 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+              <Text className="text-slate-500 text-xs">No bids placed yet for this cycle</Text>
             </View>
           )}
         </View>
@@ -1097,13 +976,13 @@ export default function CommitteeDetail() {
       })()}
 
       {/* Payout Cycle History */}
-      <Text className="text-white text-base font-bold mb-3">Payout & Dividend History</Text>
+      <Text className="text-slate-900 text-base font-bold mb-3">Payout & Dividend History</Text>
       <Card style={{ marginBottom: 20 }} padding={0}>
         <View className="p-5">
-          <View className="flex-row border-b border-brand-primary/10 pb-2 mb-3">
-            <Text className="w-14 text-neutral-400 font-bold text-xs">Cycle</Text>
-            <Text className="flex-1 text-neutral-400 font-bold text-xs">Winner</Text>
-            <Text className="w-24 text-right text-neutral-400 font-bold text-xs">Payout</Text>
+          <View className="flex-row border-b border-slate-100 pb-2 mb-3">
+            <Text className="w-14 text-slate-500 font-bold text-xs">Cycle</Text>
+            <Text className="flex-1 text-slate-500 font-bold text-xs">Winner</Text>
+            <Text className="w-24 text-right text-slate-500 font-bold text-xs">Payout</Text>
           </View>
 
           {(committee.payoutCycles || [])
@@ -1111,10 +990,10 @@ export default function CommitteeDetail() {
             .map((item: any) => {
               const winnerName = committee.members?.find((m: any) => m.userId === item.winnerId)?.user?.name || "Winner";
               return (
-                <View key={item.id} className="flex-row py-2.5 border-b border-brand-primary/5 items-center">
-                  <Text className="w-14 text-white font-bold text-sm">#{item.cycleNo}</Text>
-                  <Text className="flex-1 text-neutral-300 font-semibold text-sm">{winnerName}</Text>
-                  <Text className="w-24 text-right text-gold-500 font-bold text-sm">
+                <View key={item.id} className="flex-row py-2.5 border-b border-slate-100 items-center">
+                  <Text className="w-14 text-slate-900 font-bold text-sm">#{item.cycleNo}</Text>
+                  <Text className="flex-1 text-slate-700 font-semibold text-sm">{winnerName}</Text>
+                  <Text className="w-24 text-right text-gold-600 font-bold text-sm">
                     {formatINR(item.payoutAmtPaise)}
                   </Text>
                 </View>
@@ -1122,7 +1001,7 @@ export default function CommitteeDetail() {
             })}
 
           {(!committee.payoutCycles || committee.payoutCycles.length === 0) && (
-            <Text className="text-center text-neutral-500 py-3 text-xs">No payout cycles resolved yet</Text>
+            <Text className="text-center text-slate-500 py-3 text-xs">No payout cycles resolved yet</Text>
           )}
         </View>
       </Card>
@@ -1130,60 +1009,63 @@ export default function CommitteeDetail() {
       {/* Monthly Schedule */}
       {schedule && schedule.length > 0 && (
         <>
-          <Text className="text-white text-base font-bold mb-3">Monthly Schedule</Text>
+          <Text className="text-slate-900 text-base font-bold mb-3">Monthly Schedule</Text>
           <Card style={{ marginBottom: 20 }} padding={0}>
             <View className="p-5">
-              <View className="flex-row border-b border-brand-primary/10 pb-2 mb-3">
-                <Text className="w-14 text-neutral-400 font-bold text-xs">Cycle</Text>
-                <Text className="flex-1 text-neutral-400 font-bold text-xs">Due Date</Text>
-                <Text className="w-20 text-right text-neutral-400 font-bold text-xs">Amount</Text>
-                <Text className="w-20 text-right text-neutral-400 font-bold text-xs">Status</Text>
+              <View className="flex-row border-b border-slate-100 pb-2 mb-3">
+                <Text className="w-14 text-slate-500 font-bold text-xs">Cycle</Text>
+                <Text className="flex-1 text-slate-500 font-bold text-xs">Due Date</Text>
+                <Text className="w-16 text-right text-slate-500 font-bold text-xs">Amount</Text>
+                <Text className="w-24 text-right text-slate-500 font-bold text-xs">Status</Text>
               </View>
 
               {schedule.map((item: any) => {
                 const isCurrentCycle = item.cycleNo === committee.currentCycleNo;
-                const isPaid = item.status === "PAID";
-                const isOverdue = item.status === "OVERDUE";
+                const allPaid = item.paid === item.total;
+                const hasOverdue = item.overdue > 0;
+                const displayStatus = item.userStatus || (allPaid ? "PAID" : hasOverdue ? "OVERDUE" : "PENDING");
+                const isPaid = displayStatus === "PAID" || displayStatus === "COMPLETED";
+                const isOverdue = displayStatus === "OVERDUE";
                 return (
                   <View
                     key={item.cycleNo}
-                    className={`flex-row py-2.5 border-b border-brand-primary/5 items-center ${
-                      isCurrentCycle ? "bg-brand-500/5" : ""
+                    className={`flex-row py-2.5 border-b border-slate-100 items-center ${
+                      isCurrentCycle ? "bg-brand-50/50" : ""
                     }`}
                   >
-                    <Text className={`w-14 font-bold text-sm ${isCurrentCycle ? "text-brand-500" : "text-white"}`}>
+                    <Text className={`w-14 font-bold text-sm ${isCurrentCycle ? "text-brand-700" : "text-slate-900"}`}>
                       #{item.cycleNo}
                     </Text>
-                    <Text className="flex-1 text-neutral-300 font-semibold text-sm">
+                    <Text className="flex-1 text-slate-700 font-semibold text-sm">
                       {new Date(item.dueDate).toLocaleDateString("en-IN", {
                         day: "numeric",
                         month: "short",
                         year: "numeric",
                       })}
                     </Text>
-                    <Text className="w-20 text-right text-gold-500 font-bold text-sm">
+                    <Text className="w-16 text-right text-gold-600 font-bold text-sm">
                       {formatINR(item.amountDuePaise)}
                     </Text>
-                    <View className="w-20 items-end">
+                    <View className="w-24 items-end">
                       <View
                         className={`px-2 py-0.5 rounded ${
                           isPaid
-                            ? "bg-success-500/15"
+                            ? "bg-green-50"
                             : isOverdue
-                            ? "bg-danger-500/15"
-                            : "bg-neutral-500/15"
+                            ? "bg-red-50"
+                            : "bg-slate-100"
                         }`}
                       >
                         <Text
                           className={`text-[10px] font-bold ${
                             isPaid
-                              ? "text-success-500"
+                              ? "text-green-700"
                               : isOverdue
-                              ? "text-danger-500"
-                              : "text-neutral-400"
+                              ? "text-red-700"
+                              : "text-slate-600"
                           }`}
                         >
-                          {item.status}
+                          {isPaid ? "Paid" : isOverdue ? "Overdue" : `${item.paid}/${item.total} paid`}
                         </Text>
                       </View>
                     </View>
@@ -1196,21 +1078,21 @@ export default function CommitteeDetail() {
       )}
 
       {/* Members List */}
-      <Text className="text-white text-base font-bold mb-3">Chit Members</Text>
+      <Text className="text-slate-900 text-base font-bold mb-3">Chit Members</Text>
       {committee.members?.map((member: any) => (
         <View
           key={member.id}
-          className="flex-row items-center justify-between bg-surface-card border border-brand-primary/5 rounded-xl p-3.5 mb-2.5"
+          className="flex-row items-center justify-between bg-surface-card border border-slate-100 rounded-xl p-3.5 mb-2.5"
         >
           <View className="flex-row items-center">
-            <View className="w-7 h-7 rounded-full bg-brand-primary/10 border border-brand-primary/20 items-center justify-center mr-3">
-              <Text className="text-brand-500 font-bold text-xs">{member.slotNumber}</Text>
+            <View className="w-7 h-7 rounded-full bg-brand-50 border border-brand-200/50 items-center justify-center mr-3">
+              <Text className="text-brand-700 font-bold text-xs">{member.slotNumber}</Text>
             </View>
             <View>
-              <Text className="text-white font-bold text-sm">
+              <Text className="text-slate-900 font-bold text-sm">
                 {member.user?.name} {member.userId === currentUser?.id && "(You)"}
               </Text>
-              <Text className="text-neutral-500 text-[10px] mt-0.5">{member.user?.phone}</Text>
+              <Text className="text-slate-500 text-[10px] mt-0.5">{member.user?.phone}</Text>
             </View>
           </View>
 
@@ -1220,6 +1102,7 @@ export default function CommitteeDetail() {
           />
         </View>
       ))}
+      <AlertComponent />
     </ScrollView>
   );
 }

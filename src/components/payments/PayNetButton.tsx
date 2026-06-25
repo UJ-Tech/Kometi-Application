@@ -4,13 +4,14 @@
 // Shows countdown, penalty warnings, and amount breakdown.
 
 import React, { useState, useEffect } from "react";
-import { View, Text, Alert } from "react-native";
+import { View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { committeesApi } from "../../services/committees.api";
 import { walletApi } from "../../services/wallet.api";
 import { formatINR } from "../../utils/currency";
 import { COLORS } from "../../constants/theme";
 import Button from "../ui/Button";
+import { useAlertModal } from "../ui/AlertModal";
 
 const F = (p: number | bigint | null | undefined) => formatINR(p ?? 0);
 
@@ -51,7 +52,9 @@ export default function PayNetButton({
   isBlocked = false,
   onPaymentSuccess,
 }: PayNetButtonProps) {
+  const { alert, confirm, AlertComponent } = useAlertModal();
   const [loading, setLoading] = useState(false);
+  const [paid, setPaid] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(true);
   const [countdown, setCountdown] = useState<CountdownState>({ days: 0, hours: 0, minutes: 0 });
@@ -118,21 +121,22 @@ export default function PayNetButton({
     setLoading(true);
     try {
       await committeesApi.payNetAmount(committeeId, monthId, memberId);
-      Alert.alert(
+      await alert(
         "Payment Successful!",
         `${F(netAmountPaise)} paid for Month ${monthNumber} from wallet.`
       );
+      setPaid(true);
       onPaymentSuccess?.();
     } catch (err: any) {
       const message = err?.response?.data?.message || err?.message || "Payment failed.";
       if (message.includes("already")) {
-        Alert.alert("Already Paid", "This obligation has already been settled.");
+        await alert("Already Paid", "This obligation has already been settled.");
         onPaymentSuccess?.();
       } else if (message.includes("Insufficient") || message.includes("insufficient")) {
-        Alert.alert("Insufficient Balance", message);
+        await alert("Insufficient Balance", message);
         fetchBalance();
       } else {
-        Alert.alert("Payment Error", message);
+        await alert("Payment Error", message);
       }
     } finally {
       setLoading(false);
@@ -157,23 +161,24 @@ export default function PayNetButton({
     : "border-brand-500/20";
 
   return (
+    <>
     <View>
       {/* Amount Breakdown */}
       {contributionAmount !== undefined && distributionShare !== undefined && (
-        <View className="bg-surface-950 rounded-xl p-3 mb-3">
-          <Text className="text-neutral-400 text-[10px] uppercase font-bold mb-2">Amount Breakdown</Text>
+        <View className="bg-surface-50 rounded-xl p-3 mb-3">
+          <Text className="text-slate-400 text-[10px] uppercase font-bold mb-2">Amount Breakdown</Text>
           <View className="flex-row justify-between mb-1">
-            <Text className="text-neutral-500 text-xs">Your Contribution</Text>
-            <Text className="text-white text-xs">{F(contributionAmount)}</Text>
+            <Text className="text-slate-500 text-xs">Your Contribution</Text>
+            <Text className="text-slate-900 text-xs">{F(contributionAmount)}</Text>
           </View>
           <View className="flex-row justify-between mb-1">
-            <Text className="text-neutral-500 text-xs">- Distribution Share</Text>
+            <Text className="text-slate-500 text-xs">- Distribution Share</Text>
             <Text className="text-success-400 text-xs">{F(distributionShare)}</Text>
           </View>
-          <View className="border-t border-neutral-700 my-2" />
+          <View className="border-t border-slate-200 my-2" />
           <View className="flex-row justify-between">
-            <Text className="text-white font-bold text-xs">Net Amount Due</Text>
-            <Text className="text-white font-extrabold text-lg">{F(netAmountPaise)}</Text>
+            <Text className="text-slate-900 font-bold text-xs">Net Amount Due</Text>
+            <Text className="text-slate-900 font-extrabold text-lg">{F(netAmountPaise)}</Text>
           </View>
         </View>
       )}
@@ -243,23 +248,23 @@ export default function PayNetButton({
           <Text className="text-danger-400 text-[10px] ml-5">
             Total owed to organiser: {F(netAmountPaise + penaltyInfo.penaltyAmountPaise)}
           </Text>
-          <Text className="text-neutral-500 text-[10px] ml-5 mt-1">
+          <Text className="text-slate-500 text-[10px] ml-5 mt-1">
             Pay the organiser directly to unblock your account.
           </Text>
         </View>
       )}
 
       {/* Amount Box */}
-      {!isBlocked && (
-        <View className="bg-surface-950 rounded-xl p-3 mb-3">
+      {!isBlocked && !paid && (
+        <View className="bg-surface-50 rounded-xl p-3 mb-3">
           <View className="flex-row justify-between items-center mb-1">
-            <Text className="text-neutral-400 text-xs">Net Amount Due</Text>
-            <Text className="text-white font-extrabold text-lg">{F(netAmountPaise)}</Text>
+            <Text className="text-slate-400 text-xs">Net Amount Due</Text>
+            <Text className="text-slate-900 font-extrabold text-lg">{F(netAmountPaise)}</Text>
           </View>
           {dueDate && (
             <View className="flex-row justify-between">
-              <Text className="text-neutral-500 text-[10px]">Due by</Text>
-              <Text className="text-neutral-400 text-[10px]">
+              <Text className="text-slate-500 text-[10px]">Due by</Text>
+              <Text className="text-slate-400 text-[10px]">
                 {new Date(dueDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
               </Text>
             </View>
@@ -268,14 +273,14 @@ export default function PayNetButton({
       )}
 
       {/* Wallet Balance */}
-      {!isBlocked && (
-        <View className="flex-row items-center justify-between bg-surface-950 rounded-xl px-3 py-2 mb-3">
+      {!isBlocked && !paid && (
+        <View className="flex-row items-center justify-between bg-surface-50 rounded-xl px-3 py-2 mb-3">
           <View className="flex-row items-center">
             <Ionicons name="wallet-outline" size={16} color={COLORS.brandPrimary} />
-            <Text className="text-neutral-400 text-xs ml-1.5">Wallet Balance</Text>
+            <Text className="text-slate-400 text-xs ml-1.5">Wallet Balance</Text>
           </View>
           {balanceLoading ? (
-            <Text className="text-neutral-500 text-xs">Loading...</Text>
+            <Text className="text-slate-500 text-xs">Loading...</Text>
           ) : (
             <Text className={`font-bold text-sm ${hasSufficientBalance ? "text-success-400" : "text-danger-400"}`}>
               {walletBalance !== null ? F(walletBalance) : "N/A"}
@@ -285,27 +290,43 @@ export default function PayNetButton({
       )}
 
       {/* Pay Button (hidden when blocked) */}
+      {!isBlocked && paid && (
+        <View className="bg-success-500/10 border border-success-500/30 rounded-xl px-3 py-3 mb-3">
+          <View className="flex-row items-center">
+            <Ionicons name="checkmark-circle-outline" size={14} color="#22c55e" />
+            <Text className="text-success-400 text-xs font-bold ml-1.5">
+              Payment of {F(netAmountPaise)} for Month {monthNumber} received
+            </Text>
+          </View>
+          <Text className="text-slate-500 text-[10px] ml-5 mt-1">
+            Button will re-enable when next month is created.
+          </Text>
+        </View>
+      )}
+
       {!isBlocked && (
         <Button
           label={
-            loading
+            paid
+              ? "Paid - Waiting for Next Month"
+              : loading
               ? "Processing..."
               : hasSufficientBalance
               ? `Pay ${F(netAmountPaise)} from Wallet`
               : "Insufficient Wallet Balance"
           }
-          variant={hasSufficientBalance ? "primary" : "secondary"}
-          onPress={hasSufficientBalance ? handlePay : undefined}
+          variant={paid || hasSufficientBalance ? "primary" : "secondary"}
+          onPress={!paid && hasSufficientBalance ? handlePay : undefined}
           isLoading={loading}
-          disabled={loading || !hasSufficientBalance || balanceLoading}
+          disabled={loading || paid || !hasSufficientBalance || balanceLoading}
           icon={!loading ? <Ionicons name="wallet-outline" size={18} color="#fff" /> : undefined}
         />
       )}
 
       {/* Refresh hint */}
-      {!isBlocked && !hasSufficientBalance && !balanceLoading && (
+      {!isBlocked && !paid && !hasSufficientBalance && !balanceLoading && (
         <View className="mt-3 items-center">
-          <Text className="text-neutral-500 text-[10px] mb-2">
+          <Text className="text-slate-500 text-[10px] mb-2">
             Add funds to your wallet to pay instantly.
           </Text>
           <Button
@@ -317,5 +338,7 @@ export default function PayNetButton({
         </View>
       )}
     </View>
+    <AlertComponent />
+    </>
   );
 }

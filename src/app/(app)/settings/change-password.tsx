@@ -1,6 +1,6 @@
 // src/app/(app)/settings/change-password.tsx
 import React, { useState } from "react";
-import { View, Text, ScrollView, Alert, StyleSheet } from "react-native";
+import { View, Text, ScrollView, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../../constants/theme";
@@ -9,9 +9,11 @@ import Input from "../../../components/ui/Input";
 import Button from "../../../components/ui/Button";
 import Card from "../../../components/ui/Card";
 import { authApi } from "../../../services/auth.api";
+import { useAlertModal } from "../../../components/ui/AlertModal";
 
 export default function ChangePassword() {
   const router = useRouter();
+  const { alert, confirm, AlertComponent } = useAlertModal();
   const [isLoading, setIsLoading] = useState(false);
   const [form, setForm] = useState({
     currentPassword: "",
@@ -40,11 +42,10 @@ export default function ChangePassword() {
         currentPassword: form.currentPassword,
         newPassword: form.newPassword,
       });
-      Alert.alert("Success", "Password changed successfully", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
+      await alert("Success", "Password changed successfully");
+      router.back();
     } catch (err) {
-      Alert.alert("Error", err instanceof Error ? err.message : "Failed to change password");
+      await alert("Error", err instanceof Error ? err.message : "Failed to change password");
     } finally {
       setIsLoading(false);
     }
@@ -111,6 +112,8 @@ export default function ChangePassword() {
           size="lg"
         />
       </ScrollView>
+
+      <AlertComponent />
     </View>
   );
 }

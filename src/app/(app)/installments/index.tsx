@@ -2,7 +2,7 @@
 // Kometi Chit Installments Dues & Collection Dashboard.
 
 import React, { useState, useEffect } from "react";
-import { View, Text, FlatList, RefreshControl, Alert } from "react-native";
+import { View, Text, FlatList, RefreshControl } from "react-native";
 import { useInstallmentStore } from "../../../stores/installment.store";
 import { useWalletStore } from "../../../stores/wallet.store";
 import { formatINR } from "../../../utils/currency";
@@ -12,12 +12,14 @@ import Badge, { installmentVariant } from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
 import EmptyState from "../../../components/ui/EmptyState";
 import ScreenHeader from "../../../components/shared/ScreenHeader";
+import { useAlertModal } from "../../../components/ui/AlertModal";
 
 export default function Installments() {
   const { upcomingDues, isLoading, fetchUpcomingDues, payInstallment } = useInstallmentStore();
   const { balancePaise, fetchWalletData } = useWalletStore();
   const [refreshing, setRefreshing] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
+  const { alert, confirm, AlertComponent } = useAlertModal();
 
   const loadData = async () => {
     setRefreshing(true);
@@ -32,40 +34,34 @@ export default function Installments() {
 
   const handlePay = async (id: string, amountPaise: bigint) => {
     if (BigInt(balancePaise) < amountPaise) {
-      Alert.alert(
+      await alert(
         "Insufficient Balance",
         `Your wallet balance (${formatINR(balancePaise)}) is less than the due amount (${formatINR(amountPaise)}). Please top up your wallet first.`
       );
       return;
     }
 
-    Alert.alert(
+    const ok = await confirm(
       "Confirm Payment",
       `Are you sure you want to pay ${formatINR(amountPaise)} for this installment?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Pay Now",
-          style: "default",
-          onPress: async () => {
-            try {
-              setPayingId(id);
-              await payInstallment(id, "WALLET");
-              Alert.alert("Success", "Installment payment completed successfully.");
-              loadData();
-            } catch (err: any) {
-              Alert.alert("Payment Failed", err.message || "An error occurred.");
-            } finally {
-              setPayingId(null);
-            }
-          },
-        },
-      ]
+      { confirmLabel: "Pay Now" }
     );
+    if (ok) {
+      try {
+        setPayingId(id);
+        await payInstallment(id, "WALLET");
+        await alert("Success", "Installment payment completed successfully.");
+        loadData();
+      } catch (err: any) {
+        await alert("Payment Failed", err.message || "An error occurred.");
+      } finally {
+        setPayingId(null);
+      }
+    }
   };
 
   return (
-    <View className="flex-1 bg-surface-950 px-4">
+    <View className="flex-1 bg-surface-bg px-4">
       <ScreenHeader
         title="Dues"
         subtitle="Track and pay your upcoming chit installments"
@@ -101,8 +97,8 @@ export default function Installments() {
               <View className="p-5">
                 <View className="flex-row justify-between items-start mb-3">
                   <View className="flex-1 pr-4">
-                    <Text className="text-white font-bold text-base">Cycle #{item.cycleNo}</Text>
-                    <Text className="text-neutral-500 text-xs mt-0.5">
+                    <Text className="text-slate-900 font-bold text-base">Cycle #{item.cycleNo}</Text>
+                    <Text className="text-slate-500 text-xs mt-0.5">
                       Due: {new Date(item.dueDate).toLocaleDateString("en-IN", {
                         day: "numeric",
                         month: "short",
@@ -113,16 +109,16 @@ export default function Installments() {
                   <Badge label={item.status} variant={installmentVariant(item.status)} />
                 </View>
 
-                <View className="flex-row justify-between items-center mt-2 border-t border-brand-primary/5 pt-4">
+                <View className="flex-row justify-between items-center mt-2 border-t border-slate-100 pt-4">
                   <View>
-                    <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">
+                    <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">
                       Total Payable
                     </Text>
-                    <Text className="text-white font-bold text-lg mt-0.5">
+                    <Text className="text-slate-900 font-bold text-lg mt-0.5">
                       {formatINR(totalAmount)}
                     </Text>
                     {item.penaltyPaise > 0 && (
-                      <Text className="text-danger-400 text-[10px] font-semibold mt-0.5">
+                      <Text className="text-red-600 text-[10px] font-semibold mt-0.5">
                         Includes penalty of {formatINR(item.penaltyPaise)}
                       </Text>
                     )}
@@ -143,6 +139,8 @@ export default function Installments() {
           );
         }}
       />
+
+      <AlertComponent />
     </View>
   );
 }

@@ -7,23 +7,22 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
-  Alert,
-  Platform,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
+
 import { committeesApi } from "../../../../../../services/committees.api";
 import { useAuthStore } from "../../../../../../stores/auth.store";
+import { useCommitteeStore } from "../../../../../../stores/committee.store";
 import { canAccessAdminPanel } from "../../../../../../utils/rbac";
 import { formatINR } from "../../../../../../utils/currency";
 import { COLORS } from "../../../../../../constants/theme";
 import Card from "../../../../../../components/ui/Card";
 import Badge from "../../../../../../components/ui/Badge";
 import Button from "../../../../../../components/ui/Button";
+import { useAlertModal } from "../../../../../../components/ui/AlertModal";
 
 export default function OrganiserMonthDetail() {
-  // useLocalSearchParams picks up all parent + current dynamic segments
   const params = useLocalSearchParams<{ id: string; monthId: string }>();
   const rawId = params.id;
   const rawMonthId = params.monthId;
@@ -36,6 +35,7 @@ export default function OrganiserMonthDetail() {
 
   const router = useRouter();
   const currentUser = useAuthStore((s) => s.user);
+  const { alert, confirm, AlertComponent } = useAlertModal();
 
   const [month, setMonth] = useState<any | null>(null);
   const [committee, setCommittee] = useState<any | null>(null);
@@ -45,11 +45,7 @@ export default function OrganiserMonthDetail() {
   const [isSettling, setIsSettling] = useState(false);
 
   const notify = async (title: string, message: string) => {
-    if (Platform.OS === "web") {
-      window.alert(`${title}\n\n${message}`);
-    } else {
-      Alert.alert(title, message);
-    }
+    await alert(title, message);
   };
 
   const loadData = async () => {
@@ -78,19 +74,27 @@ export default function OrganiserMonthDetail() {
       notify("Error", "Invalid committee or month ID");
       router.back();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, monthId]);
 
-  // Auto-refresh when month is completed (payments can happen)
+  // Socket-triggered instant refresh (bids, payments, resolution)
+  const bidVersion = useCommitteeStore((s) => s.bidPlacedVersion);
+  const resolvedVersion = useCommitteeStore((s) => s.monthResolvedVersion);
+  const contributionVersion = useCommitteeStore((s) => s.contributionUpdatedVersion);
+  useEffect(() => {
+    if (bidVersion + resolvedVersion + contributionVersion > 0) {
+      loadData();
+    }
+  }, [bidVersion, resolvedVersion, contributionVersion]);
+
+  // Fallback polling every 30 seconds when month is completed (watching for settlements)
   useEffect(() => {
     if (!isValid || !month || month.status !== "completed") return;
     const interval = setInterval(() => {
       loadData();
-    }, 10000);
+    }, 30000);
     return () => clearInterval(interval);
   }, [isValid, month?.status, monthId]);
 
-  // Auto-trigger settle payout when month is completed
   useEffect(() => {
     if (!month || month.status !== "completed") return;
     const winnerObl = month.paymentObligations?.find(
@@ -115,16 +119,7 @@ export default function OrganiserMonthDetail() {
   };
 
   const confirmAction = async (title: string, message: string, confirmLabel = "Confirm") => {
-    if (Platform.OS === "web") {
-      const confirmed = window.confirm(`${title}\n\n${message}`);
-      return confirmed;
-    }
-    return new Promise<boolean>((resolve) => {
-      Alert.alert(title, message, [
-        { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
-        { text: confirmLabel, style: "destructive", onPress: () => resolve(true) },
-      ]);
-    });
+    return confirm(title, message, { confirmLabel });
   };
 
   const handleResolveMonth = async () => {
@@ -148,13 +143,12 @@ export default function OrganiserMonthDetail() {
     }
   };
 
-  // Guard: invalid URL params
   if (!isValid) {
     return (
-      <View className="flex-1 bg-surface-950 items-center justify-center px-6">
+      <View className="flex-1 bg-surface-50 items-center justify-center px-6">
         <Ionicons name="alert-circle-outline" size={48} color="#71717a" />
-        <Text className="text-white font-bold text-lg text-center mt-4">Invalid Link</Text>
-        <Text className="text-neutral-500 text-sm text-center mt-2">
+        <Text className="text-slate-900 font-bold text-lg text-center mt-4">Invalid Link</Text>
+        <Text className="text-slate-500 text-sm text-center mt-2">
           This page requires a valid committee and month ID.
         </Text>
         <TouchableOpacity
@@ -169,7 +163,7 @@ export default function OrganiserMonthDetail() {
 
   if (loading && !refreshing) {
     return (
-      <View className="flex-1 bg-surface-950 items-center justify-center">
+      <View className="flex-1 bg-surface-50 items-center justify-center">
         <ActivityIndicator size="large" color={COLORS.brandPrimary} />
       </View>
     );
@@ -177,17 +171,17 @@ export default function OrganiserMonthDetail() {
 
   if (!month || !committee) {
     return (
-      <View className="flex-1 bg-surface-950 items-center justify-center px-6">
+      <View className="flex-1 bg-surface-50 items-center justify-center px-6">
         <Ionicons name="document-outline" size={48} color="#71717a" />
-        <Text className="text-white font-bold text-lg text-center mt-4">Month Not Found</Text>
-        <Text className="text-neutral-500 text-sm text-center mt-2">
+        <Text className="text-slate-900 font-bold text-lg text-center mt-4">Month Not Found</Text>
+        <Text className="text-slate-500 text-sm text-center mt-2">
           Could not load data for this month. It may not exist yet.
         </Text>
         <TouchableOpacity
           onPress={() => router.back()}
-          className="bg-surface-card border border-brand-primary/20 px-6 py-3 rounded-xl mt-6"
+          className="bg-surface-card border border-slate-200 px-6 py-3 rounded-xl mt-6"
         >
-          <Text className="text-white font-bold">Go Back</Text>
+          <Text className="text-slate-900 font-bold">Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -202,12 +196,10 @@ export default function OrganiserMonthDetail() {
   const isBiddingOpen = month.status === "bidding_open";
   const isCompleted = month.status === "completed";
 
-  // Calculate members who haven't bid yet
   const activeMembers = committee.members.filter((m: any) => m.isActive);
   const bidderIds = new Set((month.bids || []).map((b: any) => b.memberId));
   const nonBidders = activeMembers.filter((m: any) => !bidderIds.has(m.id) && !m.hasReceivedPayout);
 
-  // Settle payout helpers
   const settleWinnerObl = isCompleted && month.paymentObligations?.find(
     (o: any) => o.direction === "receive" && o.status === "pending"
   );
@@ -217,33 +209,23 @@ export default function OrganiserMonthDetail() {
 
   return (
     <ScrollView
-      className="flex-1 bg-surface-950 px-4"
+      className="flex-1 bg-surface-50 px-4"
       contentContainerStyle={{ paddingTop: 64, paddingBottom: 120 }}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.brandPrimary} />
       }
     >
-      <LinearGradient
-        colors={[
-          isCompleted ? COLORS.success + "15" : COLORS.brandPrimary + "15",
-          "transparent",
-        ]}
-        className="absolute inset-0 h-80"
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-      />
-
       {/* Header */}
       <View className="flex-row items-center mb-6">
         <TouchableOpacity
           onPress={() => router.back()}
-          className="w-10 h-10 bg-surface-card rounded-full items-center justify-center border border-brand-primary/10 mr-4"
+          className="w-10 h-10 bg-surface-card rounded-full items-center justify-center border border-slate-200 mr-4"
         >
-          <Ionicons name="arrow-back" size={20} color="#fff" />
+          <Ionicons name="arrow-back" size={20} color="#1a1a2e" />
         </TouchableOpacity>
         <View className="flex-1">
-          <Text className="text-white text-xl font-bold">Month {month.monthNumber}</Text>
-          <Text className="text-neutral-400 text-xs">
+          <Text className="text-slate-900 text-xl font-bold">Month {month.monthNumber}</Text>
+          <Text className="text-slate-500 text-xs">
             {new Date(month.monthDate).toLocaleDateString("en-IN", {
               day: "numeric",
               month: "short",
@@ -261,32 +243,32 @@ export default function OrganiserMonthDetail() {
       {!isCompleted && (
         <Card style={{ marginBottom: 20 }} padding={0}>
           <View className="p-5">
-            <Text className="text-white font-bold mb-4 border-b border-surface-card/50 pb-2">
+            <Text className="text-slate-900 font-bold mb-4 border-b border-slate-100 pb-2">
               Financial Overview
             </Text>
             <View className="flex-row flex-wrap">
               <View className="w-1/2 mb-4">
-                <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">Total Pool</Text>
-                <Text className="text-gold-400 font-bold text-base mt-1">{formatINR(month.totalPool)}</Text>
+                <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Total Pool</Text>
+                <Text className="text-amber-600 font-bold text-base mt-1">{formatINR(month.totalPool)}</Text>
               </View>
               <View className="w-1/2 mb-4 items-end">
-                <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">Projected Interest</Text>
-                <Text className="text-white font-bold text-base mt-1">{formatINR(month.projected.interestAmount)}</Text>
+                <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Projected Interest</Text>
+                <Text className="text-slate-900 font-bold text-base mt-1">{formatINR(month.projected.interestAmount)}</Text>
               </View>
               <View className="w-1/2">
-                <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">Max Allowed Bid</Text>
-                <Text className="text-brand-400 font-bold text-base mt-1">{formatINR(month.projected.maxBidAllowed)}</Text>
+                <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Max Allowed Bid</Text>
+                <Text className="text-teal-600 font-bold text-base mt-1">{formatINR(month.projected.maxBidAllowed)}</Text>
               </View>
               <View className="w-1/2 items-end">
-                <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">Projected Dividend</Text>
-                <Text className="text-success-400 font-bold text-base mt-1">+{formatINR(month.projected.perMemberDistribution)}</Text>
+                <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Projected Dividend</Text>
+                <Text className="text-emerald-600 font-bold text-base mt-1">+{formatINR(month.projected.perMemberDistribution)}</Text>
               </View>
             </View>
           </View>
         </Card>
       )}
 
-      {/* Settle Payout Button — show when winner obligation is still pending */}
+      {/* Settle Payout Button */}
       {isCompleted && settleWinnerObl && (
           <View className="mt-3 mb-4">
             <Button
@@ -313,7 +295,7 @@ export default function OrganiserMonthDetail() {
               }}
             />
             {!settleAllPaid && (
-              <Text className="text-neutral-500 text-[10px] text-center mt-2 italic">
+              <Text className="text-slate-500 text-[10px] text-center mt-2 italic">
                 Winner receives payout once all members pay their net amount.
               </Text>
             )}
@@ -325,42 +307,42 @@ export default function OrganiserMonthDetail() {
         <View className="mb-6">
           <Card style={{ marginBottom: 16 }} padding={0}>
             <View className="p-5">
-              <View className="flex-row items-center justify-between border-b border-surface-card/50 pb-4 mb-4">
+              <View className="flex-row items-center justify-between border-b border-slate-100 pb-4 mb-4">
                 <View>
-                  <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider mb-1">Resolution</Text>
+                  <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Resolution</Text>
                   <Badge
                     label={month.resolutionType.replace("_", " ").toUpperCase()}
                     variant={month.resolutionType === "lottery" ? "neutral" : "brand"}
                   />
                 </View>
                 <View className="items-end">
-                  <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider mb-1">Winner</Text>
-                  <Text className="text-white font-bold text-base">{month.winnerMember?.user?.name || "Unknown"}</Text>
+                  <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Winner</Text>
+                  <Text className="text-slate-900 font-bold text-base">{month.winnerMember?.user?.name || "Unknown"}</Text>
                 </View>
               </View>
 
               <View className="flex-row flex-wrap mb-4">
                 <View className="w-1/2 mb-4">
-                  <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">Winning Bid / Payout</Text>
-                  <Text className="text-gold-400 font-bold text-base mt-1">{formatINR(month.winningBidAmount)}</Text>
+                  <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Winning Bid / Payout</Text>
+                  <Text className="text-amber-600 font-bold text-base mt-1">{formatINR(month.winningBidAmount)}</Text>
                 </View>
                 <View className="w-1/2 mb-4 items-end">
-                  <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">Interest Extracted</Text>
-                  <Text className="text-white font-bold text-base mt-1">{formatINR(month.interestAmount)}</Text>
+                  <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Interest Extracted</Text>
+                  <Text className="text-slate-900 font-bold text-base mt-1">{formatINR(month.interestAmount)}</Text>
                 </View>
                 <View className="w-1/2">
-                  <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">Remaining Bal.</Text>
-                  <Text className="text-white font-bold text-base mt-1">{formatINR(month.remainingBalance)}</Text>
+                  <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Remaining Bal.</Text>
+                  <Text className="text-slate-900 font-bold text-base mt-1">{formatINR(month.remainingBalance)}</Text>
                 </View>
                 <View className="w-1/2 items-end">
-                  <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">Distributable</Text>
-                  <Text className="text-success-400 font-bold text-base mt-1">{formatINR(month.distributableAmount)}</Text>
+                  <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Distributable</Text>
+                  <Text className="text-emerald-600 font-bold text-base mt-1">{formatINR(month.distributableAmount)}</Text>
                 </View>
               </View>
 
-              <View className="bg-success-500/10 border border-success-500/20 p-3 rounded-xl flex-row justify-between items-center">
-                <Text className="text-success-400 font-bold text-xs">Dividend per Member</Text>
-                <Text className="text-success-400 font-bold text-lg">+{formatINR(month.perMemberDistribution)}</Text>
+              <View className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl flex-row justify-between items-center">
+                <Text className="text-emerald-700 font-bold text-xs">Dividend per Member</Text>
+                <Text className="text-emerald-700 font-bold text-lg">+{formatINR(month.perMemberDistribution)}</Text>
               </View>
             </View>
           </Card>
@@ -383,26 +365,26 @@ export default function OrganiserMonthDetail() {
       {/* Bids Placed */}
       {!isCompleted && month.bids && (
         <View className="mb-6">
-          <Text className="text-white text-base font-bold mb-3">
+          <Text className="text-slate-900 text-base font-bold mb-3">
             Bids Placed ({month.bids.length})
           </Text>
           {month.bids.length === 0 ? (
-            <Text className="text-neutral-500 text-sm italic">No bids placed yet.</Text>
+            <Text className="text-slate-500 text-sm italic">No bids placed yet.</Text>
           ) : (
             month.bids.map((bid: any, idx: number) => (
-              <View key={bid.id} className="bg-surface-card border border-brand-primary/10 rounded-xl p-4 mb-2 flex-row justify-between items-center">
+              <View key={bid.id} className="bg-surface-card border border-slate-200 rounded-xl p-4 mb-2 flex-row justify-between items-center">
                 <View className="flex-row items-center">
-                  <View className="w-8 h-8 rounded-full bg-brand-500/10 items-center justify-center mr-3">
-                    <Text className="text-brand-500 font-bold text-xs">#{idx + 1}</Text>
+                  <View className="w-8 h-8 rounded-full bg-teal-50 items-center justify-center mr-3">
+                    <Text className="text-teal-600 font-bold text-xs">#{idx + 1}</Text>
                   </View>
                   <View>
-                    <Text className="text-white font-bold">{bid.committeeMember?.user?.name || "Unknown"}</Text>
-                    <Text className="text-neutral-500 text-[10px] mt-1">
+                    <Text className="text-slate-900 font-bold">{bid.committeeMember?.user?.name || "Unknown"}</Text>
+                    <Text className="text-slate-500 text-[10px] mt-1">
                       {new Date(bid.placedAt).toLocaleString()}
                     </Text>
                   </View>
                 </View>
-                <Text className="text-gold-400 font-bold text-base">{formatINR(bid.bidAmount)}</Text>
+                <Text className="text-amber-600 font-bold text-base">{formatINR(bid.bidAmount)}</Text>
               </View>
             ))
           )}
@@ -412,11 +394,11 @@ export default function OrganiserMonthDetail() {
       {/* Members who haven't bid */}
       {!isCompleted && nonBidders.length > 0 && (
         <View className="mb-6">
-          <Text className="text-white text-sm font-bold mb-3">Waiting for Bids ({nonBidders.length})</Text>
+          <Text className="text-slate-900 text-sm font-bold mb-3">Waiting for Bids ({nonBidders.length})</Text>
           <View className="flex-row flex-wrap gap-2">
             {nonBidders.map((m: any) => (
-              <View key={m.id} className="bg-surface-card border border-surface-card/50 px-3 py-1.5 rounded-full">
-                <Text className="text-neutral-400 text-xs">{m.user?.name || "Member"}</Text>
+              <View key={m.id} className="bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-full">
+                <Text className="text-slate-600 text-xs">{m.user?.name || "Member"}</Text>
               </View>
             ))}
           </View>
@@ -426,21 +408,21 @@ export default function OrganiserMonthDetail() {
       {/* Distributions Table */}
       {isCompleted && month.memberDistributions && (
         <View className="mb-6">
-          <Text className="text-white text-base font-bold mb-3">Member Distributions</Text>
+          <Text className="text-slate-900 text-base font-bold mb-3">Member Distributions</Text>
           <Card style={{ marginBottom: 0 }} padding={0}>
             <View className="p-4">
-              <View className="flex-row border-b border-brand-primary/10 pb-2 mb-3">
-                <Text className="w-8 text-neutral-400 font-bold text-xs">#</Text>
-                <Text className="flex-1 text-neutral-400 font-bold text-xs">Member</Text>
-                <Text className="w-24 text-right text-neutral-400 font-bold text-xs">Dividend</Text>
+              <View className="flex-row border-b border-slate-100 pb-2 mb-3">
+                <Text className="w-8 text-slate-400 font-bold text-xs">#</Text>
+                <Text className="flex-1 text-slate-400 font-bold text-xs">Member</Text>
+                <Text className="w-24 text-right text-slate-400 font-bold text-xs">Dividend</Text>
               </View>
               {month.memberDistributions.map((dist: any, idx: number) => (
-                <View key={dist.id} className="flex-row py-2 border-b border-brand-primary/5 items-center">
-                  <Text className="w-8 text-neutral-500 font-bold text-xs">{idx + 1}</Text>
-                  <Text className="flex-1 text-white font-semibold text-sm">
+                <View key={dist.id} className="flex-row py-2 border-b border-slate-50 items-center">
+                  <Text className="w-8 text-slate-500 font-bold text-xs">{idx + 1}</Text>
+                  <Text className="flex-1 text-slate-900 font-semibold text-sm">
                     {dist.committeeMember?.user?.name || "Unknown"}
                   </Text>
-                  <Text className="w-24 text-right text-success-400 font-bold text-sm">
+                  <Text className="w-24 text-right text-emerald-600 font-bold text-sm">
                     +{formatINR(dist.distributionAmount)}
                   </Text>
                 </View>
@@ -454,33 +436,32 @@ export default function OrganiserMonthDetail() {
       {isCompleted && month.paymentObligations && month.paymentObligations.length > 0 && (
         <View className="mb-6">
           <View className="flex-row items-center mb-3">
-            <View className="w-7 h-7 rounded-lg bg-gold-500/15 items-center justify-center mr-2">
+            <View className="w-7 h-7 rounded-lg bg-amber-50 items-center justify-center mr-2">
               <Ionicons name="receipt-outline" size={14} color={COLORS.goldPrimary} />
             </View>
-            <Text className="text-white font-bold text-sm">Payment Obligations</Text>
+            <Text className="text-slate-900 font-bold text-sm">Payment Obligations</Text>
           </View>
 
-          {/* Net amounts summary */}
           <Card style={{ marginBottom: 12 }} padding={0}>
             <View className="p-4">
               <View className="flex-row flex-wrap">
                 <View className="w-1/2 mb-2">
-                  <Text className="text-neutral-500 text-[10px] uppercase font-bold">Non-Winner Pays</Text>
-                  <Text className="text-danger-400 font-bold text-sm mt-0.5">
+                  <Text className="text-slate-500 text-[10px] uppercase font-bold">Non-Winner Pays</Text>
+                  <Text className="text-red-600 font-bold text-sm mt-0.5">
                     {formatINR(month.nonWinnerNetPayable || 0)} each
                   </Text>
                 </View>
                 <View className="w-1/2 mb-2 items-end">
-                  <Text className="text-neutral-500 text-[10px] uppercase font-bold">Winner Receives</Text>
-                  <Text className="text-success-400 font-bold text-sm mt-0.5">
+                  <Text className="text-slate-500 text-[10px] uppercase font-bold">Winner Receives</Text>
+                  <Text className="text-emerald-600 font-bold text-sm mt-0.5">
                     +{formatINR(month.winnerNetReceivable || 0)}
                   </Text>
                 </View>
                 {month.paymentDeadline && (
-                  <View className="w-full mt-2 pt-2 border-t border-brand-primary/10">
+                  <View className="w-full mt-2 pt-2 border-t border-slate-100">
                     <View className="flex-row justify-between items-center">
-                      <Text className="text-neutral-500 text-[10px] uppercase font-bold">Payment Deadline</Text>
-                      <Text className="text-white text-xs font-bold">
+                      <Text className="text-slate-500 text-[10px] uppercase font-bold">Payment Deadline</Text>
+                      <Text className="text-slate-900 text-xs font-bold">
                         {new Date(month.paymentDeadline).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                       </Text>
                     </View>
@@ -490,18 +471,17 @@ export default function OrganiserMonthDetail() {
             </View>
           </Card>
 
-          {/* Obligations table */}
           <Card padding={0}>
             <View className="p-4">
-              <View className="flex-row border-b border-brand-primary/10 pb-2 mb-3">
-                <Text className="flex-1 text-neutral-400 font-bold text-xs">Member</Text>
-                <Text className="w-16 text-center text-neutral-400 font-bold text-xs">Role</Text>
-                <Text className="w-20 text-right text-neutral-400 font-bold text-xs">Net Amount</Text>
-                <Text className="w-20 text-right text-neutral-400 font-bold text-xs">Status</Text>
+              <View className="flex-row border-b border-slate-100 pb-2 mb-3">
+                <Text className="flex-1 text-slate-400 font-bold text-xs">Member</Text>
+                <Text className="w-16 text-center text-slate-400 font-bold text-xs">Role</Text>
+                <Text className="w-20 text-right text-slate-400 font-bold text-xs">Net Amount</Text>
+                <Text className="w-20 text-right text-slate-400 font-bold text-xs">Status</Text>
               </View>
               {month.paymentObligations.map((obl: any, idx: number) => (
-                <View key={obl.id || idx} className="flex-row py-2 border-b border-brand-primary/5 items-center">
-                  <Text className="flex-1 text-white font-semibold text-xs">
+                <View key={obl.id || idx} className="flex-row py-2 border-b border-slate-50 items-center">
+                  <Text className="flex-1 text-slate-900 font-semibold text-xs">
                     {month.memberDistributions?.find((d: any) => d.memberId === obl.memberId)?.committeeMember?.user?.name || "Member"}
                   </Text>
                   <View className="w-16 items-center">
@@ -512,7 +492,7 @@ export default function OrganiserMonthDetail() {
                     />
                   </View>
                   <Text className={`w-20 text-right font-bold text-xs ${
-                    obl.direction === "receive" ? "text-success-400" : "text-danger-400"
+                    obl.direction === "receive" ? "text-emerald-600" : "text-red-600"
                   }`}>
                     {obl.direction === "receive" ? "+" : "-"}{formatINR(Math.abs(obl.netAmount))}
                   </Text>
@@ -540,6 +520,7 @@ export default function OrganiserMonthDetail() {
         </View>
       )}
 
+      <AlertComponent />
     </ScrollView>
   );
 }

@@ -90,7 +90,7 @@ export function AmountInput({
   return (
     <View className="mb-4">
       {label && (
-        <Text className="text-neutral-300 text-sm font-semibold mb-1.5 ml-1">
+        <Text className="text-slate-600 text-sm font-semibold mb-1.5 ml-1">
           {label}
         </Text>
       )}
@@ -109,11 +109,12 @@ export function AmountInput({
         ]}
         className="flex-row items-center px-4 h-14"
       >
-        <Text className="text-gold-500 text-lg font-bold mr-2">₹</Text>
+        <Text className="text-brand-600 text-lg font-bold mr-2">₹</Text>
         <TextInput
-          className="flex-1 text-white text-lg font-bold"
+          className="flex-1 text-slate-900 text-lg font-bold"
+          style={{ outlineStyle: "none" } as any}
           placeholder={placeholder}
-          placeholderTextColor="#525252"
+          placeholderTextColor="#94a3b8"
           keyboardType="decimal-pad"
           value={displayValue}
           onChangeText={handleChangeText}
@@ -121,14 +122,14 @@ export function AmountInput({
           onBlur={handleBlur}
         />
         {valuePaise > 0n && (
-          <Text className="text-neutral-500 text-xs font-semibold ml-2">
+          <Text className="text-slate-400 text-xs font-semibold ml-2">
             ({formatINR(valuePaise)})
           </Text>
         )}
       </View>
 
       {error ? (
-        <Text className="text-red-400 text-xs mt-1 ml-1 font-semibold">{error}</Text>
+        <Text className="text-red-500 text-xs mt-1 ml-1 font-semibold">{error}</Text>
       ) : null}
     </View>
   );

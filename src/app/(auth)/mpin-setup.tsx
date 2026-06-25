@@ -4,7 +4,6 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import OTPInput from "../../components/ui/OTPInput";
@@ -12,7 +11,7 @@ import Button from "../../components/ui/Button";
 import ScreenHeader from "../../components/shared/ScreenHeader";
 import { authApi } from "../../services/auth.api";
 import { isValidMPIN } from "../../utils/validators";
-import { COLORS, FONT_SIZE, SPACING, GRADIENTS } from "../../constants/theme";
+import { COLORS, FONT_SIZE, SPACING } from "../../constants/theme";
 
 type Step = "set" | "confirm";
 
@@ -60,13 +59,11 @@ export default function MPINSetupScreen() {
         showBack
         onBack={isSetStep ? undefined : () => { setStep("set"); setConfirm(""); setError(""); }}
       />
-      <LinearGradient colors={["rgba(111,94,255,0.18)", "transparent"]} style={styles.blob} />
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + SPACING[8] }]}>
         <View style={styles.top}>
           <View style={styles.iconCircle}>
-            <LinearGradient colors={GRADIENTS.brandPrimary as [string, string]} style={StyleSheet.absoluteFill} />
-            <Ionicons name={isSetStep ? "keypad-outline" : "shield-checkmark-outline"} size={28} color="#fff" />
+            <Ionicons name={isSetStep ? "keypad-outline" : "shield-checkmark-outline"} size={28} color={COLORS.brand[400]} />
           </View>
           <Text style={styles.title}>
             {isSetStep ? "Create your\nsecurity PIN" : "Confirm your\nPIN"}
@@ -118,16 +115,18 @@ export default function MPINSetupScreen() {
 }
 
 const styles = StyleSheet.create({
-  blob:   { position: "absolute", top: -40, left: -60, width: 220, height: 220, borderRadius: 110 },
   content:{ flexGrow: 1, paddingHorizontal: SPACING[6], gap: SPACING[8], paddingTop: SPACING[4] },
   top:    { gap: SPACING[3] },
   iconCircle: {
-    width: 64, height: 64, borderRadius: 20, overflow: "hidden",
+    width: 64, height: 64, borderRadius: 20,
     alignItems: "center", justifyContent: "center", marginBottom: SPACING[2],
+    backgroundColor: COLORS.surface.card,
+    borderWidth: 1,
+    borderColor: COLORS.surface.border,
   },
   title:   { fontSize: FONT_SIZE["3xl"], fontWeight: "800", color: COLORS.text.primary, lineHeight: 36 },
   subtitle:{ fontSize: FONT_SIZE.base, color: COLORS.text.secondary, lineHeight: 22 },
-  rulesBox:{ backgroundColor: "rgba(111,94,255,0.08)", borderRadius: 12, padding: SPACING[4], gap: SPACING[2] },
+  rulesBox:{ backgroundColor: "rgba(13,148,136,0.08)", borderRadius: 12, padding: SPACING[4], gap: SPACING[2] },
   ruleRow: { flexDirection: "row", alignItems: "center", gap: SPACING[2] },
   ruleText:{ fontSize: FONT_SIZE.sm, color: COLORS.text.secondary },
 });

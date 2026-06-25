@@ -6,13 +6,12 @@ import {
   View, Text, StyleSheet, ScrollView, TextInput, KeyboardAvoidingView, Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Button from "../../components/ui/Button";
 import ScreenHeader from "../../components/shared/ScreenHeader";
 import { committeesApi } from "../../services/committees.api";
-import { COLORS, FONT_SIZE, SPACING, GRADIENTS } from "../../constants/theme";
+import { COLORS, FONT_SIZE, SPACING } from "../../constants/theme";
 
 export default function JoinCommitteeScreen() {
   const router   = useRouter();
@@ -60,10 +59,6 @@ export default function JoinCommitteeScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScreenHeader title="Join Committee" showBack />
-      <LinearGradient
-        colors={["rgba(245,158,11,0.18)", "transparent"]}
-        style={styles.blob}
-      />
 
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + SPACING[8] }]}
@@ -71,8 +66,7 @@ export default function JoinCommitteeScreen() {
       >
         <View style={styles.top}>
           <View style={styles.iconCircle}>
-            <LinearGradient colors={GRADIENTS.goldAccent as [string, string]} style={StyleSheet.absoluteFill} />
-            <Ionicons name="key-outline" size={28} color="#fff" />
+            <Ionicons name="key-outline" size={28} color={COLORS.gold[400]} />
           </View>
           <Text style={styles.title}>Enter Invite Code</Text>
           <Text style={styles.subtitle}>
@@ -132,22 +126,24 @@ export default function JoinCommitteeScreen() {
 }
 
 const styles = StyleSheet.create({
-  blob: { position: "absolute", top: -40, right: -60, width: 220, height: 220, borderRadius: 110 },
   content: { flexGrow: 1, paddingHorizontal: SPACING[6], gap: SPACING[6], paddingTop: SPACING[4] },
   top: { gap: SPACING[3] },
   iconCircle: {
-    width: 64, height: 64, borderRadius: 20, overflow: "hidden",
+    width: 64, height: 64, borderRadius: 20,
     alignItems: "center", justifyContent: "center", marginBottom: SPACING[2],
+    backgroundColor: COLORS.surface.card,
+    borderWidth: 1,
+    borderColor: COLORS.surface.border,
   },
   title: { fontSize: FONT_SIZE["3xl"], fontWeight: "800", color: COLORS.text.primary, lineHeight: 36 },
   subtitle: { fontSize: FONT_SIZE.base, color: COLORS.text.secondary, lineHeight: 22 },
   inputContainer: { alignItems: "center" },
   codeInput: {
     width: "100%", height: 64, borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.1)",
+    backgroundColor: COLORS.surface.card,
+    borderWidth: 1.5, borderColor: COLORS.surface.border,
     fontSize: FONT_SIZE["2xl"], fontWeight: "700",
-    color: COLORS.gold[300], textAlign: "center",
+    color: COLORS.gold[500], textAlign: "center",
     letterSpacing: 6,
   },
   charCount: {
@@ -158,7 +154,7 @@ const styles = StyleSheet.create({
   error: { fontSize: FONT_SIZE.sm, color: COLORS.danger.light, textAlign: "center" },
   infoBox: {
     flexDirection: "row", gap: SPACING[2],
-    backgroundColor: "rgba(111,94,255,0.08)", borderRadius: 12,
+    backgroundColor: "rgba(13,148,136,0.06)", borderRadius: 12,
     padding: SPACING[4], alignItems: "flex-start",
   },
   infoText: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.text.secondary, lineHeight: 20 },

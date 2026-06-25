@@ -5,7 +5,7 @@ import React, { useState, useEffect } from "react";
 import { View, Text, FlatList, TouchableOpacity, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
+
 import { useCommitteeStore } from "../../../stores/committee.store";
 import { formatINR } from "../../../utils/currency";
 import { COLORS } from "../../../constants/theme";
@@ -42,21 +42,16 @@ export default function Committees() {
         {/* Illustration */}
         <View style={{
           width: 120, height: 120, borderRadius: 60,
-          backgroundColor: "rgba(111,94,255,0.08)",
+          backgroundColor: "rgba(13,148,136,0.06)",
           alignItems: "center", justifyContent: "center",
           marginBottom: 24,
         }}>
-          <LinearGradient
-            colors={["rgba(111,94,255,0.15)", "rgba(245,158,11,0.10)"]}
-            style={{ width: 120, height: 120, borderRadius: 60, alignItems: "center", justifyContent: "center" }}
-          >
-            <Ionicons name="wallet-outline" size={48} color={COLORS.brandPrimary} />
-          </LinearGradient>
+          <Ionicons name="wallet-outline" size={48} color={COLORS.brandPrimary} />
         </View>
 
         {/* Title */}
         <Text style={{
-          fontSize: 22, fontWeight: "800", color: "#fff",
+          fontSize: 22, fontWeight: "800", color: COLORS.text.primary,
           textAlign: "center", marginBottom: 8,
         }}>
           {canOpenCommitteeCreation ? "No Chits Yet" : "No Chits Found"}
@@ -64,7 +59,7 @@ export default function Committees() {
 
         {/* Description */}
         <Text style={{
-          fontSize: 14, color: "#a3a3a3",
+          fontSize: 14, color: COLORS.text.secondary,
           textAlign: "center", lineHeight: 22, marginBottom: 32, paddingHorizontal: 8,
         }}>
           {canOpenCommitteeCreation
@@ -92,7 +87,7 @@ export default function Committees() {
             size={20} color="#fff"
           />
           <Text style={{
-            color: "#fff", fontSize: 16, fontWeight: "700", marginLeft: 8,
+            color: COLORS.text.inverse, fontSize: 16, fontWeight: "700", marginLeft: 8,
           }}>
             {canOpenCommitteeCreation ? "Create Your First Chit" : "Join a Chit"}
           </Text>
@@ -122,10 +117,10 @@ export default function Committees() {
 
         {/* Feature highlights */}
         <View style={{
-          width: "100%", backgroundColor: "rgba(255,255,255,0.03)",
-          borderRadius: 16, padding: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.05)",
+          backgroundColor: "rgba(13,148,136,0.04)",
+          borderRadius: 16, padding: 20, borderWidth: 1, borderColor: "rgba(13,148,136,0.08)",
         }}>
-          <Text style={{ color: "#71717a", fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 1, marginBottom: 16 }}>
+          <Text style={{ color: COLORS.text.secondary, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 1, marginBottom: 16 }}>
             How it works
           </Text>
 
@@ -153,14 +148,14 @@ export default function Committees() {
             <View key={idx} style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: idx < 2 ? 16 : 0 }}>
               <View style={{
                 width: 36, height: 36, borderRadius: 10,
-                backgroundColor: "rgba(111,94,255,0.10)",
+                backgroundColor: "rgba(13,148,136,0.08)",
                 alignItems: "center", justifyContent: "center", marginRight: 12,
               }}>
                 <Ionicons name={step.icon} size={18} color={COLORS.brandPrimary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: "#e4e4e7", fontSize: 13, fontWeight: "600", marginBottom: 2 }}>{step.title}</Text>
-                <Text style={{ color: "#71717a", fontSize: 12, lineHeight: 18 }}>{step.desc}</Text>
+                <Text style={{ color: COLORS.text.primary, fontSize: 13, fontWeight: "600", marginBottom: 2 }}>{step.title}</Text>
+                <Text style={{ color: COLORS.text.secondary, fontSize: 12, lineHeight: 18 }}>{step.desc}</Text>
               </View>
             </View>
           ))}
@@ -170,7 +165,7 @@ export default function Committees() {
   };
 
   return (
-    <View className="flex-1 bg-surface-950 px-4">
+    <View className="flex-1 bg-surface-bg px-4">
       <ScreenHeader
         title="Chits"
         subtitle="Your active and upcoming chit pools"
@@ -248,13 +243,13 @@ export default function Committees() {
               <Card style={{ marginBottom: 16 }}>
                 <View className="p-5">
                   <View className="flex-row justify-between items-center mb-3">
-                    <Text className="text-white font-bold text-base">{item.name}</Text>
+                    <Text className="text-slate-900 font-bold text-base">{item.name}</Text>
                     <Badge label={item.status} variant={committeeVariant(item.status)} />
                   </View>
 
                   <View className="flex-row justify-between mb-4 border-b border-brand-primary/5 pb-3">
                     <View>
-                      <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">
+                      <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">
                         Total Pot
                       </Text>
                       <Text className="text-gold-500 font-bold text-base mt-0.5">
@@ -263,10 +258,10 @@ export default function Committees() {
                     </View>
 
                     <View className="items-end">
-                      <Text className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">
+                      <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">
                         Installment / slot
                       </Text>
-                      <Text className="text-white font-bold text-base mt-0.5">
+                      <Text className="text-slate-800 font-bold text-base mt-0.5">
                         {formatINR(item.installmentAmountPaise)}
                       </Text>
                     </View>
@@ -275,14 +270,14 @@ export default function Committees() {
                   <View className="flex-row justify-between items-center">
                     <View className="flex-row items-center">
                       <Ionicons name="people-outline" size={16} color="#a3a3a3" />
-                      <Text className="text-neutral-300 text-xs font-semibold ml-1.5">
+                      <Text className="text-slate-400 text-xs font-semibold ml-1.5">
                         {item.filledSlots} / {item.totalSlots} Slots
                       </Text>
                     </View>
 
                     <View className="flex-row items-center">
                       <Ionicons name="sync-outline" size={14} color="#a3a3a3" />
-                      <Text className="text-neutral-300 text-xs font-semibold ml-1.5">
+                      <Text className="text-slate-600 text-xs font-semibold ml-1.5">
                         {item.cycleDurationDays} days cycle
                       </Text>
                     </View>

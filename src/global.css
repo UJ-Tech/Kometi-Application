@@ -3,25 +3,32 @@
 @tailwind utilities;
 
 :root {
-  --brand-primary: #6f5eff;
-  --brand-dark: #4535bd;
-  --gold-primary: #f59e0b;
-  --surface-bg: #0f0d23;
-  --surface-card: #1a1640;
-  --surface-elevated: #231f52;
-  --text-primary: #f5f5f5;
-  --text-secondary: #a3a3a3;
-  --text-muted: #525252;
-  --border-subtle: rgba(111, 94, 255, 0.15);
-  --border-glow: rgba(111, 94, 255, 0.40);
+  --brand-primary: #6366f1;
+  --brand-dark: #4f46e5;
+  --gold-primary: #fbbf24;
+  --surface-bg: #07080f;
+  --surface-card: #111426;
+  --surface-elevated: #191d35;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #5c6b82;
+  --border-subtle: #1e233f;
+  --border-glow: rgba(99, 102, 241, 0.08);
 
-  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "PlusJakartaSans-Regular", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   --radius-card: 1rem;
   --radius-button: 0.75rem;
   --radius-input: 0.625rem;
 
-  --shadow-card: 0 4px 24px rgba(111, 94, 255, 0.15);
-  --shadow-gold: 0 4px 20px rgba(245, 158, 11, 0.25);
+  --shadow-card: 0 4px 24px rgba(99, 102, 241, 0.08);
+  --shadow-gold: 0 4px 20px rgba(251, 191, 36, 0.15);
+}
+
+/* Fix active input boundaries (browser-default focus outlines) on Web */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none !important;
 }

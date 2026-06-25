@@ -12,6 +12,7 @@ interface WalletState {
   isTransacting:boolean;
   hasMore:      boolean;
   pagination:   PaginationMeta;
+  walletUpdatedVersion: number; // Increments on socket events for screen refresh triggers
 
   setWallet:          (wallet: Wallet) => void;
   updateBalance:      (balancePaise: number) => void;
@@ -22,6 +23,7 @@ interface WalletState {
   setLoading:         (v: boolean) => void;
   setTransacting:     (v: boolean) => void;
   fetchWalletData:    () => Promise<void>;
+  bumpWalletUpdated:  () => void;
   topupWallet:        (amountPaise: number) => Promise<{ orderId: string; amount: number; currency: string; razorpayKeyId: string }>;
   verifyTopupPayment: (orderId: string, paymentId: string, signature: string) => Promise<void>;
   fetchWithdrawals:   (committeeId?: string) => Promise<void>;
@@ -43,12 +45,15 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   isTransacting: false,
   hasMore:       false,
   pagination:    defaultPagination,
+  walletUpdatedVersion: 0,
 
   setWallet:       (wallet) => set({ wallet, balancePaise: wallet.balancePaise }),
   setTransactions: (list)   => set({ transactions: list }),
   setLoading:      (v)      => set({ isLoading: v }),
   setTransacting:  (v)      => set({ isTransacting: v }),
   setPagination:   (meta)   => set({ pagination: meta, hasMore: meta.hasMore }),
+
+  bumpWalletUpdated: () => set((s) => ({ walletUpdatedVersion: s.walletUpdatedVersion + 1 })),
 
   updateBalance: (balancePaise) => {
     set((s) => ({
@@ -184,5 +189,6 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   reset: () => set({
     wallet: null, balancePaise: 0, transactions: [], withdrawals: [],
     isLoading: false, isTransacting: false, hasMore: false, pagination: defaultPagination,
+    walletUpdatedVersion: 0,
   }),
 }));

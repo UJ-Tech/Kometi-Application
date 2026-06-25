@@ -6,7 +6,6 @@ import {
   View, Text, KeyboardAvoidingView, Platform, StyleSheet, TouchableOpacity,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import OTPInput from "../../components/ui/OTPInput";
@@ -15,7 +14,7 @@ import ScreenHeader from "../../components/shared/ScreenHeader";
 import { authApi } from "../../services/auth.api";
 import { useAuthStore } from "../../stores/auth.store";
 import { tokenStorage } from "../../utils/storage";
-import { COLORS, FONT_SIZE, SPACING, GRADIENTS } from "../../constants/theme";
+import { COLORS, FONT_SIZE, SPACING } from "../../constants/theme";
 import { APP_CONFIG } from "../../constants/config";
 
 const OTP_EXPIRY = APP_CONFIG.OTP_EXPIRY_SECONDS;
@@ -97,16 +96,11 @@ export default function OTPVerifyScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScreenHeader title="Verify OTP" showBack />
-      <LinearGradient
-        colors={["rgba(111,94,255,0.18)", "transparent"]}
-        style={styles.blob}
-      />
 
       <View style={[styles.content, { paddingBottom: insets.bottom + SPACING[6] }]}>
         <View style={styles.top}>
           <View style={styles.iconCircle}>
-            <LinearGradient colors={GRADIENTS.brandPrimary as [string, string]} style={StyleSheet.absoluteFill} />
-            <Ionicons name="mail-outline" size={28} color="#fff" />
+            <Ionicons name="mail-outline" size={28} color={COLORS.brand[400]} />
           </View>
           <Text style={styles.title}>Check your SMS</Text>
           <Text style={styles.subtitle}>
@@ -161,12 +155,14 @@ export default function OTPVerifyScreen() {
 }
 
 const styles = StyleSheet.create({
-  blob: { position: "absolute", top: -40, right: -60, width: 220, height: 220, borderRadius: 110 },
   content: { flex: 1, paddingHorizontal: SPACING[6], gap: SPACING[8], paddingTop: SPACING[4] },
   top:     { gap: SPACING[3] },
   iconCircle: {
-    width: 64, height: 64, borderRadius: 20, overflow: "hidden",
+    width: 64, height: 64, borderRadius: 20,
     alignItems: "center", justifyContent: "center", marginBottom: SPACING[2],
+    backgroundColor: COLORS.surface.card,
+    borderWidth: 1,
+    borderColor: COLORS.surface.border,
   },
   title:    { fontSize: FONT_SIZE["2xl"], fontWeight: "800", color: COLORS.text.primary },
   subtitle: { fontSize: FONT_SIZE.base, color: COLORS.text.secondary, lineHeight: 24 },

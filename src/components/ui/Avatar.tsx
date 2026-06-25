@@ -20,12 +20,12 @@ function getInitials(name: string): string {
 
 // Simple hash to pick a gradient per name
 const AVATAR_GRADIENTS: [string, string][] = [
-  ["#6f5eff", "#4535bd"],
-  ["#f59e0b", "#d97706"],
-  ["#22c55e", "#16a34a"],
-  ["#0ea5e9", "#0284c7"],
-  ["#ec4899", "#be185d"],
-  ["#8b5cf6", "#6d28d9"],
+  ["#0d9488", "#0f766e"],
+  ["#d97706", "#b45309"],
+  ["#16a34a", "#15803d"],
+  ["#0284c7", "#0369a1"],
+  ["#be185d", "#9d174d"],
+  ["#7c3aed", "#6d28d9"],
 ];
 
 function pickGradient(name: string): [string, string] {

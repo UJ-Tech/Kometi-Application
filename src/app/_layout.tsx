@@ -10,7 +10,13 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import * as SplashScreen from "expo-splash-screen";
 import { useAuthStore } from "../stores/auth.store";
+import { useSocket } from "../hooks/useSocket";
 import NetworkBanner from "../components/shared/NetworkBanner";
+
+function SocketProvider({ children }: { children: React.ReactNode }) {
+  useSocket();
+  return <>{children}</>;
+}
 
 SplashScreen.preventAutoHideAsync();
 
@@ -55,9 +61,11 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
-          <StatusBar style="light" />
-          <NetworkBanner />
-          <Stack screenOptions={{ headerShown: false }} />
+          <SocketProvider>
+            <StatusBar style="dark" />
+            <NetworkBanner />
+            <Stack screenOptions={{ headerShown: false }} />
+          </SocketProvider>
         </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

@@ -20,6 +20,7 @@ export function useSocket(): Socket | null {
   // Store actions for real-time updates
   const updateBalance       = useWalletStore((s) => s.updateBalance);
   const prependTransaction  = useWalletStore((s) => s.prependTransaction);
+  const bumpWalletUpdated   = useWalletStore((s) => s.bumpWalletUpdated);
   const markPaid            = useInstallmentStore((s) => s.markPaid);
   const updateCommitteeStatus = useCommitteeStore((s) => s.updateCommitteeStatus);
 
@@ -45,14 +46,16 @@ export function useSocket(): Socket | null {
     });
 
     // ── Wallet events ──────────────────────────────────────────────────────
-    socket.on("wallet:credited", (data: { amountPaise: number; newBalance: number; transaction: any }) => {
-      updateBalance(data.newBalance);
-      prependTransaction(data.transaction);
+    socket.on("wallet:credited", (data: { amountPaise: number; newBalance: number; transaction?: any }) => {
+      if (data.newBalance) updateBalance(data.newBalance);
+      if (data.transaction) prependTransaction(data.transaction);
+      bumpWalletUpdated();
     });
 
-    socket.on("wallet:debited", (data: { amountPaise: number; newBalance: number; transaction: any }) => {
-      updateBalance(data.newBalance);
-      prependTransaction(data.transaction);
+    socket.on("wallet:debited", (data: { amountPaise: number; newBalance: number; transaction?: any }) => {
+      if (data.newBalance) updateBalance(data.newBalance);
+      if (data.transaction) prependTransaction(data.transaction);
+      bumpWalletUpdated();
     });
 
     // ── Installment events ─────────────────────────────────────────────────
@@ -60,25 +63,43 @@ export function useSocket(): Socket | null {
       markPaid(data.installmentId);
     });
 
+    socket.on("installment:waived", (data: { installmentId: string }) => {
+      markPaid(data.installmentId); // Mark as paid (waived = no longer pending)
+    });
+
     // ── Committee events ───────────────────────────────────────────────────
     socket.on("committee:started", (data: { committeeId: string }) => {
       updateCommitteeStatus(data.committeeId, "ACTIVE");
     });
 
-    socket.on("committee:completed", (data: { committeeId: string }) => {
-      updateCommitteeStatus(data.committeeId, "COMPLETED");
+    // Backend emits "committee:resolved" when a cycle is resolved
+    socket.on("committee:resolved", (data: { committeeId: string; cycleNo: number }) => {
+      useCommitteeStore.getState().markMonthResolved(data.committeeId, String(data.cycleNo));
     });
 
     socket.on("committee:bidding_opened", (data: { committeeId: string; monthId: string; monthNumber: number }) => {
       useCommitteeStore.getState().markBiddingOpened(data.committeeId, data.monthId);
     });
 
-    socket.on("committee:month_resolved", (data: { committeeId: string; monthId: string; monthNumber: number }) => {
-      useCommitteeStore.getState().markMonthResolved(data.committeeId, data.monthId);
-    });
-
     socket.on("committee:bid_placed", (data: { committeeId: string; monthId: string }) => {
       useCommitteeStore.getState().markBidPlaced(data.committeeId, data.monthId);
+    });
+
+    socket.on("committee:bid_submitted", (data: { committeeId: string; cycleNo: number; userId: string; bidAmountPaise: number }) => {
+      useCommitteeStore.getState().markBidPlaced(data.committeeId, String(data.cycleNo));
+    });
+
+    // ── Contribution events ────────────────────────────────────────────────
+    socket.on("contribution:paid", (data: { committeeId: string; memberId: string }) => {
+      useCommitteeStore.getState().markContributionUpdated(data.committeeId);
+    });
+
+    socket.on("contribution:member-paid", (data: { committeeId: string; memberId: string }) => {
+      useCommitteeStore.getState().markContributionUpdated(data.committeeId);
+    });
+
+    socket.on("committee:contribution-updated", (data: { committeeId: string }) => {
+      useCommitteeStore.getState().markContributionUpdated(data.committeeId);
     });
 
     return () => {

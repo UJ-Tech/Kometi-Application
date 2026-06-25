@@ -95,7 +95,8 @@ export default function OTPInput({
                 shadowOpacity:   0.4,
                 shadowRadius:    6,
                 elevation:       filled ? 4 : 0,
-              }}
+                outlineStyle:    "none",
+              } as any}
             />
           );
         })}

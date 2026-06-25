@@ -5,51 +5,52 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Primary brand — deep violet/indigo
+        // Primary — Muted Teal
         brand: {
-          50:  "#f0eeff",
-          100: "#e0ddff",
-          200: "#c4beff",
-          300: "#a79eff",
-          400: "#8b7eff",
-          500: "#6f5eff",   // primary
-          600: "#5a47e0",
-          700: "#4535bd",
-          800: "#31259a",
-          900: "#1e1677",
-          950: "#0d0944",
+          50:  "#f0fdfa",
+          100: "#ccfbf1",
+          200: "#99f6e4",
+          300: "#5eead4",
+          400: "#2dd4bf",
+          500: "#0d9488",
+          600: "#0f766e",
+          700: "#115e59",
+          800: "#134e4a",
+          900: "#042f2e",
+          950: "#021a19",
         },
-        // Gold accent — for highlights, badges, payout
+        // Gold accent
         gold: {
-          50:  "#fffbeb",
-          100: "#fef3c7",
-          200: "#fde68a",
-          300: "#fcd34d",
-          400: "#fbbf24",
-          500: "#f59e0b",   // primary gold
-          600: "#d97706",
-          700: "#b45309",
-          800: "#92400e",
-          900: "#78350f",
+          50:  "#fdf8ed",
+          100: "#f8edd0",
+          200: "#f0d89e",
+          300: "#e8cc73",
+          400: "#d4a84b",
+          500: "#b8860b",
+          600: "#996515",
+          700: "#7a4f12",
+          800: "#5c3b0e",
+          900: "#3d280a",
+          950: "#1f1405",
         },
-        // Surface / dark backgrounds
+        // Surface — Light
         surface: {
-          50:  "#f8f7ff",
-          100: "#f0effe",
-          900: "#0f0d23",   // deepest bg
-          950: "#07061a",
-          bg:       "#0f0d23",
-          card:     "#1a1640",
-          elevated: "#231f52",
-          border:   "rgba(111,94,255,0.15)",
-          glow:     "rgba(111,94,255,0.40)",
+          50:  "#f5f5f7",
+          100: "#ffffff",
+          900: "#1a1a2e",
+          950: "#111118",
+          bg:       "#f5f5f7",
+          card:     "#ffffff",
+          elevated: "#ffffff",
+          border:   "#e5e5ea",
+          glow:     "rgba(13, 148, 136, 0.06)",
         },
         // Semantic
-        success: { 400: "#4ade80", 500: "#22c55e", 600: "#16a34a" },
-        warning: { 400: "#fb923c", 500: "#f97316", 600: "#ea580c" },
-        danger:  { 400: "#f87171", 500: "#ef4444", 600: "#dc2626" },
-        info:    { 400: "#38bdf8", 500: "#0ea5e9", 600: "#0284c7" },
-        // Neutral
+        success: { 400: "#22c55e", 500: "#16a34a", 600: "#15803d" },
+        warning: { 400: "#eab308", 500: "#d97706", 600: "#b45309" },
+        danger:  { 400: "#ef4444", 500: "#dc2626", 600: "#b91c1c" },
+        info:    { 400: "#0ea5e9", 500: "#0284c7", 600: "#0369a1" },
+        // Neutral — Light grays
         neutral: {
           50:  "#fafafa",
           100: "#f5f5f5",
@@ -65,8 +66,8 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans:    ["Inter", "system-ui", "sans-serif"],
-        display: ["Inter", "system-ui", "sans-serif"],
+        sans:    ["PlusJakartaSans-Regular", "System", "sans-serif"],
+        display: ["PlusJakartaSans-Regular", "System", "sans-serif"],
         mono:    ["JetBrains Mono", "Menlo", "monospace"],
       },
       borderRadius: {
@@ -78,10 +79,10 @@ module.exports = {
         "safe-bottom": "env(safe-area-inset-bottom)",
       },
       boxShadow: {
-        "card-sm": "0 2px 12px rgba(111, 94, 255, 0.10)",
-        "card":    "0 4px 24px rgba(111, 94, 255, 0.15)",
-        "card-lg": "0 8px 40px rgba(111, 94, 255, 0.22)",
-        "gold":    "0 4px 20px rgba(245, 158, 11, 0.25)",
+        "card-sm": "0 1px 3px rgba(0, 0, 0, 0.06)",
+        "card":    "0 2px 8px rgba(0, 0, 0, 0.08)",
+        "card-lg": "0 4px 12px rgba(0, 0, 0, 0.1)",
+        "gold":    "0 2px 6px rgba(184, 134, 11, 0.08)",
       },
     },
   },

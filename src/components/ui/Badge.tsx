@@ -16,12 +16,12 @@ interface BadgeProps {
 }
 
 const VARIANT_STYLES: Record<BadgeVariant, { bg: string; text: string; dot: string }> = {
-  success: { bg: "rgba(34,197,94,0.12)",  text: COLORS.success.light, dot: COLORS.success.DEFAULT },
-  warning: { bg: "rgba(249,115,22,0.12)", text: COLORS.warning.light, dot: COLORS.warning.DEFAULT },
-  danger:  { bg: "rgba(239,68,68,0.12)",  text: COLORS.danger.light,  dot: COLORS.danger.DEFAULT  },
-  info:    { bg: "rgba(14,165,233,0.12)", text: COLORS.info.light,    dot: COLORS.info.DEFAULT    },
-  neutral: { bg: "rgba(163,163,163,0.12)",text: COLORS.text.secondary,dot: COLORS.text.muted     },
-  brand:   { bg: "rgba(111,94,255,0.15)", text: COLORS.brand[300],    dot: COLORS.brand[500]     },
+  success: { bg: "rgba(22,163,74,0.10)",  text: COLORS.success.dark, dot: COLORS.success.DEFAULT },
+  warning: { bg: "rgba(217,119,6,0.10)",  text: COLORS.warning.dark, dot: COLORS.warning.DEFAULT },
+  danger:  { bg: "rgba(220,38,38,0.10)",  text: COLORS.danger.dark,  dot: COLORS.danger.DEFAULT  },
+  info:    { bg: "rgba(2,132,199,0.10)",  text: COLORS.info.dark,    dot: COLORS.info.DEFAULT    },
+  neutral: { bg: "rgba(0,0,0,0.05)",      text: COLORS.text.secondary,dot: COLORS.text.muted     },
+  brand:   { bg: "rgba(13,148,136,0.10)", text: COLORS.brand[700],   dot: COLORS.brand[500]     },
 };
 
 export function kycVariant(status: KYCStatus): BadgeVariant {

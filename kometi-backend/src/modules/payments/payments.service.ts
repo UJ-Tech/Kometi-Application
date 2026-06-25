@@ -546,6 +546,20 @@ export class PaymentsService {
         .eq("committeeId", tx.committee_id)
         .eq("userId", resolvedUserId)
         .eq("cycleNo", cycleNo);
+
+      // Update member_payment_obligations → paid (for getMemberStats)
+      await supabase
+        .from("member_payment_obligations")
+        .update({
+          status: "paid",
+          paid_at: new Date().toISOString(),
+          payment_transaction_id: tx.id,
+        })
+        .eq("committee_id", tx.committee_id)
+        .eq("month_id", tx.month_id)
+        .eq("member_id", tx.member_id)
+        .eq("direction", "pay")
+        .eq("status", "pending");
     }
 
     // 6. Create wallet ledger entry — contribution_made
@@ -783,6 +797,20 @@ export class PaymentsService {
       console.error("[PaymentsService] installments update failed:", installError);
       // Non-fatal — monthly_contributions is the source of truth
     }
+
+    // ── 8b. Update member_payment_obligations → paid (for getMemberStats) ─
+    await supabase
+      .from("member_payment_obligations")
+      .update({
+        status: "paid",
+        paid_at: new Date().toISOString(),
+        payment_transaction_id: tx.id,
+      })
+      .eq("committee_id", committeeId)
+      .eq("month_id", monthId)
+      .eq("member_id", memberId)
+      .eq("direction", "pay")
+      .eq("status", "pending");
 
     // ── 9. Credit wallet ledger — contribution_made ───────────────────────
     try {

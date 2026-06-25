@@ -1,10 +1,8 @@
 // src/components/shared/ErrorBoundary.tsx
-// High-fidelity ErrorBoundary with premium dark glassmorphic design.
-// Allows users to recover, copy error details, or reload the app.
+// ErrorBoundary — shows a clean error screen with recovery option.
 
 import React, { Component, type ErrorInfo, type ReactNode } from "react";
 import { View, Text, ScrollView } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { COLORS } from "../../constants/theme";
 import Button from "../ui/Button";
 
@@ -41,48 +39,48 @@ export class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <View className="flex-1 bg-surface-950 px-6 justify-center">
-          <LinearGradient
-            colors={[COLORS.brand[500] + "20", "transparent"]}
-            className="absolute inset-0"
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 0.5 }}
-          />
-
-          <View className="items-center mb-8">
-            <View className="w-20 h-20 bg-danger-500/10 rounded-full items-center justify-center mb-4 border border-danger-500/30">
-              <Text className="text-danger-500 text-4xl">⚠️</Text>
+        <View style={{ flex: 1, backgroundColor: COLORS.surface.bg, paddingHorizontal: 24, justifyContent: "center" }}>
+          <View style={{ alignItems: "center", marginBottom: 32 }}>
+            <View style={{
+              width: 64, height: 64, borderRadius: 16,
+              backgroundColor: "rgba(239,68,68,0.1)",
+              borderWidth: 1, borderColor: "rgba(239,68,68,0.2)",
+              alignItems: "center", justifyContent: "center", marginBottom: 16,
+            }}>
+              <Text style={{ fontSize: 28 }}>⚠</Text>
             </View>
-            <Text className="text-white text-2xl font-bold mb-2 text-center">
-              Oops! Something went wrong
+            <Text style={{ color: COLORS.text.primary, fontSize: 22, fontWeight: "700", marginBottom: 8, textAlign: "center" }}>
+              Something went wrong
             </Text>
-            <Text className="text-neutral-400 text-sm text-center px-4">
-              An unexpected error occurred in Kometi. You can reload the screen or contact support if the issue persists.
+            <Text style={{ color: COLORS.text.secondary, fontSize: 14, textAlign: "center", paddingHorizontal: 16 }}>
+              An unexpected error occurred. You can try again or contact support.
             </Text>
           </View>
 
-          <View className="bg-surface-card border border-brand-primary/10 rounded-xl p-4 mb-8 max-h-60">
-            <Text className="text-danger-400 text-xs font-mono mb-2">
+          <View style={{
+            backgroundColor: COLORS.surface.card,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: COLORS.surface.border,
+            padding: 14, marginBottom: 32, maxHeight: 200,
+          }}>
+            <Text style={{ color: COLORS.danger.light, fontSize: 12, fontFamily: "monospace", marginBottom: 8 }}>
               {this.state.error?.toString()}
             </Text>
             {this.state.errorInfo && (
               <ScrollView>
-                <Text className="text-neutral-500 text-[10px] font-mono leading-4">
+                <Text style={{ color: COLORS.text.muted, fontSize: 10, fontFamily: "monospace", lineHeight: 16 }}>
                   {this.state.errorInfo.componentStack}
                 </Text>
               </ScrollView>
             )}
           </View>
 
-          <View className="flex-row gap-4">
-            <View className="flex-1">
-              <Button
-                label="Try Again"
-                onPress={this.handleReset}
-                variant="primary"
-              />
-            </View>
-          </View>
+          <Button
+            label="Try Again"
+            onPress={this.handleReset}
+            variant="primary"
+          />
         </View>
       );
     }

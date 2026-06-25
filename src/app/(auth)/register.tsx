@@ -6,7 +6,6 @@ import {
   View, Text, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Input from "../../components/ui/Input";
@@ -16,7 +15,7 @@ import { authApi } from "../../services/auth.api";
 import { useAuthStore } from "../../stores/auth.store";
 import { tokenStorage } from "../../utils/storage";
 import { isValidName, isValidEmail, isValidPhone } from "../../utils/validators";
-import { COLORS, FONT_SIZE, SPACING, GRADIENTS } from "../../constants/theme";
+import { COLORS, FONT_SIZE, SPACING, BORDER_RADIUS } from "../../constants/theme";
 
 export default function RegisterScreen() {
   const router         = useRouter();
@@ -84,10 +83,6 @@ export default function RegisterScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScreenHeader title="Create Account" showBack />
-      <LinearGradient
-        colors={["rgba(111,94,255,0.18)", "transparent"]}
-        style={styles.blob}
-      />
 
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + SPACING[6] }]}
@@ -95,8 +90,7 @@ export default function RegisterScreen() {
       >
         <View style={styles.top}>
           <View style={styles.iconCircle}>
-            <LinearGradient colors={GRADIENTS.brandPrimary as [string, string]} style={StyleSheet.absoluteFill} />
-            <Ionicons name="person-outline" size={28} color="#fff" />
+            <Ionicons name="person-outline" size={28} color={COLORS.brand[400]} />
           </View>
           <Text style={styles.title}>Tell us about{"\n"}yourself</Text>
           <Text style={styles.subtitle}>
@@ -104,7 +98,7 @@ export default function RegisterScreen() {
           </Text>
         </View>
 
-        <View style={styles.form}>
+        <View style={styles.formCard}>
           <Input
             label="Full Name"
             required
@@ -178,13 +172,15 @@ export default function RegisterScreen() {
             <Text style={styles.formError}>{errors.form}</Text>
           ) : null}
 
-          <Button
-            label="Create Account"
-            variant="primary"
-            size="lg"
-            isLoading={isLoading}
-            onPress={handleRegister}
-          />
+          <View style={{ marginTop: SPACING[2] }}>
+            <Button
+              label="Create Account"
+              variant="primary"
+              size="lg"
+              isLoading={isLoading}
+              onPress={handleRegister}
+            />
+          </View>
 
           <Button
             label="Back to Sign In"
@@ -199,15 +195,33 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  blob: { position: "absolute", top: -40, right: -60, width: 220, height: 220, borderRadius: 110 },
-  content: { flexGrow: 1, paddingHorizontal: SPACING[6], gap: SPACING[7] },
-  top:     { gap: SPACING[3], paddingTop: SPACING[2] },
+  content: { flexGrow: 1, paddingHorizontal: SPACING[6], gap: SPACING[5] },
+  top:     { gap: SPACING[2.5], paddingTop: SPACING[2] },
   iconCircle: {
-    width: 64, height: 64, borderRadius: 20, overflow: "hidden",
-    alignItems: "center", justifyContent: "center", marginBottom: SPACING[2],
+    width: 60, height: 60, borderRadius: 18,
+    alignItems: "center", justifyContent: "center", marginBottom: SPACING[1],
+    backgroundColor: COLORS.surface.card,
+    borderWidth: 1,
+    borderColor: COLORS.surface.border,
+    shadowColor: COLORS.brand[500],
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
   },
   title:    { fontSize: FONT_SIZE["3xl"], fontWeight: "800", color: COLORS.text.primary, lineHeight: 36 },
   subtitle: { fontSize: FONT_SIZE.base, color: COLORS.text.secondary, lineHeight: 22 },
-  form:     { gap: SPACING[4] },
+  formCard: {
+    backgroundColor: COLORS.surface.card,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    borderColor: COLORS.surface.border,
+    padding: SPACING[5],
+    gap: SPACING[4.5],
+    shadowColor: COLORS.brand[500],
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    elevation: 4,
+  },
   formError:{ fontSize: FONT_SIZE.sm, color: COLORS.danger.light, lineHeight: 20 },
 });

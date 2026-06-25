@@ -46,7 +46,7 @@ export default function AppLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: COLORS.brandPrimary,
-        tabBarInactiveTintColor: "#a3a3a3",
+        tabBarInactiveTintColor: "#64748b",
         tabBarStyle: {
           backgroundColor: COLORS.surface.card,
           borderTopWidth: 1,
@@ -58,11 +58,11 @@ export default function AppLayout() {
           bottom: 0,
           left: 0,
           right: 0,
-          elevation: 8,
-          shadowColor: "#000",
+          elevation: 4,
+          shadowColor: "#0f172a",
           shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 10,
+          shadowOpacity: 0.05,
+          shadowRadius: 8,
         },
         tabBarLabelStyle: {
           fontSize: 10,

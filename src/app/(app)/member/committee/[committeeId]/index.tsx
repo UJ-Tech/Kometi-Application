@@ -116,12 +116,13 @@ export default function MemberCommitteeOverview() {
 
   // NOTE: Month detail is refreshed in the main interval above (every 30s)
 
-  // Instant refresh when socket events fire (bidding opened, month resolved, bid placed)
+  // Instant refresh when socket events fire (bidding opened, month resolved, bid placed, contribution updated)
   const biddingVersion = useCommitteeStore((s) => s.biddingOpenedVersion);
   const resolvedVersion = useCommitteeStore((s) => s.monthResolvedVersion);
   const bidVersion = useCommitteeStore((s) => s.bidPlacedVersion);
+  const contributionVersion = useCommitteeStore((s) => s.contributionUpdatedVersion);
   useEffect(() => {
-    if (biddingVersion + resolvedVersion + bidVersion > 0) {
+    if (biddingVersion + resolvedVersion + bidVersion + contributionVersion > 0) {
       loadData();
       // Also refresh month detail
       if (monthsData?.months?.length) {
@@ -133,17 +134,17 @@ export default function MemberCommitteeOverview() {
         }
       }
     }
-  }, [biddingVersion, resolvedVersion, bidVersion]);
+  }, [biddingVersion, resolvedVersion, bidVersion, contributionVersion]);
 
   const onRefresh = useCallback(() => { setRefreshing(true); loadData(); }, [loadData]);
 
   if (!isValidId) {
     return (
-      <View className="flex-1 bg-surface-950 items-center justify-center px-6">
+      <View className="flex-1 bg-surface-50 items-center justify-center px-6">
         <Ionicons name="alert-circle-outline" size={40} color={COLORS.danger.light} />
-        <Text className="text-white font-bold text-lg mt-4">Invalid Committee</Text>
+        <Text className="text-slate-900 font-bold text-lg mt-4">Invalid Committee</Text>
         <TouchableOpacity onPress={() => router.back()} className="mt-4">
-          <Text className="text-brand-400 text-sm font-medium">Go Back</Text>
+          <Text className="text-brand-600 text-sm font-medium">Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -151,20 +152,20 @@ export default function MemberCommitteeOverview() {
 
   if (loading && !refreshing) {
     return (
-      <View className="flex-1 bg-surface-950 items-center justify-center">
+      <View className="flex-1 bg-surface-50 items-center justify-center">
         <ActivityIndicator size="large" color={COLORS.brandPrimary} />
-        <Text className="text-neutral-500 text-sm mt-4">Loading committee...</Text>
+        <Text className="text-slate-500 text-sm mt-4">Loading committee...</Text>
       </View>
     );
   }
 
   if (error && !committee) {
     return (
-      <View className="flex-1 bg-surface-950 items-center justify-center px-6">
+      <View className="flex-1 bg-surface-50 items-center justify-center px-6">
         <Ionicons name="cloud-offline-outline" size={40} color={COLORS.warning.light} />
-        <Text className="text-white font-bold text-lg mt-4">{error}</Text>
+        <Text className="text-slate-900 font-bold text-lg mt-4">{error}</Text>
         <TouchableOpacity onPress={loadData} className="mt-4 bg-brand-500 px-5 py-2.5 rounded-xl">
-          <Text className="text-white font-bold text-sm">Retry</Text>
+          <Text className="text-slate-900 font-bold text-sm">Retry</Text>
         </TouchableOpacity>
       </View>
     );
@@ -198,9 +199,13 @@ export default function MemberCommitteeOverview() {
 
   // ─── STATS: Use real data from member_payment_obligations ──────────────
   // All amounts in paise from the database
-  const myTotalPaid = memberStats?.totalPaidPaise || 0;
-  const myTotalReceived = memberStats?.totalCreditedPaise || 0;
-  const myNetPosition = memberStats?.netPositionPaise || 0;
+  // Fallback: sum all paid/completed installments if memberStats is unavailable
+  const myPaidFromInstallments = installments
+    .filter((i: any) => i.userId === currentUser?.id && (i.status === "PAID" || i.status === "COMPLETED"))
+    .reduce((sum: number, i: any) => sum + (i.amountPaidPaise || i.amountDuePaise || 0), 0);
+  const myTotalPaid = memberStats?.totalPaidPaise ?? myPaidFromInstallments;
+  const myTotalReceived = memberStats?.totalCreditedPaise ?? 0;
+  const myNetPosition = memberStats?.netPositionPaise ?? (myTotalReceived - myTotalPaid);
   // Progress: total received vs (monthly pool * completed months) — shows how much of total earnings received
   const completedMonths = monthsData?.completedMonths || months.filter((m: any) => m.status === "completed").length;
   const totalExpectedPayout = totalPool * Math.max(completedMonths, 1);
@@ -210,14 +215,22 @@ export default function MemberCommitteeOverview() {
   // Exclude organiser's cycle 1 during organiser_commission month (they don't physically pay)
   const isOrganiser = committee.organizerId === currentUser?.id;
   const currentResolutionType = currentMonth?.resolutionType;
+
+  // Build set of cycle numbers where this member is the winner (auto-paid via netting)
+  const myWonCycleNos = new Set(
+    months
+      .filter((m: any) => m.status === "completed" && m.winnerMemberId === myMemberId)
+      .map((m: any) => m.monthNumber)
+  );
+
   let myPendingCount = 0;
   installments.forEach((inst: any) => {
     if (inst.userId === currentUser?.id) {
       if (inst.status === "PENDING" || inst.status === "OVERDUE" || inst.status === "PARTIAL") {
         // Skip organiser's cycle 1 during organiser_commission month
         if (isOrganiser && inst.cycleNo === 1 && currentResolutionType === "organiser_commission") return;
-        // Skip winner's winning month installment (netted from payout, not paid physically)
-        if (isWinnerOfCurrentMonth && inst.cycleNo === currentMonth.monthNumber) return;
+        // Skip any cycle where this member is the winner (netted from payout)
+        if (myWonCycleNos.has(inst.cycleNo)) return;
         myPendingCount++;
       }
     }
@@ -240,29 +253,22 @@ export default function MemberCommitteeOverview() {
 
   return (
     <ScrollView
-      className="flex-1 bg-surface-950"
+      className="flex-1 bg-surface-50"
       contentContainerStyle={{ paddingTop: 64, paddingBottom: 120 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.brandPrimary} />}
     >
-      <LinearGradient
-        colors={[COLORS.brandPrimary + "15", "transparent"]}
-        className="absolute inset-0 h-80"
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-      />
-
       {/* Header */}
       <View className="px-4 flex-row items-center mb-5">
         <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 bg-surface-card rounded-full items-center justify-center border border-brand-primary/10 mr-4">
-          <Ionicons name="arrow-back" size={20} color="#fff" />
+          <Ionicons name="arrow-back" size={20} color="#1a1a2e" />
         </TouchableOpacity>
         <View className="flex-1">
-          <Text className="text-white text-xl font-bold" numberOfLines={1}>{committee.name}</Text>
-          <Text className="text-neutral-400 text-xs">Member Dashboard</Text>
+          <Text className="text-slate-900 text-xl font-bold" numberOfLines={1}>{committee.name}</Text>
+          <Text className="text-slate-400 text-xs">Member Dashboard</Text>
         </View>
         {slotNumber && (
           <View className="bg-brand-500/15 px-3 py-1.5 rounded-full">
-            <Text className="text-brand-400 text-xs font-bold">Slot #{slotNumber}</Text>
+            <Text className="text-brand-600 text-xs font-bold">Slot #{slotNumber}</Text>
           </View>
         )}
       </View>
@@ -274,8 +280,8 @@ export default function MemberCommitteeOverview() {
         <Card gradient>
           <View className="flex-row items-center justify-between mb-3">
             <View>
-              <Text className="text-neutral-400 text-[10px] uppercase font-bold tracking-wider">Month Progress</Text>
-              <Text className="text-white font-bold text-lg mt-0.5">
+              <Text className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Month Progress</Text>
+              <Text className="text-slate-900 font-bold text-lg mt-0.5">
                 Month {months.length} of {totalMembers}
               </Text>
             </View>
@@ -287,13 +293,13 @@ export default function MemberCommitteeOverview() {
           </View>
 
           <View className="flex-row flex-wrap gap-3">
-            <View className="flex-1 min-w-[100px] bg-surface-950 rounded-lg p-2.5">
-              <Text className="text-neutral-500 text-[9px] uppercase font-bold">Total Pool</Text>
-              <Text className="text-brand-400 font-bold text-sm mt-0.5">{F(totalPool)}</Text>
+            <View className="flex-1 min-w-[100px] bg-surface-50 rounded-lg p-2.5">
+              <Text className="text-slate-500 text-[9px] uppercase font-bold">Total Pool</Text>
+              <Text className="text-brand-600 font-bold text-sm mt-0.5">{F(totalPool)}</Text>
             </View>
-            <View className="flex-1 min-w-[100px] bg-surface-950 rounded-lg p-2.5">
-              <Text className="text-neutral-500 text-[9px] uppercase font-bold">My Contribution</Text>
-              <Text className="text-white font-bold text-sm mt-0.5">{F(installment)}</Text>
+            <View className="flex-1 min-w-[100px] bg-surface-50 rounded-lg p-2.5">
+              <Text className="text-slate-500 text-[9px] uppercase font-bold">My Contribution</Text>
+              <Text className="text-slate-900 font-bold text-sm mt-0.5">{F(installment)}</Text>
             </View>
           </View>
         </Card>
@@ -307,29 +313,29 @@ export default function MemberCommitteeOverview() {
           <View className="w-7 h-7 rounded-lg bg-brand-500/15 items-center justify-center mr-2">
             <Ionicons name="stats-chart-outline" size={14} color={COLORS.brandPrimary} />
           </View>
-          <Text className="text-white font-bold text-sm">My Stats</Text>
+          <Text className="text-slate-900 font-bold text-sm">My Stats</Text>
         </View>
 
         <View className="flex-row gap-3">
           <Card padding={0} style={{ flex: 1 }}>
             <View className="p-3 items-center">
               <Ionicons name="arrow-up-circle-outline" size={20} color={COLORS.danger.light} />
-              <Text className="text-neutral-500 text-[9px] uppercase font-bold mt-1">Contributed</Text>
-              <Text className="text-danger-400 font-bold text-sm mt-0.5">{F(myTotalPaid)}</Text>
+              <Text className="text-slate-500 text-[9px] uppercase font-bold mt-1">Contributed</Text>
+              <Text className="text-danger-600 font-bold text-sm mt-0.5">{F(myTotalPaid)}</Text>
             </View>
           </Card>
           <Card padding={0} style={{ flex: 1 }}>
             <View className="p-3 items-center">
               <Ionicons name="arrow-down-circle-outline" size={20} color={COLORS.success.light} />
-              <Text className="text-neutral-500 text-[9px] uppercase font-bold mt-1">Received</Text>
-              <Text className="text-success-400 font-bold text-sm mt-0.5">{F(myTotalReceived)}</Text>
+              <Text className="text-slate-500 text-[9px] uppercase font-bold mt-1">Received</Text>
+              <Text className="text-success-600 font-bold text-sm mt-0.5">{F(myTotalReceived)}</Text>
             </View>
           </Card>
           <Card padding={0} style={{ flex: 1 }}>
             <View className="p-3 items-center">
               <Ionicons name="trending-up-outline" size={20} color={myNetPosition >= 0 ? COLORS.success.light : COLORS.danger.light} />
-              <Text className="text-neutral-500 text-[9px] uppercase font-bold mt-1">Net</Text>
-              <Text className={`font-bold text-sm mt-0.5 ${myNetPosition >= 0 ? "text-success-400" : "text-danger-400"}`}>
+              <Text className="text-slate-500 text-[9px] uppercase font-bold mt-1">Net</Text>
+              <Text className={`font-bold text-sm mt-0.5 ${myNetPosition >= 0 ? "text-success-600" : "text-danger-600"}`}>
                 {myNetPosition >= 0 ? "+" : ""}{F(myNetPosition)}
               </Text>
             </View>
@@ -345,12 +351,12 @@ export default function MemberCommitteeOverview() {
           <View className="bg-danger-500/10 border border-danger-500/20 rounded-xl p-4">
             <View className="flex-row items-center mb-2">
               <Ionicons name="lock-closed" size={20} color="#ef4444" />
-              <Text className="text-danger-400 font-bold text-sm ml-2">Account Blocked</Text>
+              <Text className="text-danger-600 font-bold text-sm ml-2">Account Blocked</Text>
             </View>
-            <Text className="text-neutral-500 text-xs">
+            <Text className="text-slate-500 text-xs">
               {memberBlockedReason || "Your account is blocked due to overdue payment."}
             </Text>
-            <Text className="text-neutral-500 text-xs mt-2">
+            <Text className="text-slate-500 text-xs mt-2">
               Please pay the organiser to unblock your account.
             </Text>
           </View>
@@ -365,9 +371,9 @@ export default function MemberCommitteeOverview() {
           <View className="w-7 h-7 rounded-lg bg-gold-500/15 items-center justify-center mr-2">
             <Ionicons name="flash-outline" size={14} color={COLORS.goldPrimary} />
           </View>
-          <Text className="text-white font-bold text-sm">Current Month</Text>
+          <Text className="text-slate-900 font-bold text-sm">Current Month</Text>
           {currentMonth && (
-            <Text className="text-neutral-500 text-xs ml-2">#{currentMonth.monthNumber || months.length}</Text>
+            <Text className="text-slate-500 text-xs ml-2">#{currentMonth.monthNumber || months.length}</Text>
           )}
         </View>
 
@@ -375,34 +381,67 @@ export default function MemberCommitteeOverview() {
           {!currentMonth ? (
             <View className="items-center py-4">
               <Ionicons name="hourglass-outline" size={28} color={COLORS.text.muted} />
-              <Text className="text-neutral-500 text-xs mt-2">No months created yet</Text>
+              <Text className="text-slate-500 text-xs mt-2">No months created yet</Text>
             </View>
           ) : latestMonthStatus === "pending" ? (
             <View>
               <View className="flex-row items-center justify-between mb-3">
                 <Badge label="Contribution Due" variant="warning" size="md" />
-                <Text className="text-neutral-500 text-[10px]">Month #{currentMonth.monthNumber || months.length}</Text>
+                <Text className="text-slate-500 text-[10px]">Month #{currentMonth.monthNumber || months.length}</Text>
               </View>
 
               {/* Projected Pool & Distribution */}
-              <View className="bg-surface-950 rounded-xl p-3 mb-2">
+              <View className="bg-surface-50 rounded-xl p-3 mb-2">
                 <View className="flex-row justify-between items-center mb-2">
-                  <Text className="text-neutral-400 text-[10px] uppercase font-bold">Total Pool</Text>
-                  <Text className="text-white font-bold text-sm">{F(currentMonth.totalPool)}</Text>
+                  <Text className="text-slate-400 text-[10px] uppercase font-bold">Total Pool</Text>
+                  <Text className="text-slate-900 font-bold text-sm">{F(currentMonth.totalPool)}</Text>
                 </View>
                 <View className="flex-row justify-between items-center mb-2">
-                  <Text className="text-neutral-400 text-[10px] uppercase font-bold">Your Contribution</Text>
-                  <Text className="text-white font-bold text-sm">{F(installment)}</Text>
+                  <Text className="text-slate-400 text-[10px] uppercase font-bold">Your Contribution</Text>
+                  <Text className="text-slate-900 font-bold text-sm">{F(installment)}</Text>
                 </View>
                 <View className="flex-row justify-between items-center">
-                  <Text className="text-neutral-400 text-[10px] uppercase font-bold">Est. Distribution/Member</Text>
-                  <Text className="text-success-400 font-bold text-sm">+{F(currentMonth.perMemberDistribution)}</Text>
+                  <Text className="text-slate-400 text-[10px] uppercase font-bold">Est. Distribution/Member</Text>
+                  <Text className="text-success-600 font-bold text-sm">+{F(currentMonth.perMemberDistribution)}</Text>
                 </View>
               </View>
 
-              <Text className="text-neutral-500 text-[10px] text-center mt-1">
-                Waiting for organizer to open bidding
-              </Text>
+              {currentMonth.monthNumber === 1 || currentMonth.resolutionType === "organiser_commission" ? (
+                hasWon ? (
+                  <View className="bg-success-500/10 rounded-xl p-3 mt-1">
+                    <View className="flex-row items-center">
+                      <Ionicons name="checkmark-circle" size={16} color={COLORS.success.light} />
+                      <Text className="text-success-600 text-xs font-bold ml-1.5">You already received a payout</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <View>
+                    <View className="bg-teal-50 rounded-xl p-3 mb-2">
+                      <Text className="text-teal-700 text-xs text-center font-bold">
+                        Organiser Commission Month
+                      </Text>
+                      <Text className="text-slate-500 text-[10px] text-center mt-1">
+                        Pay your contribution directly. No bidding needed.
+                      </Text>
+                    </View>
+                    <PayNetButton
+                      committeeId={committeeId}
+                      monthId={currentMonth.id}
+                      memberId={myMemberId}
+                      monthNumber={currentMonth.monthNumber || 1}
+                      netAmountPaise={installment}
+                      contributionAmount={installment}
+                      distributionShare={0}
+                      isBlocked={memberIsBlocked}
+                      onPaymentSuccess={loadData}
+                    />
+                  </View>
+                )
+              ) : (
+                <Text className="text-slate-500 text-[10px] text-center mt-1">
+                  Waiting for organizer to open bidding
+                </Text>
+              )}
             </View>
           ) : latestMonthStatus === "bidding_open" ? (
             <View>
@@ -416,19 +455,19 @@ export default function MemberCommitteeOverview() {
                 <View className="bg-brand-500/10 rounded-xl p-3 mb-3">
                   <View className="flex-row items-center justify-between">
                     <View>
-                      <Text className="text-neutral-400 text-[10px] uppercase font-bold mb-1">Your Current Bid</Text>
-                      <Text className="text-brand-400 font-bold text-lg">{F(myCurrentBid.bidAmount)}</Text>
+                      <Text className="text-slate-400 text-[10px] uppercase font-bold mb-1">Your Current Bid</Text>
+                      <Text className="text-brand-600 font-bold text-lg">{F(myCurrentBid.bidAmount)}</Text>
                     </View>
                     {myBidRank > 0 && (
                       <View className="items-end">
-                        <Text className="text-neutral-500 text-[10px] uppercase font-bold mb-1">Your Rank</Text>
-                        <Text className={`font-bold text-lg ${myBidRank === 1 ? "text-gold-400" : "text-neutral-300"}`}>
+                        <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">Your Rank</Text>
+                        <Text className={`font-bold text-lg ${myBidRank === 1 ? "text-gold-600" : "text-slate-400"}`}>
                           #{myBidRank}
                         </Text>
                       </View>
                     )}
                   </View>
-                  <Text className="text-neutral-500 text-[10px] mt-1">You can edit or cancel until bidding closes</Text>
+                  <Text className="text-slate-500 text-[10px] mt-1">You can edit or cancel until bidding closes</Text>
                 </View>
               ) : null}
 
@@ -437,15 +476,15 @@ export default function MemberCommitteeOverview() {
                 <View className="bg-gold-500/10 rounded-xl p-3 mb-3">
                   <View className="flex-row items-center justify-between">
                     <View>
-                      <Text className="text-neutral-400 text-[10px] uppercase font-bold mb-1">Lowest Bid</Text>
-                      <Text className="text-gold-400 font-bold text-lg">{F(lowestBid.bidAmount)}</Text>
+                      <Text className="text-slate-400 text-[10px] uppercase font-bold mb-1">Lowest Bid</Text>
+                      <Text className="text-gold-600 font-bold text-lg">{F(lowestBid.bidAmount)}</Text>
                     </View>
                     <View className="items-end">
-                      <Text className="text-neutral-400 text-[10px] uppercase font-bold mb-1">Bids Placed</Text>
-                      <Text className="text-white font-bold text-lg">{allBids.length}</Text>
+                      <Text className="text-slate-400 text-[10px] uppercase font-bold mb-1">Bids Placed</Text>
+                      <Text className="text-slate-900 font-bold text-lg">{allBids.length}</Text>
                     </View>
                   </View>
-                  <Text className="text-neutral-500 text-[10px] mt-1">Lowest bidder wins the pool</Text>
+                  <Text className="text-slate-500 text-[10px] mt-1">Lowest bidder wins the pool</Text>
                 </View>
               )}
 
@@ -458,28 +497,28 @@ export default function MemberCommitteeOverview() {
                 />
               ) : hasWon ? (
                 <View className="bg-warning-500/10 rounded-xl p-3">
-                  <Text className="text-warning-400 text-xs font-bold text-center">
+                  <Text className="text-warning-600 text-xs font-bold text-center">
                     You have already won a payout. You cannot bid again.
                   </Text>
                 </View>
               ) : (
-                <Text className="text-neutral-500 text-xs text-center py-2">You are not eligible to bid this month</Text>
+                <Text className="text-slate-500 text-xs text-center py-2">You are not eligible to bid this month</Text>
               )}
             </View>
           ) : latestMonthStatus === "completed" ? (
             <View>
               <View className="flex-row items-center justify-between mb-2">
                 <Badge label="Resolved" variant="brand" size="md" />
-                <Text className="text-neutral-500 text-[10px]">{currentMonth.resolutionType?.replace("_", " ")}</Text>
+                <Text className="text-slate-500 text-[10px]">{currentMonth.resolutionType?.replace("_", " ")}</Text>
               </View>
 
               {currentMonth.winnerMemberId && (
-                <View className="bg-surface-950 rounded-xl p-3 mb-2">
-                  <Text className="text-neutral-500 text-[10px] uppercase font-bold mb-1">Winner</Text>
-                  <Text className="text-white font-bold text-sm">
+                <View className="bg-surface-50 rounded-xl p-3 mb-2">
+                  <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">Winner</Text>
+                  <Text className="text-slate-900 font-bold text-sm">
                     {members.find((m: any) => m.id === currentMonth.winnerMemberId)?.user?.name || "Unknown"}
                   </Text>
-                  <Text className="text-gold-400 text-xs mt-0.5">
+                  <Text className="text-gold-600 text-xs mt-0.5">
                     Winning bid: {F(currentMonth.winningBidAmount)}
                   </Text>
                 </View>
@@ -490,9 +529,9 @@ export default function MemberCommitteeOverview() {
                 <View className="bg-success-500/10 rounded-xl p-3 mt-2">
                   <View className="flex-row items-center mb-1">
                     <Ionicons name="checkmark-circle" size={16} color={COLORS.success.light} />
-                    <Text className="text-success-400 text-xs font-bold ml-1.5">Winner — Contribution Netted</Text>
+                    <Text className="text-success-600 text-xs font-bold ml-1.5">Winner — Contribution Netted</Text>
                   </View>
-                  <Text className="text-neutral-400 text-[10px] leading-5">
+                  <Text className="text-slate-400 text-[10px] leading-5">
                     You won this month. Your {F(installment)} contribution has been adjusted against your payout of {F(currentMonth.winningBidAmount)}. No payment needed.
                   </Text>
                 </View>
@@ -524,9 +563,9 @@ export default function MemberCommitteeOverview() {
                 if (myObligation.direction === "receive" && myObligation.status === "pending") {
                   return (
                     <View className="bg-success-500/10 rounded-xl p-3 mt-2">
-                      <Text className="text-neutral-500 text-[10px] uppercase font-bold mb-1">Your Payout — Expected</Text>
-                      <Text className="text-success-400 font-bold text-lg">+{F(Math.abs(myObligation.netAmount))}</Text>
-                      <Text className="text-neutral-500 text-[10px] mt-1">
+                      <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">Your Payout — Expected</Text>
+                      <Text className="text-success-600 font-bold text-lg">+{F(Math.abs(myObligation.netAmount))}</Text>
+                      <Text className="text-slate-500 text-[10px] mt-1">
                         Credited to wallet after all members pay
                       </Text>
                     </View>
@@ -538,7 +577,7 @@ export default function MemberCommitteeOverview() {
                     <View className="bg-success-500/10 rounded-xl p-3 mt-2">
                       <View className="flex-row items-center">
                         <Ionicons name="checkmark-circle" size={16} color={COLORS.success.light} />
-                        <Text className="text-success-400 text-xs font-bold ml-1.5">Payment Completed</Text>
+                        <Text className="text-success-600 text-xs font-bold ml-1.5">Payment Completed</Text>
                       </View>
                     </View>
                   );
@@ -549,13 +588,13 @@ export default function MemberCommitteeOverview() {
                     <View className="bg-warning-500/10 rounded-xl p-3 mt-2">
                       <View className="flex-row items-center">
                         <Ionicons name="person-outline" size={16} color={COLORS.warning.light} />
-                        <Text className="text-warning-400 text-xs font-bold ml-1.5">Paid by Organizer</Text>
+                        <Text className="text-warning-600 text-xs font-bold ml-1.5">Paid by Organizer</Text>
                       </View>
-                      <Text className="text-neutral-500 text-[10px] mt-1">
+                      <Text className="text-slate-500 text-[10px] mt-1">
                         Organizer advanced {F(Math.abs(myObligation.netAmount))} on your behalf
                       </Text>
                       {memberIsBlocked && (
-                        <Text className="text-danger-400 text-[10px] mt-1">
+                        <Text className="text-danger-600 text-[10px] mt-1">
                           Pay this amount to the organiser to unblock your account.
                         </Text>
                       )}
@@ -568,15 +607,15 @@ export default function MemberCommitteeOverview() {
 
               {myCurrentDistribution > 0 && (
                 <View className="bg-success-500/10 rounded-xl p-3 mt-2">
-                  <Text className="text-neutral-500 text-[10px] uppercase font-bold mb-1">Your Distribution</Text>
-                  <Text className="text-success-400 font-bold text-lg">+{F(myCurrentDistribution)}</Text>
+                  <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">Your Distribution</Text>
+                  <Text className="text-success-600 font-bold text-lg">+{F(myCurrentDistribution)}</Text>
                 </View>
               )}
 
               {currentMonth.perMemberDistribution > 0 && !myCurrentDistribution && (
                 <View className="bg-success-500/10 rounded-xl p-3 mt-2">
-                  <Text className="text-neutral-500 text-[10px] uppercase font-bold mb-1">Per-Member Distribution</Text>
-                  <Text className="text-success-400 font-bold text-lg">+{F(currentMonth.perMemberDistribution)}</Text>
+                  <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">Per-Member Distribution</Text>
+                  <Text className="text-success-600 font-bold text-lg">+{F(currentMonth.perMemberDistribution)}</Text>
                 </View>
               )}
             </View>
@@ -598,10 +637,10 @@ export default function MemberCommitteeOverview() {
               />
             </View>
             <View className="flex-1">
-              <Text className="text-white font-bold text-sm">
+              <Text className="text-slate-900 font-bold text-sm">
                 {hasWon ? "Payout Received" : "Eligible to Bid"}
               </Text>
-              <Text className="text-neutral-500 text-xs mt-0.5">
+              <Text className="text-slate-500 text-xs mt-0.5">
                 {hasWon
                   ? "You have already received your committee payout. Thank you for participating!"
                   : "You have not won yet. Keep participating to receive your payout."}
@@ -620,17 +659,17 @@ export default function MemberCommitteeOverview() {
             <View className="w-7 h-7 rounded-lg bg-success-500/15 items-center justify-center mr-2">
               <Ionicons name="pie-chart-outline" size={14} color={COLORS.success.light} />
             </View>
-            <Text className="text-white font-bold text-sm">Your Progress</Text>
+            <Text className="text-slate-900 font-bold text-sm">Your Progress</Text>
           </View>
 
           <Card>
             <View className="mb-3">
               <View className="flex-row justify-between mb-1.5">
-                <Text className="text-neutral-400 text-xs">Distributions received</Text>
-                <Text className="text-success-400 text-xs font-bold">{F(myTotalReceived)} / {F(totalExpectedPayout)}</Text>
+                <Text className="text-slate-400 text-xs">Distributions received</Text>
+                <Text className="text-success-600 text-xs font-bold">{F(myTotalReceived)} / {F(totalExpectedPayout)}</Text>
               </View>
               {/* Progress bar */}
-              <View className="h-3 bg-surface-950 rounded-full overflow-hidden">
+              <View className="h-3 bg-surface-50 rounded-full overflow-hidden">
                 <LinearGradient
                   colors={GRADIENTS.successGreen}
                   start={{ x: 0, y: 0 }}
@@ -638,7 +677,7 @@ export default function MemberCommitteeOverview() {
                   style={{ width: `${progressPercent}%`, height: "100%", borderRadius: 9999 }}
                 />
               </View>
-              <Text className="text-neutral-500 text-[10px] mt-1.5 text-right">
+              <Text className="text-slate-500 text-[10px] mt-1.5 text-right">
                 {progressPercent.toFixed(1)}% of expected total ({F(totalExpectedPayout)})
               </Text>
             </View>
@@ -658,15 +697,15 @@ export default function MemberCommitteeOverview() {
                 <View className="w-7 h-7 rounded-lg bg-success-500/15 items-center justify-center mr-2">
                   <Ionicons name="checkmark-circle-outline" size={14} color={COLORS.success.light} />
                 </View>
-                <Text className="text-white font-bold text-sm">Payment Status</Text>
+                <Text className="text-slate-900 font-bold text-sm">Payment Status</Text>
               </View>
               <Card>
                 <View className="bg-success-500/10 rounded-xl p-4">
                   <View className="flex-row items-center mb-2">
                     <Ionicons name="checkmark-circle" size={20} color={COLORS.success.light} />
-                    <Text className="text-success-400 font-bold text-sm ml-2">Winner — No Payment Needed</Text>
+                    <Text className="text-success-600 font-bold text-sm ml-2">Winner — No Payment Needed</Text>
                   </View>
-                  <Text className="text-neutral-400 text-xs leading-5">
+                  <Text className="text-slate-400 text-xs leading-5">
                     You are the winner of Month #{currentMonth.monthNumber}. Your contribution of {F(installment)} has been netted from your payout. No physical payment is required.
                   </Text>
                 </View>
@@ -674,6 +713,10 @@ export default function MemberCommitteeOverview() {
             </View>
           );
         }
+
+        // For months 2+, only show Pay Contribution after month is resolved
+        const isMonth1 = currentMonth?.monthNumber === 1 || currentMonth?.resolutionType === "organiser_commission";
+        if (!isMonth1 && latestMonthStatus !== "completed") return null;
 
         // Find latest pending contribution for current member
         const myPendingInst = installments
@@ -696,7 +739,7 @@ export default function MemberCommitteeOverview() {
               <View className="w-7 h-7 rounded-lg bg-gold-500/15 items-center justify-center mr-2">
                 <Ionicons name="card-outline" size={14} color={COLORS.goldPrimary} />
               </View>
-              <Text className="text-white font-bold text-sm">Pay Contribution</Text>
+              <Text className="text-slate-900 font-bold text-sm">Pay Contribution</Text>
             </View>
 
             <Card>
@@ -747,7 +790,7 @@ export default function MemberCommitteeOverview() {
               <View className="w-7 h-7 rounded-lg bg-danger-500/15 items-center justify-center mr-2">
                 <Ionicons name="alert-circle-outline" size={14} color={COLORS.danger.light} />
               </View>
-              <Text className="text-white font-bold text-sm">Pending Dues</Text>
+              <Text className="text-slate-900 font-bold text-sm">Pending Dues</Text>
             </View>
             <Badge label={`${myPendingCount} pending`} variant="danger" size="sm" />
           </View>
@@ -759,8 +802,8 @@ export default function MemberCommitteeOverview() {
                 if (i.status !== "PENDING" && i.status !== "OVERDUE" && i.status !== "PARTIAL") return false;
                 // Exclude organiser's cycle 1 during organiser_commission month
                 if (isOrganiser && i.cycleNo === 1 && currentResolutionType === "organiser_commission") return false;
-                // Exclude winner's winning month installment (netted from payout)
-                if (isWinnerOfCurrentMonth && i.cycleNo === currentMonth.monthNumber) return false;
+                // Exclude any cycle where this member is the winner (netted from payout)
+                if (myWonCycleNos.has(i.cycleNo)) return false;
                 return true;
               })
               .slice(0, 5)
@@ -770,13 +813,13 @@ export default function MemberCommitteeOverview() {
                     <Ionicons name="time-outline" size={14} color={COLORS.danger.light} />
                   </View>
                   <View className="flex-1">
-                    <Text className="text-white text-xs font-semibold">Cycle #{inst.cycleNo}</Text>
-                    <Text className="text-neutral-500 text-[10px]">Due: {fmtDate(inst.dueDate)}</Text>
+                    <Text className="text-slate-900 text-xs font-semibold">Cycle #{inst.cycleNo}</Text>
+                    <Text className="text-slate-500 text-[10px]">Due: {fmtDate(inst.dueDate)}</Text>
                   </View>
                   <View className="items-end">
-                    <Text className="text-danger-400 text-xs font-bold">{F(inst.amountDuePaise)}</Text>
+                    <Text className="text-danger-600 text-xs font-bold">{F(inst.amountDuePaise)}</Text>
                     {inst.penaltyPaise > 0 && (
-                      <Text className="text-warning-400 text-[9px]">+{F(inst.penaltyPaise)} late fee</Text>
+                      <Text className="text-warning-600 text-[9px]">+{F(inst.penaltyPaise)} late fee</Text>
                     )}
                   </View>
                 </View>

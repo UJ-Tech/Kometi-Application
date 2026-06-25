@@ -604,6 +604,7 @@ export class CommitteesService {
     if (commError || !committee) throw new Error("Committee not found");
 
     const isOrganizer = committee.organizerId === userId;
+    let userMemberId: string | null = null;
     if (!isOrganizer) {
       const { data: member } = await supabase
         .from("committee_members")
@@ -612,15 +613,48 @@ export class CommitteesService {
         .eq("userId", userId)
         .maybeSingle();
       if (!member) throw new Error("You do not have access to this committee");
+      userMemberId = member.id;
     }
 
+    // Fetch all installments for this committee
     const { data: installments, error: instError } = await supabase
       .from("installments")
-      .select("cycleNo, dueDate, amountDuePaise, amountPaidPaise, status")
+      .select("cycleNo, dueDate, amountDuePaise, amountPaidPaise, status, userId")
       .eq("committeeId", committeeId)
       .order("cycleNo", { ascending: true });
 
     if (instError) throw instError;
+
+    // Aggregate per cycle: count paid, overdue, pending
+    const cycleMap = new Map<number, { cycleNo: number; dueDate: string; amountDuePaise: number; paid: number; pending: number; overdue: number; total: number; userStatus: string | null }>();
+
+    for (const inst of installments || []) {
+      const existing = cycleMap.get(inst.cycleNo);
+      if (existing) {
+        existing.total++;
+        if (inst.status === "PAID" || inst.status === "COMPLETED") existing.paid++;
+        else if (inst.status === "OVERDUE") existing.overdue++;
+        else existing.pending++;
+      } else {
+        cycleMap.set(inst.cycleNo, {
+          cycleNo: inst.cycleNo,
+          dueDate: inst.dueDate,
+          amountDuePaise: inst.amountDuePaise,
+          paid: (inst.status === "PAID" || inst.status === "COMPLETED") ? 1 : 0,
+          pending: (inst.status !== "PAID" && inst.status !== "COMPLETED" && inst.status !== "OVERDUE") ? 1 : 0,
+          overdue: inst.status === "OVERDUE" ? 1 : 0,
+          total: 1,
+          userStatus: null,
+        });
+      }
+
+      // Track current user's own status
+      if (userMemberId && inst.userId === userId) {
+        cycleMap.get(inst.cycleNo)!.userStatus = inst.status;
+      }
+    }
+
+    const cycles = Array.from(cycleMap.values()).sort((a, b) => a.cycleNo - b.cycleNo);
 
     return {
       committeeId,
@@ -628,7 +662,7 @@ export class CommitteesService {
       cycleDurationDays: committee.cycleDurationDays,
       installmentAmountPaise: committee.installmentAmountPaise,
       status: committee.status,
-      cycles: installments || [],
+      cycles,
     };
   }
 
@@ -1062,6 +1096,15 @@ export class CommitteesService {
 
     if (cErr || !committee) throw new Error("Committee not found");
 
+    // Resolve userId from memberId (committee_members.id → userId)
+    const { data: memberRow } = await supabase
+      .from("committee_members")
+      .select("userId")
+      .eq("id", memberId)
+      .single();
+
+    const userId = memberRow?.userId;
+
     // Fetch all payment obligations for this member in this committee
     const { data: obligations, error: oblErr } = await supabase
       .from("member_payment_obligations")
@@ -1074,11 +1117,11 @@ export class CommitteesService {
     const allObligations = obligations || [];
 
     // Calculate totals from obligations
-    let totalContributedPaise = 0;  // sum of contribution_amount (what they owe the pool)
-    let totalReceivedPaise = 0;     // sum of distribution_share (what they get back from the pool)
-    let totalPaidPaise = 0;         // sum of net_amount where direction=pay AND status in [paid, organiser_advanced]
-    let totalCreditedPaise = 0;     // sum of net_amount where direction=receive (winner payout)
-    let totalInterestPaise = 0;     // sum of interest_charged
+    let totalContributedPaise = 0;
+    let totalReceivedPaise = 0;
+    let totalPaidPaise = 0;
+    let totalCreditedPaise = 0;
+    let totalInterestPaise = 0;
     let monthsCompleted = 0;
     let monthsWon = 0;
 
@@ -1093,16 +1136,31 @@ export class CommitteesService {
       if (o.direction === "pay" && (o.status === "paid" || o.status === "organiser_advanced")) {
         totalPaidPaise += Number(o.net_amount || 0);
       }
-      if (o.direction === "receive") {
+      if (o.direction === "receive" && o.status === "paid") {
         totalCreditedPaise += Number(o.net_amount || 0);
         if (o.role === "winner") monthsWon++;
       }
     }
 
+    // Also count contributions from installments (covers payments made before month resolution)
+    if (userId) {
+      const { data: insts } = await supabase
+        .from("installments")
+        .select("amountPaidPaise, amountDuePaise, status")
+        .eq("committeeId", committeeId)
+        .eq("userId", userId);
+
+      const installmentPaid = (insts || [])
+        .filter((i: any) => i.status === "PAID" || i.status === "COMPLETED")
+        .reduce((sum: number, i: any) => sum + Number(i.amountPaidPaise || i.amountDuePaise || 0), 0);
+
+      // Use the higher of obligation-based or installment-based paid amount
+      totalPaidPaise = Math.max(totalPaidPaise, installmentPaid);
+    }
+
     monthsCompleted = monthIds.size;
 
     // Net position: what they've actually received minus what they've actually paid
-    // In netted flow: winners get credited, non-winners pay later
     const netPositionPaise = totalCreditedPaise - totalPaidPaise;
 
     return {
@@ -1110,8 +1168,8 @@ export class CommitteesService {
       memberId,
       totalContributedPaise,
       totalReceivedPaise,
-      totalPaidPaise,       // actual payments made (non-winners after resolution)
-      totalCreditedPaise,   // actual credits received (winners after resolution)
+      totalPaidPaise,
+      totalCreditedPaise,
       totalInterestPaise,
       netPositionPaise,
       monthsCompleted,
