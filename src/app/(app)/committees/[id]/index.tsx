@@ -1,7 +1,7 @@
 // src/app/(app)/committees/[id]/index.tsx
 // Moved from committees/[id].tsx → committees/[id]/index.tsx
 // so the [id]/ directory can hold nested manage/ screens without conflict.
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -53,10 +53,6 @@ export default function CommitteeDetail() {
     return confirm(title, message, { confirmLabel });
   };
 
-  const syncCommitteeData = async () => {
-    await Promise.all([loadCommittee(), loadJoinRequests()]);
-  };
-
   const markRequestProcessed = (requestId: string, status: "APPROVED" | "REJECTED") => {
     setJoinRequests((prev) =>
       prev.map((request) => (
@@ -67,7 +63,7 @@ export default function CommitteeDetail() {
     );
   };
 
-  const loadCommittee = async () => {
+  const loadCommittee = useCallback(async () => {
     try {
       const res = await committeesApi.getById(id);
       setCommittee(res.data.data);
@@ -79,62 +75,30 @@ export default function CommitteeDetail() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
-
-  useEffect(() => {
-    if (isValidId) {
-      loadCommittee();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // Socket-triggered instant refresh (committee status, bids, join requests)
-  const biddingVersion = useCommitteeStore((s) => s.biddingOpenedVersion);
-  const resolvedVersion = useCommitteeStore((s) => s.monthResolvedVersion);
-  const bidVersion = useCommitteeStore((s) => s.bidPlacedVersion);
-  const contributionVersion = useCommitteeStore((s) => s.contributionUpdatedVersion);
-  useEffect(() => {
-    if (biddingVersion + resolvedVersion + bidVersion + contributionVersion > 0) {
-      syncCommitteeData();
-    }
-  }, [biddingVersion, resolvedVersion, bidVersion, contributionVersion]);
-
-  const loadJoinRequests = async () => {
+  const loadJoinRequests = useCallback(async () => {
     try {
       const res = await committeesApi.getJoinRequests(id);
       setJoinRequests(res.data.data);
     } catch (err) {
       console.error("[CommitteeDetail] Failed to load join requests:", err);
     }
-  };
+  }, [id]);
 
-  useEffect(() => {
-    if (id && committee?.organizerId === currentUser?.id && committee?.status === "DRAFT") {
-      loadJoinRequests();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, committee?.organizerId, committee?.status]);
-
-  const loadSchedule = async () => {
-    if (!id || !committee) return;
-    if (committee.status === "DRAFT") return;
+  const loadSchedule = useCallback(async (committeeData?: any) => {
+    if (!id) return;
+    const status = committeeData?.status;
+    if (status === "DRAFT") return;
     try {
       const res = await committeesApi.getSchedule(id);
       setSchedule(res.data.data.cycles);
     } catch (err) {
       console.error("[CommitteeDetail] Failed to load schedule:", err);
     }
-  };
+  }, [id]);
 
-  useEffect(() => {
-    if (committee && committee.status !== "DRAFT") {
-      loadSchedule();
-      loadMonths();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [committee?.id, committee?.status]);
-
-  const loadMonths = async () => {
+  const loadMonths = useCallback(async () => {
     try {
       const res = await committeesApi.getMonths(id);
       const data = res.data.data;
@@ -142,7 +106,58 @@ export default function CommitteeDetail() {
     } catch (err) {
       console.error("[CommitteeDetail] Failed to load months:", err);
     }
-  };
+  }, [id]);
+
+  const syncCommitteeData = useCallback(async () => {
+    await Promise.all([loadCommittee(), loadJoinRequests()]);
+  }, [loadCommittee, loadJoinRequests]);
+
+  useEffect(() => {
+    if (isValidId) {
+      loadCommittee();
+    }
+  }, [id, isValidId, loadCommittee]);
+
+  // Socket-triggered instant refresh (committee status, bids, join requests)
+  const biddingVersion = useCommitteeStore((s) => s.biddingOpenedVersion);
+  const resolvedVersion = useCommitteeStore((s) => s.monthResolvedVersion);
+  const bidVersion = useCommitteeStore((s) => s.bidPlacedVersion);
+  const contributionVersion = useCommitteeStore((s) => s.contributionUpdatedVersion);
+  const socketVersionSum = biddingVersion + resolvedVersion + bidVersion + contributionVersion;
+  const lastSocketVersion = useRef(0);
+  const pendingCommitteeRefresh = useRef(false);
+  const isTypingInput = bidAmount.length > 0 || adjustSizeValue.length > 0;
+  useEffect(() => {
+    if (socketVersionSum > 0 && socketVersionSum !== lastSocketVersion.current) {
+      lastSocketVersion.current = socketVersionSum;
+      if (isTypingInput) {
+        pendingCommitteeRefresh.current = true;
+      } else {
+        syncCommitteeData();
+      }
+    }
+  }, [socketVersionSum, syncCommitteeData, isTypingInput]);
+
+  // Flush pending refresh when user clears inputs
+  useEffect(() => {
+    if (!isTypingInput && pendingCommitteeRefresh.current) {
+      pendingCommitteeRefresh.current = false;
+      syncCommitteeData();
+    }
+  }, [isTypingInput, syncCommitteeData]);
+
+  useEffect(() => {
+    if (id && committee?.organizerId === currentUser?.id && committee?.status === "DRAFT") {
+      loadJoinRequests();
+    }
+  }, [id, committee?.organizerId, committee?.status, loadJoinRequests, currentUser?.id]);
+
+  useEffect(() => {
+    if (committee && committee.status !== "DRAFT") {
+      loadSchedule(committee);
+      loadMonths();
+    }
+  }, [committee, loadSchedule, loadMonths]);
 
   if (!isValidId) {
     return (

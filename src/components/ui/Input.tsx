@@ -1,5 +1,5 @@
 // src/components/ui/Input.tsx
-import React, { useState, forwardRef } from "react";
+import React, { forwardRef } from "react";
 import {
   View,
   TextInput,
@@ -27,23 +27,18 @@ const Input = forwardRef<TextInput, InputProps>(({
   rightElement,
   containerStyle,
   required,
+  value,
+  onChangeText,
+  onFocus,
+  onBlur,
+  returnKeyType,
+  onSubmitEditing,
+  blurOnSubmit = true,
   ...rest
 }, ref) => {
-  const [isFocused, setIsFocused] = useState(false);
-
   const borderColor = error
     ? COLORS.danger.DEFAULT
-    : isFocused
-    ? COLORS.brand[500]
     : COLORS.surface.border;
-
-  const shadowStyle = isFocused ? {
-    shadowColor:   COLORS.brand[500],
-    shadowOffset:  { width: 0, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius:  6,
-    elevation:     3,
-  } : {};
 
   return (
     <View style={[{ width: "100%" }, containerStyle]}>
@@ -70,7 +65,6 @@ const Input = forwardRef<TextInput, InputProps>(({
           paddingHorizontal: SPACING[3],
           height:          52,
         },
-        shadowStyle,
       ]}>
         {leftIcon && (
           <View style={{ marginRight: SPACING[2] }}>{leftIcon}</View>
@@ -83,12 +77,15 @@ const Input = forwardRef<TextInput, InputProps>(({
             fontSize:   FONT_SIZE.base,
             color:      COLORS.text.primary,
             paddingVertical: 0,
-            outlineStyle: "none",
-          } as any}
+          }}
           placeholderTextColor={COLORS.text.muted}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          value={rest.value ?? ""}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          value={value ?? ""}
+          onChangeText={onChangeText}
+          returnKeyType={returnKeyType}
+          onSubmitEditing={onSubmitEditing}
+          blurOnSubmit={blurOnSubmit}
           {...rest}
         />
 

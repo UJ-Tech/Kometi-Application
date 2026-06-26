@@ -1,5 +1,5 @@
 // src/app/(app)/committees/[id]/manage/month/[monthId].tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -43,6 +43,7 @@ export default function OrganiserMonthDetail() {
   const [refreshing, setRefreshing] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
   const [isSettling, setIsSettling] = useState(false);
+  const settleAttemptedRef = useRef(false);
 
   const notify = async (title: string, message: string) => {
     await alert(title, message);
@@ -80,11 +81,14 @@ export default function OrganiserMonthDetail() {
   const bidVersion = useCommitteeStore((s) => s.bidPlacedVersion);
   const resolvedVersion = useCommitteeStore((s) => s.monthResolvedVersion);
   const contributionVersion = useCommitteeStore((s) => s.contributionUpdatedVersion);
+  const socketVersionSum = bidVersion + resolvedVersion + contributionVersion;
+  const lastSocketVersion = useRef(0);
   useEffect(() => {
-    if (bidVersion + resolvedVersion + contributionVersion > 0) {
+    if (socketVersionSum > 0 && socketVersionSum !== lastSocketVersion.current) {
+      lastSocketVersion.current = socketVersionSum;
       loadData();
     }
-  }, [bidVersion, resolvedVersion, contributionVersion]);
+  }, [socketVersionSum, loadData]);
 
   // Fallback polling every 30 seconds when month is completed (watching for settlements)
   useEffect(() => {
@@ -100,7 +104,8 @@ export default function OrganiserMonthDetail() {
     const winnerObl = month.paymentObligations?.find(
       (o: any) => o.direction === "receive" && o.status === "pending"
     );
-    if (winnerObl) {
+    if (winnerObl && !settleAttemptedRef.current) {
+      settleAttemptedRef.current = true;
       committeesApi.settlePayout(id, monthId).then((res) => {
         const result = res.data?.data;
         if (result?.settled) {
@@ -111,7 +116,7 @@ export default function OrganiserMonthDetail() {
         console.error("[SettlePayout] Auto-settle failed:", err);
       });
     }
-  }, [month?.status, month?.paymentObligations]);
+  }, [month?.status]);
 
   const handleRefresh = () => {
     setRefreshing(true);

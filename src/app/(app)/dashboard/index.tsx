@@ -1,7 +1,7 @@
 // src/app/(app)/dashboard/index.tsx
 // Kometi Member & Organizer Premium Dashboard Home.
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, Text, ScrollView, TouchableOpacity, RefreshControl, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 
@@ -49,12 +49,15 @@ export default function Dashboard() {
   const walletUpdatedVersion = useWalletStore((s) => s.walletUpdatedVersion);
   const contributionVersion = useCommitteeStore((s) => s.contributionUpdatedVersion);
   const resolvedVersion = useCommitteeStore((s) => s.monthResolvedVersion);
+  const socketVersionSum = walletUpdatedVersion + contributionVersion + resolvedVersion;
+  const lastSocketVersion = useRef(0);
   useEffect(() => {
-    if (walletUpdatedVersion + contributionVersion + resolvedVersion > 0) {
+    if (socketVersionSum > 0 && socketVersionSum !== lastSocketVersion.current) {
+      lastSocketVersion.current = socketVersionSum;
       fetchWalletData();
       fetchUpcomingDues();
     }
-  }, [walletUpdatedVersion, contributionVersion, resolvedVersion]);
+  }, [socketVersionSum, fetchWalletData, fetchUpcomingDues]);
 
   const confirmLogout = async () => {
     return confirm("Logout", "Are you sure you want to logout?", { confirmLabel: "Logout", type: "warning" });

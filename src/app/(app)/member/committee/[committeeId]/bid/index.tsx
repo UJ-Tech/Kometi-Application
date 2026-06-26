@@ -1,6 +1,6 @@
 // src/app/(app)/member/committee/[committeeId]/bid/index.tsx
 // Place Bid Screen — real-time validation, live preview, confirmation
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -84,11 +84,27 @@ export default function PlaceBidScreen() {
   const bidVersion = useCommitteeStore((s) => s.bidPlacedVersion);
   const biddingVersion = useCommitteeStore((s) => s.biddingOpenedVersion);
   const resolvedVersion = useCommitteeStore((s) => s.monthResolvedVersion);
+  const socketVersionSum = bidVersion + biddingVersion + resolvedVersion;
+  const lastSocketVersion = useRef(0);
+  const pendingBidRefresh = useRef(false);
   useEffect(() => {
-    if (bidVersion + biddingVersion + resolvedVersion > 0) {
+    if (socketVersionSum > 0 && socketVersionSum !== lastSocketVersion.current) {
+      lastSocketVersion.current = socketVersionSum;
+      if (bidInput.length > 0) {
+        pendingBidRefresh.current = true;
+      } else {
+        loadData();
+      }
+    }
+  }, [socketVersionSum, loadData, bidInput.length]);
+
+  // Flush pending refresh when user clears bid input
+  useEffect(() => {
+    if (bidInput.length === 0 && pendingBidRefresh.current) {
+      pendingBidRefresh.current = false;
       loadData();
     }
-  }, [bidVersion, biddingVersion, resolvedVersion]);
+  }, [bidInput.length, loadData]);
 
   if (!isValidId) {
     return (

@@ -76,6 +76,7 @@ export default function LoginScreen() {
           { paddingBottom: insets.bottom + SPACING[6] },
         ]}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
       >
         <View style={styles.topSection}>
           <View style={styles.iconCircle}>

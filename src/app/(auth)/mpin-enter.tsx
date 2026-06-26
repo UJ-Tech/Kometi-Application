@@ -1,7 +1,7 @@
 // src/app/(auth)/mpin-enter.tsx
 // Returning user MPIN gate — with biometric shortcut
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -34,10 +34,12 @@ export default function MPINEnterScreen() {
     if (ok) router.replace("/(app)/dashboard");
   };
 
+  const biometricOffered = useRef(false);
   useEffect(() => {
-    // Offer biometric on mount
-    if (isEnrolled) handleBiometric();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (isEnrolled && !biometricOffered.current) {
+      biometricOffered.current = true;
+      handleBiometric();
+    }
   }, [isEnrolled]);
 
   const handleVerify = async () => {

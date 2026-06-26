@@ -1,6 +1,6 @@
 // src/app/(app)/member/committee/[committeeId]/index.tsx
 // Member Dashboard — Committee Overview
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -62,7 +62,6 @@ export default function MemberCommitteeOverview() {
       if (mRes.status === "fulfilled") setMonthsData(mRes.value.data.data);
       if (iRes.status === "fulfilled") setInstallments(iRes.value.data.data || []);
 
-      // Fetch member stats once we have committee data (need myMemberId)
       const cData = cRes.status === "fulfilled" ? cRes.value.data.data : null;
       if (cData) {
         const members: any[] = cData.members || [];
@@ -80,19 +79,23 @@ export default function MemberCommitteeOverview() {
     }
   }, [committeeId, isValidId, currentUser?.id]);
 
+  // Use a ref for monthsData to avoid stale closures in intervals/socket handlers
+  const monthsDataRef = useRef(monthsData);
+  monthsDataRef.current = monthsData;
+
   useEffect(() => {
     if (isValidId) loadData();
     else { setLoading(false); setError("Invalid committee ID"); }
   }, [isValidId, loadData]);
 
-  // Auto-refresh all committee data every 30 seconds (stats, obligations, month detail)
+  // Auto-refresh all committee data every 30 seconds
   useEffect(() => {
     if (!isValidId) return;
     const interval = setInterval(() => {
       loadData();
-      // Also refresh current month detail if available
-      if (monthsData?.months?.length) {
-        const latestMonth = monthsData.months[monthsData.months.length - 1];
+      const md = monthsDataRef.current;
+      if (md?.months?.length) {
+        const latestMonth = md.months[md.months.length - 1];
         if (latestMonth?.id) {
           committeesApi.getMonth(committeeId, latestMonth.id)
             .then((res: any) => setCurrentMonthDetail(res.data.data))
@@ -101,7 +104,7 @@ export default function MemberCommitteeOverview() {
       }
     }, 30000);
     return () => clearInterval(interval);
-  }, [isValidId, loadData, committeeId, monthsData]);
+  }, [isValidId, loadData, committeeId]);
 
   // Load current month detail when months data is available
   useEffect(() => {
@@ -116,17 +119,20 @@ export default function MemberCommitteeOverview() {
 
   // NOTE: Month detail is refreshed in the main interval above (every 30s)
 
-  // Instant refresh when socket events fire (bidding opened, month resolved, bid placed, contribution updated)
+  // Instant refresh when socket events fire
   const biddingVersion = useCommitteeStore((s) => s.biddingOpenedVersion);
   const resolvedVersion = useCommitteeStore((s) => s.monthResolvedVersion);
   const bidVersion = useCommitteeStore((s) => s.bidPlacedVersion);
   const contributionVersion = useCommitteeStore((s) => s.contributionUpdatedVersion);
+  const socketVersionSum = biddingVersion + resolvedVersion + bidVersion + contributionVersion;
+  const lastSocketVersion = useRef(0);
   useEffect(() => {
-    if (biddingVersion + resolvedVersion + bidVersion + contributionVersion > 0) {
+    if (socketVersionSum > 0 && socketVersionSum !== lastSocketVersion.current) {
+      lastSocketVersion.current = socketVersionSum;
       loadData();
-      // Also refresh month detail
-      if (monthsData?.months?.length) {
-        const latestMonth = monthsData.months[monthsData.months.length - 1];
+      const md = monthsDataRef.current;
+      if (md?.months?.length) {
+        const latestMonth = md.months[md.months.length - 1];
         if (latestMonth?.id) {
           committeesApi.getMonth(committeeId, latestMonth.id)
             .then((res: any) => setCurrentMonthDetail(res.data.data))
@@ -134,7 +140,7 @@ export default function MemberCommitteeOverview() {
         }
       }
     }
-  }, [biddingVersion, resolvedVersion, bidVersion, contributionVersion]);
+  }, [socketVersionSum, loadData, committeeId]);
 
   const onRefresh = useCallback(() => { setRefreshing(true); loadData(); }, [loadData]);
 

@@ -1,9 +1,10 @@
 // src/app/(app)/settings/change-password.tsx
 import React, { useState } from "react";
-import { View, Text, ScrollView, StyleSheet } from "react-native";
+import { View, Text, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS } from "../../../constants/theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { COLORS, SPACING } from "../../../constants/theme";
 import ScreenHeader from "../../../components/shared/ScreenHeader";
 import Input from "../../../components/ui/Input";
 import Button from "../../../components/ui/Button";
@@ -13,6 +14,7 @@ import { useAlertModal } from "../../../components/ui/AlertModal";
 
 export default function ChangePassword() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { alert, confirm, AlertComponent } = useAlertModal();
   const [isLoading, setIsLoading] = useState(false);
   const [form, setForm] = useState({
@@ -52,7 +54,10 @@ export default function ChangePassword() {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: COLORS.surface.bg }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
       <ScreenHeader
         title="Change Password"
         subtitle="Update your account password"
@@ -60,8 +65,10 @@ export default function ChangePassword() {
       />
 
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + SPACING[6] }]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
       >
         <Card style={{ marginBottom: 20 }}>
           <View style={styles.cardContent}>
@@ -79,6 +86,7 @@ export default function ChangePassword() {
           onChangeText={(val) => setForm({ ...form, currentPassword: val })}
           error={errors.currentPassword}
           secureTextEntry
+          returnKeyType="next"
           required
         />
 
@@ -89,6 +97,7 @@ export default function ChangePassword() {
           onChangeText={(val) => setForm({ ...form, newPassword: val })}
           error={errors.newPassword}
           secureTextEntry
+          returnKeyType="next"
           containerStyle={{ marginTop: 16 }}
           required
         />
@@ -100,6 +109,8 @@ export default function ChangePassword() {
           onChangeText={(val) => setForm({ ...form, confirmPassword: val })}
           error={errors.confirmPassword}
           secureTextEntry
+          returnKeyType="done"
+          onSubmitEditing={handleChangePassword}
           containerStyle={{ marginTop: 16 }}
           required
         />
@@ -114,18 +125,14 @@ export default function ChangePassword() {
       </ScrollView>
 
       <AlertComponent />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.surface.bg,
-  },
   content: {
     padding: 20,
-    paddingBottom: 40,
+    flexGrow: 1,
   },
   cardContent: {
     flexDirection: "row",

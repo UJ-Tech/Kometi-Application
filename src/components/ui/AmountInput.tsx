@@ -2,7 +2,7 @@
 // A premium paise-aware input component tailored for Indian rupee formatting.
 // Handles typing with proper comma separation (Lakhs/thousands) and converts to BigInt paise.
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, TextInput, Text, StyleSheet } from "react-native";
 import { COLORS, BORDER_RADIUS } from "../../constants/theme";
 import { formatINR } from "../../utils/currency";
@@ -26,11 +26,14 @@ export function AmountInput({
 }: AmountInputProps) {
   const [isFocused, setIsFocused] = useState(false);
   const [displayValue, setDisplayValue] = useState("");
+  const lastExternalPaise = useRef(valuePaise);
 
-  // Keep display synchronized with external value
+  // Keep display synchronized only when value changes from external source (not from typing)
   useEffect(() => {
+    if (valuePaise === lastExternalPaise.current) return;
+    lastExternalPaise.current = valuePaise;
     if (valuePaise === 0n) {
-      if (!isFocused) setDisplayValue("");
+      setDisplayValue("");
     } else {
       const rupeesVal = Number(valuePaise) / 100;
       setDisplayValue(rupeesVal.toLocaleString("en-IN", {
@@ -38,8 +41,7 @@ export function AmountInput({
         minimumFractionDigits: 0,
       }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [valuePaise, isFocused]);
+  }, [valuePaise]);
 
   const handleChangeText = (text: string) => {
     // Strip everything except numbers and a single decimal dot
@@ -55,20 +57,24 @@ export function AmountInput({
     setDisplayValue(cleanText);
 
     // Convert to BigInt paise
+    let newPaise = 0n;
     if (!cleanText || cleanText === ".") {
-      onChangePaise(0n);
-      return;
-    }
-
-    const rupeesNum = parseFloat(cleanText);
-    if (!isNaN(rupeesNum)) {
-      const calculatedPaise = BigInt(Math.round(rupeesNum * 100));
-      if (maxAmountPaise && calculatedPaise > maxAmountPaise) {
-        onChangePaise(maxAmountPaise);
-      } else {
-        onChangePaise(calculatedPaise);
+      newPaise = 0n;
+    } else {
+      const rupeesNum = parseFloat(cleanText);
+      if (!isNaN(rupeesNum)) {
+        const calculatedPaise = BigInt(Math.round(rupeesNum * 100));
+        if (maxAmountPaise && calculatedPaise > maxAmountPaise) {
+          newPaise = maxAmountPaise;
+        } else {
+          newPaise = calculatedPaise;
+        }
       }
     }
+
+    // Update ref so useEffect doesn't treat this as external change
+    lastExternalPaise.current = newPaise;
+    onChangePaise(newPaise);
   };
 
   const handleBlur = () => {

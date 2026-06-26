@@ -87,6 +87,7 @@ export default function RegisterScreen() {
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + SPACING[6] }]}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
       >
         <View style={styles.top}>
           <View style={styles.iconCircle}>

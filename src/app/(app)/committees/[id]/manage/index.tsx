@@ -1,5 +1,5 @@
 // src/app/(app)/committees/[id]/manage/index.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -111,20 +111,40 @@ export default function OrganiserManageTimeline() {
   const biddingVersion = useCommitteeStore((s) => s.biddingOpenedVersion);
   const resolvedVersion = useCommitteeStore((s) => s.monthResolvedVersion);
   const contributionVersion = useCommitteeStore((s) => s.contributionUpdatedVersion);
+  const socketVersionSum = bidVersion + biddingVersion + resolvedVersion + contributionVersion;
+  const lastSocketVersion = useRef(0);
+  const pendingRefresh = useRef(false);
   useEffect(() => {
-    if (bidVersion + biddingVersion + resolvedVersion + contributionVersion > 0) {
+    if (socketVersionSum > 0 && socketVersionSum !== lastSocketVersion.current) {
+      lastSocketVersion.current = socketVersionSum;
+      if (showCreateMonth) {
+        pendingRefresh.current = true;
+      } else {
+        loadData();
+      }
+    }
+  }, [socketVersionSum, loadData, showCreateMonth]);
+
+  // Refresh deferred data when user closes the create month form
+  useEffect(() => {
+    if (!showCreateMonth && pendingRefresh.current) {
+      pendingRefresh.current = false;
       loadData();
     }
-  }, [bidVersion, biddingVersion, resolvedVersion, contributionVersion]);
+  }, [showCreateMonth, loadData]);
 
   // Fallback polling every 60 seconds (in case socket disconnects)
   useEffect(() => {
     if (!isValidId) return;
     const interval = setInterval(() => {
-      loadData();
+      if (showCreateMonth) {
+        pendingRefresh.current = true;
+      } else {
+        loadData();
+      }
     }, 60000);
     return () => clearInterval(interval);
-  }, [isValidId, loadData]);
+  }, [isValidId, loadData, showCreateMonth]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);

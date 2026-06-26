@@ -1,7 +1,7 @@
 // src/app/(auth)/otp-verify.tsx
 // OTP verification with countdown timer, resend, and new-user redirect
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View, Text, KeyboardAvoidingView, Platform, StyleSheet, TouchableOpacity,
 } from "react-native";
@@ -37,8 +37,20 @@ export default function OTPVerifyScreen() {
     if (countdown <= 0) { setCanResend(true); return; }
     const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [countdown]);
+
+  // Auto-verify when OTP is complete
+  const autoVerifyTriggered = useRef(false);
+  useEffect(() => {
+    if (otp.length === APP_CONFIG.OTP_LENGTH && !isLoading && !autoVerifyTriggered.current) {
+      autoVerifyTriggered.current = true;
+      const t = setTimeout(() => handleVerify(), 100);
+      return () => clearTimeout(t);
+    }
+    if (otp.length < APP_CONFIG.OTP_LENGTH) {
+      autoVerifyTriggered.current = false;
+    }
+  }, [otp, isLoading]);
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
@@ -117,12 +129,6 @@ export default function OTPVerifyScreen() {
           error={error}
           autoFocus
         />
-
-        {/* Auto verify when 6 digits entered */}
-        {otp.length === APP_CONFIG.OTP_LENGTH && !isLoading && (() => {
-          setTimeout(() => handleVerify(), 100);
-          return null;
-        })()}
 
         <Button
           label="Verify OTP"
