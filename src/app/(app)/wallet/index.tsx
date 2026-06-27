@@ -2,7 +2,7 @@
 // Kometi Wallet Management, balance ledger and transactions ledger.
 
 import React, { useState, useEffect } from "react";
-import { View, Text, FlatList, TouchableOpacity, RefreshControl, Platform } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, RefreshControl, Platform, Linking } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useWalletStore } from "../../../stores/wallet.store";
@@ -112,8 +112,17 @@ export default function Wallet() {
           },
         });
       } else {
-        // Mobile fallback — show manual UPI instruction
-        await alert("Web Only", "Wallet top-up via Razorpay is currently supported on web. Please use the web app to add funds.");
+        // Mobile: Open Razorpay checkout in browser
+        try {
+          const webCheckoutUrl = `https://checkout.razorpay.com/v1/checkout.html?order_id=${orderData.orderId}&key=${orderData.razorpayKeyId}&amount=${orderData.amount}&currency=${orderData.currency}&name=Kometi&description=${encodeURIComponent(`Add ${formatINR(topupAmount)} to Wallet`)}`;
+          await Linking.openURL(webCheckoutUrl);
+          await alert(
+            "Payment Initiated",
+            "Please complete the payment in your browser. Once done, return to this app and pull down to refresh your balance."
+          );
+        } catch (err) {
+          await alert("Error", "Failed to open payment page. Please try again or use the web app.");
+        }
       }
     } catch (err: any) {
       await alert("Top-up Failed", err.message || "An error occurred during payment.");
@@ -235,16 +244,13 @@ export default function Wallet() {
                   </View>
                   <View className="mt-5">
                     {isMobile ? (
-                      <TouchableOpacity
-                        disabled={topupLoading}
-                        className="bg-surface-card border border-brand-primary/20 rounded-xl h-14 items-center justify-center flex-row"
-                        onPress={async () =>
-                          await alert("Use Web App", "Wallet top-up is available on the web app. Please visit kometi.app to add funds.")
-                        }
-                      >
-                        <Ionicons name="phone-portrait-outline" size={18} color={COLORS.brandPrimary} />
-                        <Text className="text-brand-600 font-bold text-sm ml-2">View on Web to Pay</Text>
-                      </TouchableOpacity>
+                      <Button
+                        label={topupLoading ? "Opening Payment..." : `Pay ${formatINR(topupAmount)}`}
+                        variant="gold"
+                        onPress={handleTopup}
+                        isLoading={topupLoading}
+                        disabled={topupAmount <= 0n || topupLoading}
+                      />
                     ) : (
                       <Button
                         label={topupLoading ? "Processing..." : `Pay ${formatINR(topupAmount)}`}

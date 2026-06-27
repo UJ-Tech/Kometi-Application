@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.surface.border,
     padding: SPACING[5],
-    gap: SPACING[4.5],
+    gap: SPACING[4],
     shadowColor: COLORS.brand[500],
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.05,

@@ -138,7 +138,7 @@ export default function LoginScreen() {
             <Text style={styles.formError}>{errors.form}</Text>
           ) : null}
 
-          <View style={{ marginTop: SPACING[2] }}>
+          <View style={{ marginTop: SPACING[3] }}>
             <Button
               label="Sign In"
               variant="primary"
@@ -148,12 +148,14 @@ export default function LoginScreen() {
             />
           </View>
 
-          <Button
-            label="Create Account"
-            variant="secondary"
-            size="md"
-            onPress={() => router.push("/(auth)/register")}
-          />
+          <View style={{ marginTop: SPACING[2] }}>
+            <Button
+              label="Create Account"
+              variant="secondary"
+              size="md"
+              onPress={() => router.push("/(auth)/register")}
+            />
+          </View>
         </View>
 
         <View style={styles.trustRow}>
@@ -197,7 +199,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.surface.border,
     padding: SPACING[5],
-    gap: SPACING[4.5],
+    gap: SPACING[4],
   },
   formError: { fontSize: FONT_SIZE.sm, color: COLORS.danger.light, lineHeight: 20 },
   trustRow: {

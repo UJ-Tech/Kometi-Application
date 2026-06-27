@@ -94,7 +94,7 @@ export default function RoleSelectScreen() {
             >
               {isSelected && (
                 <View
-                  style={{ ...StyleSheet.absoluteFillObject, backgroundColor: role.bgColor }}
+                  style={{ ...StyleSheet.absoluteFill, backgroundColor: role.bgColor }}
                 />
               )}
               <View style={[

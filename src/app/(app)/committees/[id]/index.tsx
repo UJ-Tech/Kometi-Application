@@ -123,7 +123,8 @@ export default function CommitteeDetail() {
   const resolvedVersion = useCommitteeStore((s) => s.monthResolvedVersion);
   const bidVersion = useCommitteeStore((s) => s.bidPlacedVersion);
   const contributionVersion = useCommitteeStore((s) => s.contributionUpdatedVersion);
-  const socketVersionSum = biddingVersion + resolvedVersion + bidVersion + contributionVersion;
+  const joinRequestVersion = useCommitteeStore((s) => s.joinRequestVersion);
+  const socketVersionSum = biddingVersion + resolvedVersion + bidVersion + contributionVersion + joinRequestVersion;
   const lastSocketVersion = useRef(0);
   const pendingCommitteeRefresh = useRef(false);
   const isTypingInput = bidAmount.length > 0 || adjustSizeValue.length > 0;
@@ -255,7 +256,7 @@ export default function CommitteeDetail() {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    loadCommittee();
+    Promise.all([loadCommittee(), loadJoinRequests()]).finally(() => setRefreshing(false));
   };
 
   const handlePlaceBid = async () => {

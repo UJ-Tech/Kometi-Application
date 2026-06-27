@@ -342,7 +342,7 @@ export class CommitteesService {
     // 1. Find committee by invite code
     const { data: committee, error: commError } = await supabase
       .from("committees")
-      .select("id, name, status, totalSlots, filledSlots")
+      .select("id, name, status, totalSlots, filledSlots, organizerId")
       .eq("inviteCode", code)
       .single();
 
@@ -394,6 +394,11 @@ export class CommitteesService {
         .single();
 
       if (updateErr) throw updateErr;
+      // Notify organizer about the new join request
+      emitToUser(committee.organizerId, "committee:join_request_received", {
+        committeeId: committee.id,
+        requestId: updated.id,
+      });
       return { committee, joinRequest: updated, isRetry: true };
     }
 
@@ -409,6 +414,11 @@ export class CommitteesService {
       .single();
 
     if (createErr) throw createErr;
+    // Notify organizer about the new join request
+    emitToUser(committee.organizerId, "committee:join_request_received", {
+      committeeId: committee.id,
+      requestId: joinRequest.id,
+    });
     return { committee, joinRequest, isRetry: false };
   }
 
@@ -536,6 +546,19 @@ export class CommitteesService {
 
     if (statusErr) throw statusErr;
 
+    // Notify the user whose request was approved
+    emitToUser(joinRequest.userId, "committee:join_request_approved", {
+      committeeId,
+      requestId,
+      slotNumber: nextSlot,
+    });
+    // Also notify organizer about the update
+    emitToUser(organizerId, "committee:join_request_updated", {
+      committeeId,
+      requestId,
+      status: "APPROVED",
+    });
+
     return { success: true, alreadyMember: false, slotNumber: nextSlot };
   }
 
@@ -576,6 +599,17 @@ export class CommitteesService {
       .eq("id", requestId);
 
     if (updateError) throw updateError;
+    // Notify the user whose request was rejected
+    emitToUser(request.userId, "committee:join_request_rejected", {
+      committeeId,
+      requestId,
+    });
+    // Also notify organizer about the update
+    emitToUser(organizerId, "committee:join_request_updated", {
+      committeeId,
+      requestId,
+      status: "REJECTED",
+    });
     return { success: true };
   }
 

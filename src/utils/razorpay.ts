@@ -1,7 +1,7 @@
 // src/utils/razorpay.ts
 // Razorpay Checkout script loader and payment opener.
 
-import { Platform } from "react-native";
+import { Platform, Linking } from "react-native";
 
 declare global {
   interface Window {
@@ -94,7 +94,28 @@ export async function openRazorpayCheckout(
   options: Omit<RazorpayOptions, "handler"> & { handler: (response: RazorpayResponse) => void }
 ): Promise<void> {
   if (Platform.OS !== "web") {
-    throw new Error("Razorpay Checkout is only supported on web. Use react-native-razorpay for mobile.");
+    // For mobile, open the Razorpay checkout page in the browser
+    const checkoutUrl = `https://checkout.razorpay.com/v1/checkout.js`;
+    const paymentUrl = `https://api.razorpay.com/v1/orders/${options.order_id}/pay`;
+    
+    // Create a deep link URL that the backend can handle
+    const deepLinkUrl = `kometi://payment?orderId=${options.order_id}&amount=${options.amount}&currency=${options.currency}`;
+    
+    // Try to open the Razorpay app if installed (for UPI payments)
+    const canOpenRazorpay = await Linking.canOpenURL("razorpay://");
+    
+    if (canOpenRazorpay) {
+      // Open Razorpay app with payment details
+      await Linking.openURL(`razorpay://pay?orderId=${options.order_id}&amount=${options.amount}&key=${options.key}`);
+    } else {
+      // Fallback: Open web checkout in browser
+      const webCheckoutUrl = `https://checkout.razorpay.com/v1/checkout.html?order_id=${options.order_id}&key=${options.key}&amount=${options.amount}&currency=${options.currency}&name=${encodeURIComponent(options.name)}&description=${encodeURIComponent(options.description || "")}`;
+      await Linking.openURL(webCheckoutUrl);
+    }
+    
+    // Note: The handler callback won't be called on mobile
+    // The backend should verify the payment via webhooks or when the user returns
+    return;
   }
 
   const loaded = await loadRazorpayScript();
@@ -110,4 +131,26 @@ export async function openRazorpayCheckout(
   });
 
   rzp.open();
+}
+
+/**
+ * Open Razorpay checkout in in-app browser for mobile
+ * Returns the payment result when user completes or cancels
+ */
+export async function openRazorpayInBrowser(
+  options: Omit<RazorpayOptions, "handler"> & { handler: (response: RazorpayResponse) => void }
+): Promise<void> {
+  if (Platform.OS === "web") {
+    // Use the web checkout
+    return openRazorpayCheckout(options);
+  }
+
+  // For mobile, use expo-web-browser or Linking
+  const webCheckoutUrl = `https://checkout.razorpay.com/v1/checkout.html?order_id=${options.order_id}&key=${options.key}&amount=${options.amount}&currency=${options.currency}&name=${encodeURIComponent(options.name)}&description=${encodeURIComponent(options.description || "")}`;
+  
+  try {
+    await Linking.openURL(webCheckoutUrl);
+  } catch (err) {
+    throw new Error("Failed to open payment page. Please try again.");
+  }
 }

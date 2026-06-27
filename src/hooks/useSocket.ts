@@ -102,6 +102,32 @@ export function useSocket(): Socket | null {
       useCommitteeStore.getState().markContributionUpdated(data.committeeId);
     });
 
+    // ── Join Request events ────────────────────────────────────────────────
+    socket.on("committee:join_request_received", (data: { committeeId: string; requestId: string }) => {
+      useCommitteeStore.getState().bumpJoinRequest(data.committeeId);
+    });
+
+    socket.on("committee:join_request_approved", (data: { committeeId: string; requestId: string; slotNumber: number }) => {
+      useCommitteeStore.getState().bumpJoinRequest(data.committeeId);
+    });
+
+    socket.on("committee:join_request_rejected", (data: { committeeId: string; requestId: string }) => {
+      useCommitteeStore.getState().bumpJoinRequest(data.committeeId);
+    });
+
+    socket.on("committee:join_request_updated", (data: { committeeId: string; requestId: string; status: string }) => {
+      useCommitteeStore.getState().bumpJoinRequest(data.committeeId);
+    });
+
+    // ── KYC status events ──────────────────────────────────────────────────
+    socket.on("kyc:status_updated", (data: { userId: string; status: string }) => {
+      // Only update if it's the current user
+      const currentUser = useAuthStore.getState().user;
+      if (currentUser && currentUser.id === data.userId) {
+        useAuthStore.getState().updateKYCStatus(data.status as any);
+      }
+    });
+
     return () => {
       socket.disconnect();
       socketRef.current = null;
