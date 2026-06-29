@@ -8,7 +8,7 @@
     "scheme": "kometi",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/icon.png"
     },
     "android": {
       "adaptiveIcon": {
@@ -30,14 +30,8 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#1A1A1A",
-          "android": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 200
-          },
-          "ios": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 200
-          }
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200
         }
       ],
       "expo-secure-store"

@@ -2,7 +2,7 @@
 // Kometi Wallet Management, balance ledger and transactions ledger.
 
 import React, { useState, useEffect } from "react";
-import { View, Text, FlatList, TouchableOpacity, RefreshControl, Platform, Linking } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, RefreshControl, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useWalletStore } from "../../../stores/wallet.store";
@@ -73,57 +73,43 @@ export default function Wallet() {
       // 1. Create Razorpay order from backend
       const orderData = await topupWallet(amountPaise);
 
-      // 2. Open Razorpay Checkout on web
-      if (Platform.OS === "web") {
-        await openRazorpayCheckout({
-          key: orderData.razorpayKeyId,
-          amount: orderData.amount,
-          currency: orderData.currency,
-          name: "Kometi",
-          description: `Add ${formatINR(topupAmount)} to Wallet`,
-          order_id: orderData.orderId,
-          prefill: {
-            name: currentUser?.name || "",
-            email: currentUser?.email || "",
-            contact: currentUser?.phone || "",
+      // 2. Open Razorpay Checkout (web: popup, mobile: native payment sheet)
+      await openRazorpayCheckout({
+        key: orderData.razorpayKeyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "Kometi",
+        description: `Add ${formatINR(topupAmount)} to Wallet`,
+        order_id: orderData.orderId,
+        prefill: {
+          name: currentUser?.name || "",
+          email: currentUser?.email || "",
+          contact: currentUser?.phone || "",
+        },
+        theme: { color: "#6f5eff" },
+        handler: async (response) => {
+          // 3. Verify payment on backend
+          try {
+            await verifyTopupPayment(
+              response.razorpay_order_id,
+              response.razorpay_payment_id,
+              response.razorpay_signature
+            );
+            await alert("Success", `Added ${formatINR(topupAmount)} to your wallet successfully.`);
+            setTopupAmount(0n);
+            setShowTopupInput(false);
+            loadData();
+          } catch (verifyErr: any) {
+            await alert("Payment Received", "Your payment was successful but verification failed. Please contact support if the issue persists.");
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            alert("Payment Cancelled", "You cancelled the payment. No amount was charged.");
+            setTopupLoading(false);
           },
-          theme: { color: "#6f5eff" },
-          handler: async (response) => {
-            // 3. Verify payment on backend
-            try {
-              await verifyTopupPayment(
-                response.razorpay_order_id,
-                response.razorpay_payment_id,
-                response.razorpay_signature
-              );
-              await alert("Success", `Added ${formatINR(topupAmount)} to your wallet successfully.`);
-              setTopupAmount(0n);
-              setShowTopupInput(false);
-              loadData();
-            } catch (verifyErr: any) {
-              await alert("Payment Received", "Your payment was successful but verification failed. Please contact support if the issue persists.");
-            }
-          },
-          modal: {
-            ondismiss: () => {
-              alert("Payment Cancelled", "You cancelled the payment. No amount was charged.");
-              setTopupLoading(false);
-            },
-          },
-        });
-      } else {
-        // Mobile: Open Razorpay checkout in browser
-        try {
-          const webCheckoutUrl = `https://checkout.razorpay.com/v1/checkout.html?order_id=${orderData.orderId}&key=${orderData.razorpayKeyId}&amount=${orderData.amount}&currency=${orderData.currency}&name=Kometi&description=${encodeURIComponent(`Add ${formatINR(topupAmount)} to Wallet`)}`;
-          await Linking.openURL(webCheckoutUrl);
-          await alert(
-            "Payment Initiated",
-            "Please complete the payment in your browser. Once done, return to this app and pull down to refresh your balance."
-          );
-        } catch (err) {
-          await alert("Error", "Failed to open payment page. Please try again or use the web app.");
-        }
-      }
+        },
+      });
     } catch (err: any) {
       await alert("Top-up Failed", err.message || "An error occurred during payment.");
     } finally {
@@ -131,7 +117,6 @@ export default function Wallet() {
     }
   };
 
-  const isMobile = Platform.OS !== "web";
   const isScriptLoading = Platform.OS === "web" && scriptReady === null;
 
   return (
@@ -243,23 +228,13 @@ export default function Wallet() {
                     </TouchableOpacity>
                   </View>
                   <View className="mt-5">
-                    {isMobile ? (
-                      <Button
-                        label={topupLoading ? "Opening Payment..." : `Pay ${formatINR(topupAmount)}`}
-                        variant="gold"
-                        onPress={handleTopup}
-                        isLoading={topupLoading}
-                        disabled={topupAmount <= 0n || topupLoading}
-                      />
-                    ) : (
-                      <Button
-                        label={topupLoading ? "Processing..." : `Pay ${formatINR(topupAmount)}`}
-                        variant="gold"
-                        onPress={handleTopup}
-                        isLoading={topupLoading}
-                        disabled={topupAmount <= 0n || topupLoading || scriptReady === false}
-                      />
-                    )}
+                    <Button
+                      label={topupLoading ? "Processing..." : `Pay ${formatINR(topupAmount)}`}
+                      variant="gold"
+                      onPress={handleTopup}
+                      isLoading={topupLoading}
+                      disabled={topupAmount <= 0n || topupLoading || (Platform.OS === "web" && scriptReady === false)}
+                    />
                   </View>
                   {Platform.OS === "web" && scriptReady === false && (
                     <Text className="text-danger-400 text-[10px] text-center mt-2">
