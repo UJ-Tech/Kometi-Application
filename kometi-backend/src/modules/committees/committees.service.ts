@@ -576,7 +576,7 @@ export class CommitteesService {
 
     const { data: request, error: reqError } = await supabase
       .from("join_requests")
-      .select("id, status, committeeId")
+      .select("id, status, committeeId, userId")
       .eq("id", requestId)
       .single();
 
