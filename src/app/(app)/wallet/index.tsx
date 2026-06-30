@@ -2,7 +2,7 @@
 // Kometi Wallet Management, balance ledger and transactions ledger.
 
 import React, { useState, useEffect } from "react";
-import { View, Text, FlatList, TouchableOpacity, RefreshControl, Platform } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useWalletStore } from "../../../stores/wallet.store";
@@ -13,7 +13,7 @@ import Button from "../../../components/ui/Button";
 import EmptyState from "../../../components/ui/EmptyState";
 import ScreenHeader from "../../../components/shared/ScreenHeader";
 import { AmountInput } from "../../../components/ui/AmountInput";
-import { openRazorpayCheckout, loadRazorpayScript } from "../../../utils/razorpay";
+import { openRazorpayCheckout } from "../../../utils/razorpay";
 import { useAuthStore } from "../../../stores/auth.store";
 import type { Withdrawal } from "../../../types";
 import { useAlertModal } from "../../../components/ui/AlertModal";
@@ -26,15 +26,7 @@ export default function Wallet() {
   const [topupAmount, setTopupAmount] = useState<bigint>(0n);
   const [showTopupInput, setShowTopupInput] = useState(false);
   const [topupLoading, setTopupLoading] = useState(false);
-  const [scriptReady, setScriptReady] = useState<boolean | null>(null);
   const { alert, confirm, AlertComponent } = useAlertModal();
-
-  // Pre-load Razorpay script on mount (web only)
-  React.useEffect(() => {
-    if (Platform.OS === "web") {
-      loadRazorpayScript().then(setScriptReady);
-    }
-  }, []);
 
   const loadData = async () => {
     setRefreshing(true);
@@ -116,8 +108,6 @@ export default function Wallet() {
       setTopupLoading(false);
     }
   };
-
-  const isScriptLoading = Platform.OS === "web" && scriptReady === null;
 
   return (
     <View className="flex-1 bg-surface-bg px-4">
@@ -233,14 +223,9 @@ export default function Wallet() {
                       variant="gold"
                       onPress={handleTopup}
                       isLoading={topupLoading}
-                      disabled={topupAmount <= 0n || topupLoading || (Platform.OS === "web" && scriptReady === false)}
+                      disabled={topupAmount <= 0n || topupLoading}
                     />
                   </View>
-                  {Platform.OS === "web" && scriptReady === false && (
-                    <Text className="text-danger-400 text-[10px] text-center mt-2">
-                      Failed to load payment gateway. Check your network.
-                    </Text>
-                  )}
                 </View>
               </Card>
             )}

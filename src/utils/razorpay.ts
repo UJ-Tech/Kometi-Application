@@ -1,7 +1,8 @@
 // src/utils/razorpay.ts
-// Razorpay Checkout script loader and payment opener.
+// Razorpay Checkout: web popup via Checkout.js, mobile native via react-native-razorpay.
 
 import { Platform } from "react-native";
+import RazorpayCheckout from "react-native-razorpay";
 
 declare global {
   interface Window {
@@ -36,14 +37,12 @@ export interface RazorpayResponse {
   razorpay_signature: string;
 }
 
-/**
- * Load the Razorpay Checkout.js script (web only).
- * Returns a promise that resolves when the script is ready.
- */
+// ─── Web: Checkout.js script ───────────────────────────────────────────────
+
 let scriptLoaded = false;
 let scriptLoading = false;
 
-export function loadRazorpayScript(): Promise<boolean> {
+function loadRazorpayScript(): Promise<boolean> {
   return new Promise((resolve) => {
     if (Platform.OS !== "web") {
       resolve(false);
@@ -83,14 +82,17 @@ export function loadRazorpayScript(): Promise<boolean> {
   });
 }
 
+// ─── Main entry point ──────────────────────────────────────────────────────
+
 /**
  * Open Razorpay Checkout.
- * On web: opens a popup via Checkout.js.
- * On mobile: opens native Razorpay payment sheet via react-native-razorpay.
+ * - Web: popup via Checkout.js
+ * - Mobile: native checkout via react-native-razorpay
  */
 export async function openRazorpayCheckout(
   options: RazorpayOptions
 ): Promise<void> {
+  // ── Web ──
   if (Platform.OS === "web") {
     const loaded = await loadRazorpayScript();
     if (!loaded || !window.Razorpay) {
@@ -100,20 +102,16 @@ export async function openRazorpayCheckout(
     }
 
     const rzp = new window.Razorpay(options);
-
     rzp.on("payment.failed", () => {
       options.modal?.ondismiss?.();
     });
-
     rzp.open();
     return;
   }
 
-  // Mobile: use react-native-razorpay native module
-  const RazorpayCheckout = require("react-native-razorpay").default;
-
+  // ── Mobile: native Razorpay SDK ──
   try {
-    const result = await RazorpayCheckout.open({
+    const params = {
       key: options.key,
       amount: options.amount,
       currency: options.currency,
@@ -121,20 +119,20 @@ export async function openRazorpayCheckout(
       description: options.description,
       order_id: options.order_id,
       prefill: options.prefill || {},
-      theme: options.theme || { color: "#6f5eff" },
-    });
+      theme: options.theme || {},
+    };
 
-    // Payment succeeded — call handler with the response
+    const result = await RazorpayCheckout.open(params);
     options.handler({
       razorpay_order_id: result.razorpay_order_id,
       razorpay_payment_id: result.razorpay_payment_id,
       razorpay_signature: result.razorpay_signature,
     });
   } catch (err: any) {
-    // User cancelled or payment failed
-    if (err?.code === 0 || err?.description === "Payment cancelled by user") {
+    if (err?.code === 0 || err?.description === "Payment cancelled") {
       options.modal?.ondismiss?.();
     } else {
+      options.modal?.ondismiss?.();
       throw err;
     }
   }
