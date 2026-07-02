@@ -1,22 +1,9 @@
 // src/constants/config.ts
 // App-wide configuration constants
 
-import Constants from "expo-constants";
 
-function getDevServerHost(): string {
-  const hostUri = Constants.expoConfig?.hostUri;
-  const host = hostUri?.split(":")[0];
-  // Fallback to local machine IP for mobile device connectivity
-  return host && host.length > 0 ? host : "192.168.1.12";
-}
-
-function getDevApiBaseUrl(): string {
-  return process.env.EXPO_PUBLIC_API_BASE_URL ?? `http://${getDevServerHost()}:5000/api/v1`;
-}
-
-function getDevSocketUrl(): string {
-  return process.env.EXPO_PUBLIC_SOCKET_URL ?? `http://${getDevServerHost()}:5000`;
-}
+const apiBaseUrl = "https://kometi-application.onrender.com/api/v1";
+const socketUrl  = "https://kometi-application.onrender.com";
 
 export const APP_CONFIG = {
   name:    "Kometi",
@@ -24,8 +11,8 @@ export const APP_CONFIG = {
   scheme:  "kometi",
 
   // API
-  API_BASE_URL:    __DEV__ ? getDevApiBaseUrl() : "https://kometi-application.onrender.com/api/v1",
-  SOCKET_URL:      __DEV__ ? getDevSocketUrl() : "https://kometi-application.onrender.com",
+  API_BASE_URL:    apiBaseUrl,
+  SOCKET_URL:      socketUrl,
   API_TIMEOUT_MS:  30_000,
 
   // Auth
