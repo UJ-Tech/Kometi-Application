@@ -1,18 +1,10 @@
 // src/utils/razorpay.ts
 // Razorpay Checkout: web popup via Checkout.js, mobile native via react-native-razorpay,
-// Expo Go fallback via expo-web-browser + deep link callback.
+// Expo Go fallback via expo-web-browser openAuthSessionAsync.
 
 import { Platform } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { APP_CONFIG } from "../constants/config";
-
-// react-native-razorpay is a native module — null in Expo Go, real module in APK builds.
-let RazorpayCheckout: any = null;
-try {
-  RazorpayCheckout = require("react-native-razorpay").default;
-} catch {
-  RazorpayCheckout = null;
-}
 
 declare global {
   interface Window {
@@ -172,6 +164,43 @@ async function openBrowserCheckout(options: RazorpayOptions): Promise<void> {
   }
 }
 
+// ─── Try native Razorpay SDK ───────────────────────────────────────────────
+
+async function tryNativeCheckout(options: RazorpayOptions): Promise<boolean> {
+  try {
+    const RazorpayCheckout = require("react-native-razorpay").default;
+    if (!RazorpayCheckout || typeof RazorpayCheckout.open !== "function") {
+      return false;
+    }
+
+    const result = await RazorpayCheckout.open({
+      key: options.key,
+      amount: options.amount,
+      currency: options.currency,
+      name: options.name,
+      description: options.description,
+      order_id: options.order_id,
+      prefill: options.prefill || {},
+      theme: options.theme || {},
+    });
+
+    options.handler({
+      razorpay_order_id: result.razorpay_order_id,
+      razorpay_payment_id: result.razorpay_payment_id,
+      razorpay_signature: result.razorpay_signature,
+    });
+    return true;
+  } catch (err: any) {
+    if (err?.code === 0 || err?.description === "Payment cancelled") {
+      options.modal?.ondismiss?.();
+      return true;
+    }
+    // Native module exists but broken (Expo Go) — fall through to browser
+    console.log("[Razorpay] Native SDK failed, falling back to browser:", err?.message);
+    return false;
+  }
+}
+
 // ─── Main entry point ──────────────────────────────────────────────────────
 
 /**
@@ -200,37 +229,10 @@ export async function openRazorpayCheckout(
     return;
   }
 
-  // ── Mobile APK: native Razorpay SDK (react-native-razorpay) ──
-  if (RazorpayCheckout && typeof RazorpayCheckout.open === "function") {
-    try {
-      const params = {
-        key: options.key,
-        amount: options.amount,
-        currency: options.currency,
-        name: options.name,
-        description: options.description,
-        order_id: options.order_id,
-        prefill: options.prefill || {},
-        theme: options.theme || {},
-      };
+  // ── Mobile: try native SDK first, fall back to browser ──
+  const nativeResult = await tryNativeCheckout(options);
+  if (nativeResult) return;
 
-      const result = await RazorpayCheckout.open(params);
-      options.handler({
-        razorpay_order_id: result.razorpay_order_id,
-        razorpay_payment_id: result.razorpay_payment_id,
-        razorpay_signature: result.razorpay_signature,
-      });
-    } catch (err: any) {
-      if (err?.code === 0 || err?.description === "Payment cancelled") {
-        options.modal?.ondismiss?.();
-      } else {
-        options.modal?.ondismiss?.();
-        throw err;
-      }
-    }
-    return;
-  }
-
-  // ── Expo Go: browser checkout via openAuthSessionAsync ──
+  // ── Expo Go: browser checkout ──
   await openBrowserCheckout(options);
 }
