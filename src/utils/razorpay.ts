@@ -2,7 +2,7 @@
 // Razorpay Checkout: web popup via Checkout.js, mobile native via react-native-razorpay,
 // Expo Go fallback via expo-web-browser + deep link callback.
 
-import { Platform, Linking } from "react-native";
+import { Platform } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { APP_CONFIG } from "../constants/config";
 
@@ -46,6 +46,8 @@ export interface RazorpayResponse {
   razorpay_payment_id: string;
   razorpay_signature: string;
 }
+
+const DEEP_LINK_SCHEME = "kometi://payment-callback";
 
 // ─── Web: Checkout.js script ───────────────────────────────────────────────
 
@@ -92,7 +94,7 @@ function loadRazorpayScript(): Promise<boolean> {
   });
 }
 
-// ─── Expo Go fallback: browser checkout + deep link callback ────────────────
+// ─── Expo Go fallback: browser checkout via openAuthSessionAsync ────────────
 
 function buildCheckoutUrl(options: RazorpayOptions): string {
   const params = new URLSearchParams({
@@ -102,7 +104,7 @@ function buildCheckoutUrl(options: RazorpayOptions): string {
     name: options.name,
     description: options.description,
     order_id: options.order_id,
-    callback_url: "kometi://payment-callback",
+    callback_url: DEEP_LINK_SCHEME,
   });
 
   if (options.prefill?.name) params.set("prefill_name", options.prefill.name);
@@ -114,78 +116,60 @@ function buildCheckoutUrl(options: RazorpayOptions): string {
   return `${baseUrl}/payments/checkout?${params.toString()}`;
 }
 
-function openBrowserCheckout(options: RazorpayOptions): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const url = buildCheckoutUrl(options);
-    let listener: any = null;
-    let handled = false;
-
-    const cleanup = () => {
-      if (listener) {
-        listener.remove();
-        listener = null;
-      }
-    };
-
-    listener = Linking.addEventListener("url", ({ url: deepLinkUrl }) => {
-      if (handled) return;
-      handled = true;
-
-      try {
-        const queryStart = deepLinkUrl.indexOf("?");
-        const queryString = queryStart >= 0 ? deepLinkUrl.slice(queryStart + 1) : "";
-        const params = new URLSearchParams(queryString);
-
-        cleanup();
-
-        if (params.get("dismissed") === "true" || params.get("failed") === "true") {
-          options.modal?.ondismiss?.();
-          if (params.get("failed") === "true") {
-            reject(new Error(decodeURIComponent(params.get("error") || "Payment failed")));
-          } else {
-            resolve();
-          }
-          return;
-        }
-
-        const orderId = params.get("orderId");
-        const paymentId = params.get("paymentId");
-        const signature = params.get("signature");
-
-        if (orderId && paymentId && signature) {
-          options.handler({
-            razorpay_order_id: orderId,
-            razorpay_payment_id: paymentId,
-            razorpay_signature: signature,
-          });
-          resolve();
-        } else {
-          options.modal?.ondismiss?.();
-          reject(new Error("Payment cancelled"));
-        }
-      } catch {
-        cleanup();
-        options.modal?.ondismiss?.();
-        reject(new Error("Payment cancelled"));
-      }
-    });
-
-    WebBrowser.openBrowserAsync(url).then(({ type }) => {
-      if (handled) return;
-      handled = true;
-
-      if (type === "cancel" || type === "dismiss") {
-        cleanup();
-        options.modal?.ondismiss?.();
-        resolve();
-      }
-    }).catch((err) => {
-      if (handled) return;
-      handled = true;
-      cleanup();
-      reject(err);
-    });
+function parseRedirectUrl(redirectUrl: string): Record<string, string> {
+  const queryStart = redirectUrl.indexOf("?");
+  if (queryStart < 0) return {};
+  const queryString = redirectUrl.slice(queryStart + 1);
+  const params = new URLSearchParams(queryString);
+  const result: Record<string, string> = {};
+  params.forEach((value, key) => {
+    result[key] = value;
   });
+  return result;
+}
+
+async function openBrowserCheckout(options: RazorpayOptions): Promise<void> {
+  const url = buildCheckoutUrl(options);
+
+  try {
+    const result = await WebBrowser.openAuthSessionAsync(url, DEEP_LINK_SCHEME);
+
+    if (result.type === "success" && result.url) {
+      const params = parseRedirectUrl(result.url);
+
+      if (params.failed === "true") {
+        options.modal?.ondismiss?.();
+        throw new Error(decodeURIComponent(params.error || "Payment failed"));
+      }
+
+      if (params.dismissed === "true") {
+        options.modal?.ondismiss?.();
+        return;
+      }
+
+      const { orderId, paymentId, signature } = params;
+      if (orderId && paymentId && signature) {
+        options.handler({
+          razorpay_order_id: orderId,
+          razorpay_payment_id: paymentId,
+          razorpay_signature: signature,
+        });
+        return;
+      }
+
+      options.modal?.ondismiss?.();
+      throw new Error("Payment cancelled");
+    }
+
+    // result.type === 'cancel' or 'dismiss' — user closed browser
+    options.modal?.ondismiss?.();
+  } catch (err: any) {
+    if (err?.message === "Payment cancelled" || err?.message?.startsWith("Payment failed")) {
+      throw err;
+    }
+    options.modal?.ondismiss?.();
+    throw new Error("Payment was interrupted. Please try again.");
+  }
 }
 
 // ─── Main entry point ──────────────────────────────────────────────────────
@@ -194,7 +178,7 @@ function openBrowserCheckout(options: RazorpayOptions): Promise<void> {
  * Open Razorpay Checkout.
  * - Web: popup via Checkout.js
  * - Mobile APK: native checkout via react-native-razorpay
- * - Expo Go: browser checkout via expo-web-browser + deep link callback
+ * - Expo Go: browser checkout via expo-web-browser openAuthSessionAsync
  */
 export async function openRazorpayCheckout(
   options: RazorpayOptions
@@ -247,6 +231,6 @@ export async function openRazorpayCheckout(
     return;
   }
 
-  // ── Expo Go: browser checkout + deep link callback ──
+  // ── Expo Go: browser checkout via openAuthSessionAsync ──
   await openBrowserCheckout(options);
 }
