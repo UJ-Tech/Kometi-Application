@@ -15,7 +15,6 @@ type LocalUser = {
   email: string;
   passwordHash: string;
   pin: string | null;
-  role: "ADMIN" | "MANAGER" | "ACCOUNTANT" | "AGENT" | "ORGANIZER" | "MEMBER";
   isActive: boolean;
   kycStatus: "PENDING" | "SUBMITTED" | "VERIFIED" | "REJECTED";
   profileImageUrl: string | null;
@@ -94,7 +93,7 @@ export class AuthService {
     const store = await readLocalStore();
     const user = store.users.find((u) => u.id === userId && u.isActive);
     if (!user) return null;
-    return { id: user.id, phone: user.phone, role: user.role, isActive: user.isActive };
+    return { id: user.id, phone: user.phone, isActive: user.isActive };
   }
 
   static async sendOtp(phone: string): Promise<string> {
@@ -219,7 +218,6 @@ export class AuthService {
           name,
           email,
           passwordHash,
-          role: "MEMBER",
         })
         .select()
         .single();
@@ -254,7 +252,6 @@ export class AuthService {
         email,
         passwordHash,
         pin: null,
-        role: "MEMBER",
         isActive: true,
         kycStatus: "PENDING",
         profileImageUrl: null,
@@ -348,31 +345,6 @@ export class AuthService {
       user.pin = hashedMpin;
       user.updatedAt = new Date().toISOString();
       await writeLocalStore(store);
-    }
-  }
-
-  static async setUserRole(userId: string, role: "MEMBER" | "ORGANIZER") {
-    try {
-      const { data, error } = await supabase
-        .from("users")
-        .update({ role, updatedAt: new Date().toISOString() })
-        .eq("id", userId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      if (!data) throw new Error("User not found");
-      return this.sanitizeUser(data);
-    } catch (error) {
-      if (!isDatabaseUnavailable(error)) throw error;
-
-      const store = await readLocalStore();
-      const user = store.users.find((u) => u.id === userId);
-      if (!user) throw new Error("User not found");
-      user.role = role;
-      user.updatedAt = new Date().toISOString();
-      await writeLocalStore(store);
-      return this.sanitizeUser(user);
     }
   }
 

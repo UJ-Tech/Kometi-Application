@@ -1,7 +1,7 @@
 // src/modules/committees/committees.router.ts
 import { Router } from "express";
 import { CommitteesController } from "./committees.controller";
-import { protect, authorize } from "../../middleware/auth.middleware";
+import { protect, authorizeOrganizer } from "../../middleware/auth.middleware";
 import { validate } from "../../middleware/validate";
 import { createCommitteeSchema, addMemberSchema, joinByCodeSchema, adjustCommitteeSizeSchema } from "./committees.validator";
 
@@ -17,31 +17,31 @@ router.use("/:id/months", committeeMonthsRouter);
 router.get("/", CommitteesController.list as any);
 router.get("/:id", CommitteesController.getById as any);
 
-// Organizers or Admins only allowed to manage committee lifecycle
+// Any authenticated user can create a committee (they become the organizer)
 router.post(
   "/",
-  authorize("ADMIN", "ORGANIZER") as any,
   validate(createCommitteeSchema),
   CommitteesController.create as any
 );
 
+// Committee management — only the organizer of that specific committee (or admin)
 router.post(
   "/:id/members",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   validate(addMemberSchema),
   CommitteesController.addMember as any
 );
 
 router.post(
   "/:id/adjust-size",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   validate(adjustCommitteeSizeSchema),
   CommitteesController.adjustCommitteeSize as any
 );
 
 router.post(
   "/:id/start",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteesController.start as any
 );
 
@@ -50,7 +50,7 @@ router.post(
   CommitteesController.submitBid as any
 );
 
-// Join by invite code (any authenticated member)
+// Join by invite code (any authenticated user)
 router.post(
   "/join-by-code",
   validate(joinByCodeSchema),
@@ -63,22 +63,22 @@ router.get(
   CommitteesController.getMyJoinRequestStatus as any
 );
 
-// Join request management (organizer only)
+// Join request management (committee organizer only)
 router.get(
   "/:id/join-requests",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteesController.getJoinRequests as any
 );
 
 router.post(
   "/:id/join-requests/:requestId/approve",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteesController.approveJoinRequest as any
 );
 
 router.post(
   "/:id/join-requests/:requestId/reject",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteesController.rejectJoinRequest as any
 );
 
@@ -91,25 +91,25 @@ router.get(
 
 router.get(
   "/:id/lottery/status",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteesController.getLotteryStatus as any
 );
 
 router.post(
   "/:id/lottery/lock",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteesController.lockLotteryMembers as any
 );
 
 router.post(
   "/:id/lottery/draw",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteesController.drawLotteryWinner as any
 );
 
 router.post(
   "/:id/lottery/confirm",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteesController.confirmLotteryPayout as any
 );
 
@@ -127,19 +127,19 @@ router.get(
 
 router.post(
   "/:id/members/:memberId/block",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteesController.blockMember as any
 );
 
 router.post(
   "/:id/members/:memberId/unblock",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteesController.unblockMember as any
 );
 
 router.get(
   "/:id/blocked-members",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteesController.getBlockedMembers as any
 );
 
@@ -147,13 +147,13 @@ router.get(
 
 router.delete(
   "/:id/members/:memberId",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteesController.removeMember as any
 );
 
 router.post(
   "/:id/members/add-active",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteesController.addMemberToActive as any
 );
 

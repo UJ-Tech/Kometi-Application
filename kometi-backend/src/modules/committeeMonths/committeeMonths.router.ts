@@ -1,7 +1,7 @@
 // src/modules/committeeMonths/committeeMonths.router.ts
 import { Router } from "express";
 import { CommitteeMonthsController } from "./committeeMonths.controller";
-import { protect, authorize } from "../../middleware/auth.middleware";
+import { protect, authorizeOrganizer } from "../../middleware/auth.middleware";
 
 const router = Router({ mergeParams: true }); // mergeParams gives access to :id from parent router
 
@@ -31,7 +31,7 @@ router.get(
 // Get overdue payment obligations (organiser only)
 router.get(
   "/overdue",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteeMonthsController.getOverdueObligations as any
 );
 
@@ -39,7 +39,7 @@ router.get(
 // Get organiser's advance records (organiser only)
 router.get(
   "/organiser-advances",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteeMonthsController.getOrganiserAdvances as any
 );
 
@@ -47,7 +47,7 @@ router.get(
 // Create a new committee month with pre-calculated values (organizer only)
 router.post(
   "/",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteeMonthsController.createMonth as any
 );
 
@@ -55,7 +55,7 @@ router.post(
 // Resolve a month: set winner, recalculate actuals, create disbursements (organizer only)
 router.post(
   "/:monthId/resolve",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteeMonthsController.resolveMonth as any
 );
 
@@ -70,7 +70,7 @@ router.get(
 // Open bidding for a month (organizer only)
 router.post(
   "/:monthNumber/open-bidding",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteeMonthsController.openBidding as any
 );
 
@@ -99,7 +99,7 @@ router.post(
 // Organiser advances payment for a defaulting member (organizer only)
 router.post(
   "/:monthId/organiser-advance",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteeMonthsController.organiserAdvance as any
 );
 
@@ -114,7 +114,7 @@ router.get(
 // Manually trigger winner payout settlement (organizer only)
 router.post(
   "/:monthId/settle-payout",
-  authorize("ADMIN", "ORGANIZER") as any,
+  authorizeOrganizer() as any,
   CommitteeMonthsController.settlePayout as any
 );
 

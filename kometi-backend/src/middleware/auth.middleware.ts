@@ -11,7 +11,7 @@ export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     phone: string;
-    role: "ADMIN" | "MANAGER" | "ACCOUNTANT" | "AGENT" | "ORGANIZER" | "MEMBER";
+    isActive: boolean;
   };
 }
 
@@ -38,7 +38,7 @@ export async function protect(
     try {
       const { data, error } = await supabase
         .from("users")
-        .select("id, phone, role, isActive")
+        .select("id, phone, isActive")
         .eq("id", decoded.id)
         .single();
       
@@ -71,15 +71,43 @@ export async function protect(
   }
 }
 
-export function authorize(...roles: Array<"ADMIN" | "MANAGER" | "ACCOUNTANT" | "AGENT" | "ORGANIZER" | "MEMBER">) {
-  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    if (!req.user || !roles.includes(req.user.role as any)) {
-      res.status(403).json({
-        error: `User role '${req.user?.role}' is not authorized to access this action`,
-      });
+/**
+ * Authorize if user is ADMIN or the organizer of the committee identified by :id param.
+ * Committee management is based on ownership, not a global user role.
+ */
+export function authorizeOrganizer() {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      res.status(401).json({ error: "Not authorized" });
       return;
     }
-    next();
-    return;
+
+    const committeeId = req.params.id;
+    if (!committeeId) {
+      res.status(400).json({ error: "Committee ID is required" });
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("committees")
+        .select("organizerId")
+        .eq("id", committeeId)
+        .single();
+
+      if (error || !data) {
+        res.status(404).json({ error: "Committee not found" });
+        return;
+      }
+      if (data.organizerId !== req.user.id) {
+        res.status(403).json({
+          error: "Only the committee organizer can perform this action",
+        });
+        return;
+      }
+      next();
+    } catch {
+      res.status(500).json({ error: "Failed to verify committee ownership" });
+    }
   };
 }

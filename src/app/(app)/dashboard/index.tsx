@@ -13,7 +13,7 @@ import { useInstallmentStore } from "../../../stores/installment.store";
 import { authApi } from "../../../services/auth.api";
 import { tokenStorage } from "../../../utils/storage";
 import { formatINR } from "../../../utils/currency";
-import { canAccessAdminPanel, canCreateCommittee, canViewMembers } from "../../../utils/rbac";
+import { canViewMembers } from "../../../utils/rbac";
 import { COLORS } from "../../../constants/theme";
 import Card from "../../../components/ui/Card";
 import Avatar from "../../../components/ui/Avatar";
@@ -78,9 +78,7 @@ export default function Dashboard() {
     }
   };
 
-  const canOpenAdminPanel = canAccessAdminPanel(user?.role);
-  const canOpenCommitteeCreation = canCreateCommittee(user?.role);
-  const canOpenMembers = canViewMembers(user?.role);
+  const canOpenMembers = canViewMembers();
 
   return (
     <ScrollView
@@ -110,15 +108,6 @@ export default function Dashboard() {
         </View>
 
         <View className="flex-row gap-2.5">
-          {canOpenAdminPanel && (
-            <TouchableOpacity
-              onPress={() => router.push("/dashboard/admin")}
-              className="w-10 h-10 bg-brand-500/10 border border-brand-500/25 rounded-full items-center justify-center"
-            >
-              <Ionicons name="shield-checkmark-outline" size={20} color={COLORS.brandPrimary} />
-            </TouchableOpacity>
-          )}
-
           <TouchableOpacity
             onPress={() => router.push("/settings/change-password")}
             className="w-10 h-10 bg-brand-50 rounded-full items-center justify-center border border-brand-100"
@@ -222,18 +211,27 @@ export default function Dashboard() {
           </TouchableOpacity>
         )}
 
-        {canOpenCommitteeCreation && (
-          <TouchableOpacity
-            onPress={() => router.push("/committees/create")}
-            style={styles.gridBtn}
-            className="bg-white border border-slate-100 items-center justify-center"
-          >
-            <View className="w-12 h-12 rounded-full bg-indigo-50 items-center justify-center mb-2 border border-indigo-100">
-              <Ionicons name="add-circle" size={26} color={COLORS.brandPrimary} />
-            </View>
-            <Text className="text-slate-700 font-semibold text-xs">Create Chit</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          onPress={() => router.push("/committees/create")}
+          style={styles.gridBtn}
+          className="bg-white border border-slate-100 items-center justify-center"
+        >
+          <View className="w-12 h-12 rounded-full bg-indigo-50 items-center justify-center mb-2 border border-indigo-100">
+            <Ionicons name="add-circle" size={26} color={COLORS.brandPrimary} />
+          </View>
+          <Text className="text-slate-700 font-semibold text-xs">Create Chit</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => router.push("/(auth)/join-committee" as any)}
+          style={styles.gridBtn}
+          className="bg-white border border-slate-100 items-center justify-center"
+        >
+          <View className="w-12 h-12 rounded-full bg-amber-50 items-center justify-center mb-2 border border-amber-100">
+            <Ionicons name="enter-outline" size={24} color={COLORS.goldPrimary} />
+          </View>
+          <Text className="text-slate-700 font-semibold text-xs">Join Chit</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Recent Activities */}

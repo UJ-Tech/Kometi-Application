@@ -14,7 +14,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { committeesApi } from "../../../../../../services/committees.api";
 import { useAuthStore } from "../../../../../../stores/auth.store";
 import { useCommitteeStore } from "../../../../../../stores/committee.store";
-import { canAccessAdminPanel } from "../../../../../../utils/rbac";
 import { formatINR } from "../../../../../../utils/currency";
 import { COLORS } from "../../../../../../constants/theme";
 import Card from "../../../../../../components/ui/Card";
@@ -193,8 +192,7 @@ export default function OrganiserMonthDetail() {
   }
 
   const isOrganizer = committee.organizerId === currentUser?.id;
-  const isAdminOrManager = canAccessAdminPanel(currentUser?.role);
-  if (!isOrganizer && !isAdminOrManager) {
+  if (!isOrganizer) {
     return null;
   }
 

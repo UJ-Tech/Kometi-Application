@@ -49,12 +49,6 @@ export const verifyMpinSchema = z.object({
   }),
 });
 
-export const setRoleSchema = z.object({
-  body: z.object({
-    role: z.enum(["MEMBER", "ORGANIZER"], { required_error: "Role is required" }),
-  }),
-});
-
 export const changePasswordSchema = z.object({
   body: z.object({
     currentPassword: z.string().min(8, "Current password must be at least 8 characters"),

@@ -42,7 +42,7 @@ export default function MPINSetupScreen() {
     setIsLoading(true);
     try {
       await authApi.setMPIN({ mpin });
-      router.replace("/(auth)/role-select" as any);
+      router.replace("/(app)/dashboard" as any);
     } catch (e: any) {
       setError(e.message ?? "Failed to set MPIN");
     } finally {

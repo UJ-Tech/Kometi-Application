@@ -47,16 +47,12 @@ export class AdminService {
       }
     });
 
-    // 5. Total Users by Role
-    const { data: usersByRole } = await supabase
+    // 5. Total Users
+    const { count: totalUsersCount, error: usersError } = await supabase
       .from("users")
-      .select("role");
+      .select("*", { count: "exact", head: true });
 
-    const userStats: Record<string, number> = {};
-    (usersByRole || []).forEach((u: any) => {
-      userStats[u.role] = (userStats[u.role] || 0) + 1;
-    });
-    const totalUsersCount = (usersByRole || []).length;
+    if (usersError) throw usersError;
 
     // 6. Total Installments by Status
     const { data: installmentsByStatus } = await supabase
@@ -147,7 +143,7 @@ export class AdminService {
     // 11. Wallets summary
     const { data: wallets } = await supabase
       .from("wallets")
-      .select("id, userId, balancePaise, user:users(name, phone, role)")
+      .select("id, userId, balancePaise, user:users(name, phone)")
       .order("balancePaise", { ascending: false });
 
     const totalWalletBalancePaise = (wallets || []).reduce(
@@ -161,8 +157,7 @@ export class AdminService {
       activeCommitteesCount: activeCommitteesCount || 0,
       profitOverviewPaise,
       monthlyAnalytics,
-      totalUsersCount,
-      userStats,
+      totalUsersCount: totalUsersCount || 0,
       committeeStats,
       installmentStats,
       recentTransactions: recentTransactions || [],
@@ -170,25 +165,5 @@ export class AdminService {
       wallets: wallets || [],
       totalWalletBalancePaise,
     };
-  }
-
-  static async updateUserRole(userId: string, newRole: string) {
-    const validRoles = ["ADMIN", "MANAGER", "ACCOUNTANT", "AGENT", "ORGANIZER", "MEMBER"];
-    if (!validRoles.includes(newRole)) {
-      throw new Error(`Invalid user role: ${newRole}`);
-    }
-
-    const { data: user, error } = await supabase
-      .from("users")
-      .update({ role: newRole })
-      .eq("id", userId)
-      .select("id, name, phone, role")
-      .single();
-
-    if (error || !user) {
-      throw new Error("Failed to update user role");
-    }
-
-    return user;
   }
 }

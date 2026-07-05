@@ -14,7 +14,6 @@ export default function AppLayout() {
   const router = useRouter();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isLoading = useAuthStore((s) => s.isLoading);
-  const userRole = useAuthStore((s) => s.user?.role);
   const committees = useCommitteeStore((s) => s.committees);
   const hasCommittee = committees.length > 0;
 
@@ -101,7 +100,7 @@ export default function AppLayout() {
         name="members/index"
         options={{
           title: "Members",
-          href: canViewMembers(userRole, hasCommittee) ? undefined : null,
+          href: canViewMembers(hasCommittee) ? undefined : null,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "person-add" : "person-add-outline"} size={22} color={color} />
           ),

@@ -20,7 +20,6 @@ import * as Clipboard from "expo-clipboard";
 import { committeesApi } from "../../../../services/committees.api";
 import { useAuthStore } from "../../../../stores/auth.store";
 import { useCommitteeStore } from "../../../../stores/committee.store";
-import { canAccessAdminPanel } from "../../../../utils/rbac";
 import { formatINR } from "../../../../utils/currency";
 import { COLORS } from "../../../../constants/theme";
 import Card from "../../../../components/ui/Card";
@@ -409,7 +408,6 @@ export default function CommitteeDetail() {
 
   const totalPot = Number(committee.installmentAmountPaise) * committee.totalSlots;
   const isOrganizer = committee.organizerId === currentUser?.id;
-  const isAdminOrManager = canAccessAdminPanel(currentUser?.role);
 
   // Find current user's membership
   const myMembership = committee.members?.find((m: any) => m.userId === currentUser?.id);
@@ -938,7 +936,7 @@ export default function CommitteeDetail() {
                 </View>
               )}
 
-              {(isOrganizer || isAdminOrManager) && monthsData && monthsData.some((m: any) => m.status !== "completed") && (
+              {isOrganizer && monthsData && monthsData.some((m: any) => m.status !== "completed") && (
                 <TouchableOpacity
                   onPress={handleResolveMonth}
                   disabled={loading}

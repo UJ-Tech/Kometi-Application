@@ -1,7 +1,7 @@
 // src/modules/members/members.router.ts
 import { Router } from "express";
 import { MembersController } from "./members.controller";
-import { protect, authorize } from "../../middleware/auth.middleware";
+import { protect } from "../../middleware/auth.middleware";
 import { validate } from "../../middleware/validate";
 import { updateKycSchema, verifyKycStatusSchema } from "./members.validator";
 
@@ -14,10 +14,9 @@ router.get("/", MembersController.list as any);
 router.get("/:id", MembersController.getById as any);
 router.post("/kyc", validate(updateKycSchema), MembersController.updateKyc as any);
 
-// Admins/Organizers only KYC approval
+// KYC approval (any authenticated user — service layer checks committee ownership)
 router.put(
   "/:id/kyc/status",
-  authorize("ADMIN", "ORGANIZER") as any,
   validate(verifyKycStatusSchema),
   MembersController.verifyKyc as any
 );

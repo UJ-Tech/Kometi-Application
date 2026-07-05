@@ -1,6 +1,6 @@
 // src/services/admin.api.ts
 import apiClient from "./api.client";
-import type { ApiResponse, User, UserRole } from "../types";
+import type { ApiResponse } from "../types";
 
 export interface MonthlyAnalytic {
   month: string;
@@ -23,7 +23,7 @@ export interface WalletSummary {
   id: string;
   userId: string;
   balancePaise: number;
-  user: { name: string; phone: string; role: string };
+  user: { name: string; phone: string };
 }
 
 export interface AdminDashboardStats {
@@ -33,7 +33,6 @@ export interface AdminDashboardStats {
   profitOverviewPaise: number;
   monthlyAnalytics: MonthlyAnalytic[];
   totalUsersCount: number;
-  userStats: Record<string, number>;
   committeeStats: Record<string, number>;
   installmentStats: Record<string, number>;
   recentTransactions: any[];
@@ -45,7 +44,4 @@ export interface AdminDashboardStats {
 export const adminApi = {
   getDashboardStats: () =>
     apiClient.get<ApiResponse<AdminDashboardStats>>("/admin/dashboard-stats"),
-
-  updateUserRole: (userId: string, role: UserRole) =>
-    apiClient.put<ApiResponse<User>>(`/admin/users/${userId}/role`, { role }),
 };

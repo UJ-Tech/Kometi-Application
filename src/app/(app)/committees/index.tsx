@@ -13,16 +13,10 @@ import Card from "../../../components/ui/Card";
 import Badge, { committeeVariant } from "../../../components/ui/Badge";
 import ScreenHeader from "../../../components/shared/ScreenHeader";
 
-import { useAuthStore } from "../../../stores/auth.store";
-import { canCreateCommittee } from "../../../utils/rbac";
-
 export default function Committees() {
   const router = useRouter();
-  const user = useAuthStore((s) => s.user);
   const { committees, isLoading, fetchCommittees } = useCommitteeStore();
   const [refreshing, setRefreshing] = useState(false);
-
-  const canOpenCommitteeCreation = canCreateCommittee(user?.role);
 
   const loadData = async () => {
     setRefreshing(true);
@@ -54,7 +48,7 @@ export default function Committees() {
           fontSize: 22, fontWeight: "800", color: COLORS.text.primary,
           textAlign: "center", marginBottom: 8,
         }}>
-          {canOpenCommitteeCreation ? "No Chits Yet" : "No Chits Found"}
+          No Chits Yet
         </Text>
 
         {/* Description */}
@@ -62,18 +56,12 @@ export default function Committees() {
           fontSize: 14, color: COLORS.text.secondary,
           textAlign: "center", lineHeight: 22, marginBottom: 32, paddingHorizontal: 8,
         }}>
-          {canOpenCommitteeCreation
-            ? "You haven't created any chit committees yet. Create your first chit to start saving with friends, family, or colleagues."
-            : "You haven't joined any chit committees yet. Ask a friend for an invite code to join their chit fund."
-          }
+          Create your own chit fund or join an existing one using an invite code.
         </Text>
 
-        {/* Primary CTA */}
+        {/* Primary CTA - Create */}
         <TouchableOpacity
-          onPress={() => canOpenCommitteeCreation
-            ? router.push("/committees/create")
-            : router.push("/(auth)/join-committee" as any)
-          }
+          onPress={() => router.push("/committees/create")}
           activeOpacity={0.8}
           style={{
             width: "100%", height: 56, borderRadius: 16,
@@ -82,38 +70,33 @@ export default function Committees() {
             flexDirection: "row", marginBottom: 12,
           }}
         >
-          <Ionicons
-            name={canOpenCommitteeCreation ? "add-circle-outline" : "enter-outline"}
-            size={20} color="#fff"
-          />
+          <Ionicons name="add-circle-outline" size={20} color="#fff" />
           <Text style={{
             color: COLORS.text.inverse, fontSize: 16, fontWeight: "700", marginLeft: 8,
           }}>
-            {canOpenCommitteeCreation ? "Create Your First Chit" : "Join a Chit"}
+            Create a Chit
           </Text>
         </TouchableOpacity>
 
-        {/* Secondary CTA for organizers */}
-        {canOpenCommitteeCreation && (
-          <TouchableOpacity
-            onPress={() => router.push("/(auth)/join-committee" as any)}
-            activeOpacity={0.7}
-            style={{
-              width: "100%", height: 48, borderRadius: 12,
-              backgroundColor: "rgba(245,158,11,0.10)",
-              borderWidth: 1, borderColor: "rgba(245,158,11,0.20)",
-              alignItems: "center", justifyContent: "center",
-              flexDirection: "row", marginBottom: 24,
-            }}
-          >
-            <Ionicons name="people-outline" size={18} color={COLORS.goldPrimary} />
-            <Text style={{
-              color: COLORS.goldPrimary, fontSize: 14, fontWeight: "600", marginLeft: 8,
-            }}>
-              Or Join Someone Else{"'"}s Chit
-            </Text>
-          </TouchableOpacity>
-        )}
+        {/* Secondary CTA - Join */}
+        <TouchableOpacity
+          onPress={() => router.push("/(auth)/join-committee" as any)}
+          activeOpacity={0.7}
+          style={{
+            width: "100%", height: 48, borderRadius: 12,
+            backgroundColor: "rgba(245,158,11,0.10)",
+            borderWidth: 1, borderColor: "rgba(245,158,11,0.20)",
+            alignItems: "center", justifyContent: "center",
+            flexDirection: "row", marginBottom: 24,
+          }}
+        >
+          <Ionicons name="people-outline" size={18} color={COLORS.goldPrimary} />
+          <Text style={{
+            color: COLORS.goldPrimary, fontSize: 14, fontWeight: "600", marginLeft: 8,
+          }}>
+            Join with Invite Code
+          </Text>
+        </TouchableOpacity>
 
         {/* Feature highlights */}
         <View style={{
@@ -127,17 +110,13 @@ export default function Committees() {
           {[
             {
               icon: "create-outline" as const,
-              title: canOpenCommitteeCreation ? "Create a Chit" : "Get an Invite",
-              desc: canOpenCommitteeCreation
-                ? "Set the installment amount, slots, and cycle duration"
-                : "Ask your chit organizer for the 8-digit invite code",
+              title: "Create or Join",
+              desc: "Create your own chit or enter an invite code to join one",
             },
             {
               icon: "people-outline" as const,
               title: "Add Members",
-              desc: canOpenCommitteeCreation
-                ? "Share the invite code or approve join requests"
-                : "Enter the code to request membership",
+              desc: "Share the invite code or approve join requests",
             },
             {
               icon: "wallet-outline" as const,
@@ -170,21 +149,20 @@ export default function Committees() {
         title="Chits"
         subtitle="Your active and upcoming chit pools"
         rightElement={
-          canOpenCommitteeCreation ? (
+          <View style={{ flexDirection: "row", gap: 8 }}>
             <TouchableOpacity
               onPress={() => router.push("/committees/create")}
               className="w-10 h-10 bg-brand-500/10 border border-brand-500/20 rounded-full items-center justify-center"
             >
               <Ionicons name="add" size={24} color={COLORS.brandPrimary} />
             </TouchableOpacity>
-          ) : (
             <TouchableOpacity
               onPress={() => router.push("/(auth)/join-committee" as any)}
               className="w-10 h-10 bg-gold-500/10 border border-gold-500/20 rounded-full items-center justify-center"
             >
               <Ionicons name="enter-outline" size={22} color={COLORS.goldPrimary} />
             </TouchableOpacity>
-          )
+          </View>
         }
         transparent
       />
@@ -201,7 +179,7 @@ export default function Committees() {
         }
         contentContainerStyle={{ paddingBottom: 100, flexGrow: 1 }}
         ListHeaderComponent={
-          committees.length > 0 && !canOpenCommitteeCreation ? (
+          committees.length > 0 ? (
             <TouchableOpacity
               onPress={() => router.push("/(auth)/join-committee" as any)}
               activeOpacity={0.8}

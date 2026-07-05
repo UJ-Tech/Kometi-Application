@@ -6,7 +6,6 @@ import { View, Text, FlatList, TouchableOpacity, RefreshControl, ActivityIndicat
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useMemberStore } from "../../../stores/member.store";
-import { useAuthStore } from "../../../stores/auth.store";
 import { useCommitteeStore } from "../../../stores/committee.store";
 import { membersApi } from "../../../services/members.api";
 import { COLORS } from "../../../constants/theme";
@@ -15,13 +14,12 @@ import Avatar from "../../../components/ui/Avatar";
 import Badge, { kycVariant } from "../../../components/ui/Badge";
 import EmptyState from "../../../components/ui/EmptyState";
 import ScreenHeader from "../../../components/shared/ScreenHeader";
-import { canVerifyKYC, canViewMembers, canCreateCommittee } from "../../../utils/rbac";
+import { canViewMembers } from "../../../utils/rbac";
 import { useAlertModal } from "../../../components/ui/AlertModal";
 
 export default function Members() {
   const router = useRouter();
   const { members, isLoading, searchQuery, setSearchQuery, fetchMembers } = useMemberStore();
-  const currentUser = useAuthStore((s) => s.user);
   const committees = useCommitteeStore((s) => s.committees);
   const hasCommittee = committees.length > 0;
   const [refreshing, setRefreshing] = useState(false);
@@ -29,10 +27,10 @@ export default function Members() {
   const { alert, confirm, AlertComponent } = useAlertModal();
 
   useEffect(() => {
-    if (!canViewMembers(currentUser?.role, hasCommittee)) {
+    if (!canViewMembers(hasCommittee)) {
       router.replace("/dashboard");
     }
-  }, [currentUser?.role, hasCommittee, router]);
+  }, [hasCommittee, router]);
 
   const loadData = async () => {
     setRefreshing(true);
@@ -89,7 +87,7 @@ export default function Members() {
       m.phone.includes(searchQuery)
   );
 
-  if (!canViewMembers(currentUser?.role, hasCommittee)) {
+  if (!canViewMembers(hasCommittee)) {
     return null;
   }
 
@@ -97,7 +95,7 @@ export default function Members() {
     <View className="flex-1 bg-surface-bg px-4">
       <ScreenHeader
         title="Members"
-        subtitle={currentUser?.role === "ADMIN" ? "Manage all chit participants" : "View members of your chits"}
+        subtitle="View members of your chits"
         transparent
       />
 
@@ -133,9 +131,7 @@ export default function Members() {
             <EmptyState
               icon="people-outline"
               title="No members found"
-              description={canCreateCommittee(currentUser?.role) ? "Invite your first member to join your committees." : "No members found in the system."}
-              actionLabel={canCreateCommittee(currentUser?.role) ? "Add Member" : undefined}
-              onAction={canCreateCommittee(currentUser?.role) ? () => console.log("Add Member") : undefined}
+              description="Invite members to join your committees."
             />
           ) : null
         }
@@ -151,7 +147,7 @@ export default function Members() {
 
             <View className="items-end">
               <Badge label={item.kycStatus} variant={kycVariant(item.kycStatus)} />
-              {canVerifyKYC(currentUser?.role) && item.kycStatus === "PENDING" && (
+              {item.kycStatus === "PENDING" && (
                 <TouchableOpacity
                   onPress={() => handleVerifyKYC(item.id, item.name)}
                   disabled={isProcessing === item.id}

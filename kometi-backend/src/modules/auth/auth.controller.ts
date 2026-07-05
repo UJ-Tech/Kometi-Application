@@ -115,19 +115,6 @@ export class AuthController {
     }
   }
 
-  static async setRole(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) throw new Error("Unauthorized");
-
-      const { role } = req.body;
-      const user = await AuthService.setUserRole(userId, role);
-      res.status(200).json({ success: true, data: user });
-    } catch (err) {
-      next(err);
-    }
-  }
-
   static async changePassword(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const userId = req.user?.id;

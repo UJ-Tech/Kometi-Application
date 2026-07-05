@@ -1,7 +1,7 @@
 // src/app/(app)/committees/create.tsx
 // Organiser Committee (Chit) Creation Screen
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -15,22 +15,12 @@ import Button from "../../../components/ui/Button";
 import Card from "../../../components/ui/Card";
 import { committeesApi } from "../../../services/committees.api";
 import { useCommitteeStore } from "../../../stores/committee.store";
-import { useAuthStore } from "../../../stores/auth.store";
-import { canCreateCommittee } from "../../../utils/rbac";
 import { useAlertModal } from "../../../components/ui/AlertModal";
 
 export default function CreateCommittee() {
   const router = useRouter();
   const { alert, confirm, AlertComponent } = useAlertModal();
-  const user = useAuthStore((s) => s.user);
   const { upsertCommittee } = useCommitteeStore();
-
-  // Guard: Redirect if not allowed to create committees
-  useEffect(() => {
-    if (user && !canCreateCommittee(user.role)) {
-      alert("Access Denied", "You do not have permission to create a committee.").then(() => router.replace("/dashboard"));
-    }
-  }, [user]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [form, setForm] = useState({

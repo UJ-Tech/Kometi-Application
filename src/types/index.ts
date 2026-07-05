@@ -1,7 +1,6 @@
 // src/types/index.ts
 // Shared domain types matching the Prisma schema / API response shapes
 
-export type UserRole    = "ADMIN" | "MANAGER" | "ACCOUNTANT" | "AGENT" | "ORGANIZER" | "MEMBER";
 export type KYCStatus   = "PENDING" | "SUBMITTED" | "VERIFIED" | "REJECTED";
 export type CommitteeStatus = "DRAFT" | "ACTIVE" | "COMPLETED" | "CANCELLED";
 export type InstallmentStatus = "PENDING" | "PAID" | "OVERDUE" | "PARTIAL" | "WAIVED";
@@ -34,7 +33,6 @@ export interface User {
   phone:          string;
   name:           string;
   email?:         string;
-  role:           UserRole;
   isActive:       boolean;
   kycStatus:      KYCStatus;
   profileImageUrl?: string;
