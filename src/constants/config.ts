@@ -2,10 +2,10 @@
 // App-wide configuration constants
 
 
-// const apiBaseUrl = "https://kometi-application.onrender.com/api/v1";
-// const socketUrl  = "https://kometi-application.onrender.com";
-const apiBaseUrl = "http://localhost:5000/api/v1";
-const socketUrl  = "http://localhost:5000";
+const apiBaseUrl = "https://kometi-application.onrender.com/api/v1";
+const socketUrl  = "https://kometi-application.onrender.com";
+// const apiBaseUrl = "http://localhost:5000/api/v1";
+// const socketUrl  = "http://localhost:5000";
 
 export const APP_CONFIG = {
   name:    "Kometi",
