@@ -1,6 +1,7 @@
 // src/modules/wallet/wallet.service.ts
 import supabase from "../../config/supabase";
 import { emitToUser } from "../../config/socket";
+import { sendPushToUser } from "../../config/push";
 
 export class WalletService {
   static async getWalletData(userId: string) {
@@ -101,6 +102,10 @@ export class WalletService {
     emitToUser(userId, "wallet:credited", {
       amountPaise: amount,
       newBalance: balanceAfter,
+    });
+
+    sendPushToUser(userId, "Wallet Credited", `₹${Math.floor(amount / 100)} deposited to your wallet.`, {
+      type: "WALLET_CREDITED",
     });
   }
 
@@ -203,6 +208,10 @@ export class WalletService {
     emitToUser(recipientId, "wallet:credited", {
       amountPaise: amount,
       newBalance: recipientAfter,
+    });
+
+    sendPushToUser(recipientId, "Wallet Credited", `₹${Math.floor(amount / 100)} received in your wallet.`, {
+      type: "WALLET_CREDITED",
     });
   }
 }

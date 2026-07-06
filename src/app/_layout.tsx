@@ -11,10 +11,16 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import * as SplashScreen from "expo-splash-screen";
 import { useAuthStore } from "../stores/auth.store";
 import { useSocket } from "../hooks/useSocket";
+import { usePushNotifications } from "../hooks/usePushNotifications";
 import NetworkBanner from "../components/shared/NetworkBanner";
 
 function SocketProvider({ children }: { children: React.ReactNode }) {
   useSocket();
+  return <>{children}</>;
+}
+
+function PushProvider({ children }: { children: React.ReactNode }) {
+  usePushNotifications();
   return <>{children}</>;
 }
 
@@ -62,9 +68,11 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <SocketProvider>
-            <StatusBar style="dark" />
-            <NetworkBanner />
-            <Stack screenOptions={{ headerShown: false }} />
+            <PushProvider>
+              <StatusBar style="dark" />
+              <NetworkBanner />
+              <Stack screenOptions={{ headerShown: false }} />
+            </PushProvider>
           </SocketProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

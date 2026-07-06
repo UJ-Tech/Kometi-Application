@@ -21,4 +21,7 @@ router.put(
   MembersController.verifyKyc as any
 );
 
+// Device token registration for push notifications
+router.post("/device-token", MembersController.registerDeviceToken as any);
+
 export default router;

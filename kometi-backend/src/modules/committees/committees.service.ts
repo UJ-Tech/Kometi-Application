@@ -1,6 +1,7 @@
 // src/modules/committees/committees.service.ts
 import supabase from "../../config/supabase";
 import { emitToAll, emitToUser } from "../../config/socket";
+import { sendPushToUser, sendPushToUsers } from "../../config/push";
 
 function generateInviteCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no I,O,0,1 to avoid confusion
@@ -245,8 +246,20 @@ export class CommitteesService {
 
     if (instError) throw instError;
 
-    // Notify all via WebSockets
+    // Notify all via WebSockets + Push
     emitToAll("committee:started", { committeeId });
+
+    // Push notification to all members
+    try {
+      const memberUserIds = (committee.members || []).map((m: any) => m.userId).filter(Boolean);
+      if (memberUserIds.length > 0) {
+        sendPushToUsers(memberUserIds, "Committee Started!", `${committee.name} has been activated. First cycle begins now.`, {
+          type: "COMMITTEE_START", committeeId,
+        });
+      }
+    } catch (e) {
+      console.error("[startCommittee] Push notification failed:", e);
+    }
   }
 
   static async submitBid(committeeId: string, userId: string, bidAmountPaise: number) {
@@ -546,12 +559,16 @@ export class CommitteesService {
 
     if (statusErr) throw statusErr;
 
-    // Notify the user whose request was approved
+    // Notify the user whose request was approved (socket + push)
     emitToUser(joinRequest.userId, "committee:join_request_approved", {
       committeeId,
       requestId,
       slotNumber: nextSlot,
     });
+    sendPushToUser(joinRequest.userId, "Join Request Approved!", `You've been accepted into the committee.`, {
+      type: "COMMITTEE_START", committeeId,
+    });
+
     // Also notify organizer about the update
     emitToUser(organizerId, "committee:join_request_updated", {
       committeeId,
@@ -599,10 +616,13 @@ export class CommitteesService {
       .eq("id", requestId);
 
     if (updateError) throw updateError;
-    // Notify the user whose request was rejected
+    // Notify the user whose request was rejected (socket + push)
     emitToUser(request.userId, "committee:join_request_rejected", {
       committeeId,
       requestId,
+    });
+    sendPushToUser(request.userId, "Join Request Declined", `Your request to join the committee was not approved.`, {
+      type: "COMMITTEE_START", committeeId,
     });
     // Also notify organizer about the update
     emitToUser(organizerId, "committee:join_request_updated", {
@@ -1048,33 +1068,17 @@ export class CommitteesService {
 
     if (updateErr) throw updateErr;
 
-    // 5. Write notifications to DB
     const winnerUser = (winnerMember?.user as any)?.name || "Member";
 
-    // Notification to winner
-    await supabase.from("notifications").insert({
-      userId: payoutCycle.winnerId,
-      type: "COMMITTEE_PAYOUT",
-      title: "Lottery Winner!",
-      body: `Congratulations! You won Cycle #${cycleNo} of ${committee.name}. Payout of ₹${Math.floor(winningBidAmountPaise / 100)} credited to your wallet.`,
-      metadata: { committeeId, cycleNo, payoutAmtPaise: winningBidAmountPaise, receiptNumber },
+    // Push notification to winner
+    sendPushToUser(payoutCycle.winnerId, "Lottery Winner!", `Congratulations! You won Cycle #${cycleNo} of ${committee.name}. Payout credited to your wallet.`, {
+      type: "COMMITTEE_PAYOUT", committeeId, cycleNo,
     });
 
     // Notifications to all other members
     const otherMembers = (committee.members ?? []).filter((m: any) => m.userId !== payoutCycle.winnerId);
-    const notifInserts = otherMembers.map((m: any) => ({
-      userId: m.userId,
-      type: "COMMITTEE_PAYOUT" as const,
-      title: "Lottery Completed",
-      body: `Lottery for Cycle #${cycleNo} of ${committee.name} completed. Winner: ${winnerUser} (Slot ${payoutCycle.winnerSlot}). Next installment due soon.`,
-      metadata: { committeeId, cycleNo, winnerId: payoutCycle.winnerId, receiptNumber },
-    }));
 
-    if (notifInserts.length > 0) {
-      await supabase.from("notifications").insert(notifInserts);
-    }
-
-    // 6. Emit real-time events
+    // 6. Emit real-time events + push
     emitToUser(payoutCycle.winnerId, "wallet:credited", {
       amountPaise: winningBidAmountPaise,
       newBalance: winnerBalanceAfter,
@@ -1087,6 +1091,14 @@ export class CommitteesService {
       payoutAmtPaise: winningBidAmountPaise,
       receiptNumber,
     });
+
+    // Push to other members about lottery completion
+    if (otherMembers.length > 0) {
+      const otherUserIds = otherMembers.map((m: any) => m.userId);
+      sendPushToUsers(otherUserIds, "Lottery Completed", `Winner: ${winnerUser}. Next installment due soon.`, {
+        type: "COMMITTEE_PAYOUT", committeeId, cycleNo,
+      });
+    }
 
     // 7. Advance to next cycle
     const nextCycleNo = cycleNo + 1;

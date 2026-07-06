@@ -1,7 +1,7 @@
 // src/app/(auth)/join-committee.tsx
 // Join committee by entering an 8-character invite code
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TextInput, KeyboardAvoidingView, Platform,
 } from "react-native";
@@ -11,15 +11,55 @@ import { Ionicons } from "@expo/vector-icons";
 import Button from "../../components/ui/Button";
 import ScreenHeader from "../../components/shared/ScreenHeader";
 import { committeesApi } from "../../services/committees.api";
-import { COLORS, FONT_SIZE, SPACING } from "../../constants/theme";
+import { COLORS, FONT_SIZE, SPACING, BORDER_RADIUS } from "../../constants/theme";
+
+const CODE_LENGTH = 8;
 
 export default function JoinCommitteeScreen() {
   const router   = useRouter();
   const insets   = useSafeAreaInsets();
+  const inputsRef = useRef<(TextInput | null)[]>([]);
 
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const digits = code.padEnd(CODE_LENGTH, "").slice(0, CODE_LENGTH).split("");
+
+  const handleCharChange = (text: string, index: number) => {
+    // Strip non-alphanumeric, uppercase
+    const cleaned = text.toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+    if (cleaned.length > 1) {
+      // Pasted — fill all boxes
+      const newCode = cleaned.slice(0, CODE_LENGTH);
+      setCode(newCode);
+      setError("");
+      inputsRef.current[Math.min(newCode.length - 1, CODE_LENGTH - 1)]?.focus();
+      return;
+    }
+
+    const arr    = [...digits];
+    arr[index]   = cleaned;
+    const newCode = arr.join("").replace(/ /g, "");
+    setCode(newCode);
+    setError("");
+
+    if (cleaned && index < CODE_LENGTH - 1) {
+      inputsRef.current[index + 1]?.focus();
+    }
+  };
+
+  const handleKeyPress = (e: any, index: number) => {
+    if (e.nativeEvent.key === "Backspace") {
+      if (!digits[index] && index > 0) {
+        const arr  = [...digits];
+        arr[index - 1] = "";
+        setCode(arr.join("").replace(/ /g, ""));
+        inputsRef.current[index - 1]?.focus();
+      }
+    }
+  };
 
   const handleJoin = async () => {
     const trimmed = code.trim().toUpperCase();
@@ -74,23 +114,39 @@ export default function JoinCommitteeScreen() {
           </Text>
         </View>
 
-        {/* Code Input */}
+        {/* Code Input — Character boxes */}
         <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.codeInput}
-            value={code}
-            onChangeText={(t) => {
-              setCode(t.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8));
-              setError("");
-            }}
-            placeholder="XXXXXXXX"
-            placeholderTextColor={COLORS.text.muted}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={8}
-            autoFocus
-          />
-          <Text style={styles.charCount}>{code.length}/8</Text>
+          <View style={styles.codeBoxes}>
+            {Array.from({ length: CODE_LENGTH }).map((_, i) => {
+              const filled = !!digits[i] && digits[i] !== " ";
+              const borderColor = error
+                ? COLORS.danger.DEFAULT
+                : filled
+                ? COLORS.gold[500]
+                : COLORS.surface.border;
+
+              return (
+                <TextInput
+                  key={i}
+                  ref={(r) => { inputsRef.current[i] = r; }}
+                  value={digits[i] === " " ? "" : digits[i]}
+                  onChangeText={(t) => handleCharChange(t, i)}
+                  onKeyPress={(e) => handleKeyPress(e, i)}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  maxLength={2}
+                  selectTextOnFocus
+                  autoFocus={i === 0}
+                  style={[
+                    styles.codeBox,
+                    { borderColor },
+                    filled && styles.codeBoxFilled,
+                  ]}
+                />
+              );
+            })}
+          </View>
+          <Text style={styles.charCount}>{code.length}/{CODE_LENGTH}</Text>
         </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -136,18 +192,33 @@ const styles = StyleSheet.create({
   title: { fontSize: FONT_SIZE["3xl"], fontWeight: "800", color: COLORS.text.primary, lineHeight: 36 },
   subtitle: { fontSize: FONT_SIZE.base, color: COLORS.text.secondary, lineHeight: 22 },
   inputContainer: { alignItems: "center", position: "relative" },
-  codeInput: {
-    width: "100%", height: 64, borderRadius: 16,
+  codeBoxes: {
+    flexDirection: "row",
+    gap: 6,
+    justifyContent: "center",
+  },
+  codeBox: {
+    width: 40,
+    height: 52,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 2,
     backgroundColor: COLORS.surface.card,
-    borderWidth: 1.5, borderColor: COLORS.surface.border,
-    fontSize: FONT_SIZE["2xl"], fontWeight: "700",
-    color: COLORS.gold[500], textAlign: "center",
-    letterSpacing: 2,
-    paddingHorizontal: 40,
+    textAlign: "center",
+    fontSize: FONT_SIZE.xl,
+    fontWeight: "700",
+    color: COLORS.gold[500],
+  },
+  codeBoxFilled: {
+    shadowColor: COLORS.gold[500],
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 2,
   },
   charCount: {
-    position: "absolute", right: SPACING[4], bottom: -20,
-    fontSize: FONT_SIZE.xs, color: COLORS.text.muted,
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.text.muted,
+    marginTop: SPACING[2],
   },
   error: { fontSize: FONT_SIZE.sm, color: COLORS.danger.light, textAlign: "center" },
   infoBox: {

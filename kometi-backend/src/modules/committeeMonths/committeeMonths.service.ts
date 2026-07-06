@@ -13,6 +13,7 @@ import {
 } from "../../utils/committeeCalculations";
 import { WalletLedgerService } from "../wallet/wallet-ledger.service";
 import { emitToAll, emitToUser } from "../../config/socket";
+import { sendPushToUser } from "../../config/push";
 
 /**
  * Generate placeholder contribution records for projection/display.
@@ -589,9 +590,8 @@ export class CommitteeMonthsService {
       );
     }
 
-    // 6. Create notifications for all members
+    // 6. Emit real-time notifications via socket (no DB storage)
     try {
-      // Get committee name and winner name for notification
       const { data: committeeForNotif } = await supabase
         .from("committees")
         .select("name")
@@ -608,40 +608,42 @@ export class CommitteeMonthsService {
       const winnerName = (winnerUser as any)?.user?.name || "Member";
       const resolutionLabel = resolutionType === "lottery" ? "Lottery" : resolutionType === "organiser_commission" ? "Organiser Commission" : "Bidding";
 
-      // Notify winner
+      // Notify winner (socket + push)
       if (winnerUser) {
-        await this.createNotification(
-          winnerUser.userId,
-          "COMMITTEE_PAYOUT",
-          `You Won Month #${month.month_number}!`,
-          `Congratulations! You won ${resolutionLabel} for ${committeeName} Month #${month.month_number}. ` +
+        const winnerTitle = `You Won Month #${month.month_number}!`;
+        const winnerBody = `Congratulations! You won ${resolutionLabel} for ${committeeName} Month #${month.month_number}. ` +
           (resolutionType !== "organiser_commission"
             ? `Your payout of ₹${Math.round(summary.winnerNetReceivable)} will be credited after all members pay.`
-            : `Your commission has been credited to your wallet.`),
-          { committeeId, monthId, resolutionType, winningBidAmount }
-        );
+            : `Your commission has been credited to your wallet.`);
+
+        emitToUser(winnerUser.userId, "notification:new", {
+          type: "COMMITTEE_PAYOUT", title: winnerTitle, body: winnerBody,
+        });
+        sendPushToUser(winnerUser.userId, winnerTitle, winnerBody, {
+          type: "COMMITTEE_PAYOUT", committeeId, monthId,
+        });
       }
 
-      // Notify non-winners
+      // Notify non-winners (socket + push)
       if (activeMembers && activeMembers.length > 0) {
-        const nonWinnerUserIds = activeMembers
-          .filter((m) => m.id !== winnerMemberId)
-          .map((m) => m.userId);
+        const nonWinnerTitle = `Month #${month.month_number} Resolved — Payment Due`;
+        const nonWinnerBody = `${committeeName} Month #${month.month_number} resolved via ${resolutionLabel}. ` +
+          `Winner: ${winnerName}. You need to pay ₹${Math.round(summary.nonWinnerNetPayable)} by ` +
+          `${new Date(paymentDeadline).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}.`;
 
-        if (nonWinnerUserIds.length > 0) {
-          await this.createNotifications(
-            nonWinnerUserIds,
-            "INSTALLMENT_DUE",
-            `Month #${month.month_number} Resolved — Payment Due`,
-            `${committeeName} Month #${month.month_number} resolved via ${resolutionLabel}. ` +
-            `Winner: ${winnerName}. You need to pay ₹${Math.round(summary.nonWinnerNetPayable)} by ` +
-            `${new Date(paymentDeadline).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}.`,
-            { committeeId, monthId, resolutionType, winnerId: winnerMemberId }
-          );
+        for (const member of activeMembers) {
+          if (member.id !== winnerMemberId) {
+            emitToUser(member.userId, "notification:new", {
+              type: "INSTALLMENT_DUE", title: nonWinnerTitle, body: nonWinnerBody,
+            });
+            sendPushToUser(member.userId, nonWinnerTitle, nonWinnerBody, {
+              type: "INSTALLMENT_DUE", committeeId, monthId,
+            });
+          }
         }
       }
     } catch (notifErr) {
-      console.error("[resolveMonth] Notification creation failed (non-fatal):", notifErr);
+      console.error("[resolveMonth] Notification emit failed (non-fatal):", notifErr);
     }
 
     return {
@@ -1726,7 +1728,7 @@ export class CommitteeMonthsService {
       `for month ${monthId} — all obligations settled`
     );
 
-    // Notify winner that payout has been credited
+    // Emit real-time notification to winner (no DB storage)
     try {
       const { data: committeeNotif } = await supabase
         .from("committees")
@@ -1740,17 +1742,19 @@ export class CommitteeMonthsService {
         .eq("id", monthId)
         .single();
 
-      await this.createNotification(
-        winnerMember.userId,
-        "WALLET_CREDIT",
-        "Winner Payout Credited!",
-        `Your payout of ₹${Math.round(winnerPayoutPaise)} for ${(committeeNotif as any)?.name || "Committee"} ` +
+      const settleTitle = "Winner Payout Credited!";
+      const settleBody = `Your payout of ₹${Math.round(winnerPayoutPaise)} for ${(committeeNotif as any)?.name || "Committee"} ` +
         `Month #${(monthNotif as any)?.month_number || "?"} has been credited to your wallet. ` +
-        `All members have completed their payments.`,
-        { committeeId, monthId, amountPaise: winnerPayoutPaise }
-      );
+        `All members have completed their payments.`;
+
+      emitToUser(winnerMember.userId, "notification:new", {
+        type: "WALLET_CREDIT", title: settleTitle, body: settleBody,
+      });
+      sendPushToUser(winnerMember.userId, settleTitle, settleBody, {
+        type: "WALLET_CREDIT", committeeId, monthId,
+      });
     } catch (notifErr) {
-      console.error("[settleWinnerPayout] Notification failed (non-fatal):", notifErr);
+      console.error("[settleWinnerPayout] Notification emit failed (non-fatal):", notifErr);
     }
 
     return { settled: true, reason: "Winner wallet credited", amount: winnerPayoutPaise };
@@ -1868,62 +1872,5 @@ export class CommitteeMonthsService {
       committeeMonth: a.committeeMonth,
       repaidStatus: a.status === "paid" ? "repaid" : "pending",
     }));
-  }
-
-  // ─── Notification Helpers ─────────────────────────────────────────────────
-  private static async createNotification(
-    userId: string,
-    type: string,
-    title: string,
-    body: string,
-    metadata?: Record<string, any>
-  ) {
-    try {
-      const { error } = await supabase.from("notifications").insert({
-        userId,
-        type,
-        title,
-        body,
-        metadata: metadata || {},
-      });
-      if (error) {
-        console.error("[Notification] Failed to create:", error);
-        return;
-      }
-      // Emit real-time event so frontend badge updates instantly
-      emitToUser(userId, "notification:new", { type, title, body });
-    } catch (err) {
-      console.error("[Notification] Failed to create:", err);
-    }
-  }
-
-  private static async createNotifications(
-    userIds: string[],
-    type: string,
-    title: string,
-    body: string,
-    metadata?: Record<string, any>
-  ) {
-    if (userIds.length === 0) return;
-    try {
-      const inserts = userIds.map((userId) => ({
-        userId,
-        type,
-        title,
-        body,
-        metadata: metadata || {},
-      }));
-      const { error } = await supabase.from("notifications").insert(inserts);
-      if (error) {
-        console.error("[Notification] Failed to create batch:", error);
-        return;
-      }
-      // Emit to each user
-      for (const userId of userIds) {
-        emitToUser(userId, "notification:new", { type, title, body });
-      }
-    } catch (err) {
-      console.error("[Notification] Failed to create batch:", err);
-    }
   }
 }

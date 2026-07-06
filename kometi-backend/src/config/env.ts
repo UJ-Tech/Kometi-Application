@@ -21,6 +21,9 @@ const envSchema = z.object({
   RAZORPAY_KEY_ID: z.string().min(1, "RAZORPAY_KEY_ID is required"),
   RAZORPAY_KEY_SECRET: z.string().min(1, "RAZORPAY_KEY_SECRET is required"),
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+
+  // Expo Push Notifications
+  EXPO_ACCESS_TOKEN: z.string().optional(),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

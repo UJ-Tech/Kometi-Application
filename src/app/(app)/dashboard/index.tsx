@@ -30,7 +30,7 @@ export default function Dashboard() {
   const { balancePaise, transactions, fetchWalletData } = useWalletStore();
   const { fetchCommittees } = useCommitteeStore();
   const { upcomingDues, fetchUpcomingDues } = useInstallmentStore();
-  const { unreadCount, fetchUnreadCount, newNotificationVersion } = useNotificationsStore();
+  const { unreadCount, newNotificationVersion } = useNotificationsStore();
 
   const loadData = async () => {
     setRefreshing(true);
@@ -38,7 +38,6 @@ export default function Dashboard() {
       fetchWalletData(),
       fetchCommittees(),
       fetchUpcomingDues(),
-      fetchUnreadCount(),
     ]);
     setRefreshing(false);
   };
@@ -61,13 +60,6 @@ export default function Dashboard() {
       fetchUpcomingDues();
     }
   }, [socketVersionSum, fetchWalletData, fetchUpcomingDues]);
-
-  // Refresh unread count when new notification arrives via socket
-  useEffect(() => {
-    if (newNotificationVersion > 0) {
-      fetchUnreadCount();
-    }
-  }, [newNotificationVersion]);
 
   const confirmLogout = async () => {
     return confirm("Logout", "Are you sure you want to logout?", { confirmLabel: "Logout", type: "warning" });

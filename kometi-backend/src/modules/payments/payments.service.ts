@@ -5,6 +5,7 @@ import crypto from "crypto";
 import supabase from "../../config/supabase";
 import razorpay from "../../config/razorpay";
 import { emitToUser, emitToAll } from "../../config/socket";
+import { sendPushToUser } from "../../config/push";
 import { WalletLedgerService } from "../wallet/wallet-ledger.service";
 
 export class PaymentsService {
@@ -364,6 +365,10 @@ export class PaymentsService {
       newBalance: balanceAfter,
     });
 
+    sendPushToUser(userId, "Wallet Credited", `₹${Math.floor(topupOrder.amount / 100)} added to your wallet.`, {
+      type: "WALLET_CREDITED",
+    });
+
     return { success: true, message: "Wallet credited successfully" };
   }
 
@@ -629,6 +634,9 @@ export class PaymentsService {
         monthId: tx.month_id,
         memberId: tx.member_id,
         amount: tx.amount,
+      });
+      sendPushToUser(committee.organizerId, "Contribution Received", `A member paid ₹${Math.floor(tx.amount / 100)} for this cycle.`, {
+        type: "CONTRIBUTION_PAID", committeeId: tx.committee_id, monthId: tx.month_id,
       });
     }
 
@@ -954,6 +962,9 @@ export class PaymentsService {
         monthId,
         memberId,
         amount: totalAmountPaise,
+      });
+      sendPushToUser(committee.organizerId, "Contribution Received", `A member paid ₹${Math.floor(totalAmountPaise / 100)} for this cycle.`, {
+        type: "CONTRIBUTION_PAID", committeeId, monthId,
       });
     }
 

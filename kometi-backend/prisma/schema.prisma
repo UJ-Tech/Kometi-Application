@@ -72,16 +72,6 @@ enum TransactionStatus {
   REVERSED
 }
 
-enum NotificationType {
-  INSTALLMENT_DUE
-  INSTALLMENT_PAID
-  COMMITTEE_PAYOUT
-  COMMITTEE_START
-  KYC_UPDATE
-  WALLET_CREDIT
-  WALLET_DEBIT
-}
-
 // ─── MODELS ─────────────────────────────────────────────
 
 model User {
@@ -107,8 +97,7 @@ model User {
   organizedCommittees     Committee[]           @relation("OrganizerCommittees")
   installmentsPaid        Installment[]
   transactions            Transaction[]
-  notifications           Notification[]
-  auditLogs               AuditLog[]
+  auditLogs              AuditLog[]
   refreshTokens           RefreshToken[]
   joinRequests            JoinRequest[]
   reviewedJoinRequests    JoinRequest[]         @relation("ReviewedBy")
@@ -335,22 +324,6 @@ model Transaction {
   @@index([userId, status])
   @@index([idempotencyKey])
   @@map("transactions")
-}
-
-model Notification {
-  id        String           @id @default(cuid())
-  userId    String
-  type      NotificationType
-  title     String
-  body      String
-  isRead    Boolean          @default(false)
-  metadata  Json?
-  createdAt DateTime         @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, isRead])
-  @@map("notifications")
 }
 
 model AuditLog {
