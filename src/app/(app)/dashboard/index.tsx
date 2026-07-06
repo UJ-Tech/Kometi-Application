@@ -10,6 +10,7 @@ import { useAuthStore } from "../../../stores/auth.store";
 import { useWalletStore } from "../../../stores/wallet.store";
 import { useCommitteeStore } from "../../../stores/committee.store";
 import { useInstallmentStore } from "../../../stores/installment.store";
+import { useNotificationsStore } from "../../../stores/notifications.store";
 import { authApi } from "../../../services/auth.api";
 import { tokenStorage } from "../../../utils/storage";
 import { formatINR } from "../../../utils/currency";
@@ -29,6 +30,7 @@ export default function Dashboard() {
   const { balancePaise, transactions, fetchWalletData } = useWalletStore();
   const { fetchCommittees } = useCommitteeStore();
   const { upcomingDues, fetchUpcomingDues } = useInstallmentStore();
+  const { unreadCount, fetchUnreadCount, newNotificationVersion } = useNotificationsStore();
 
   const loadData = async () => {
     setRefreshing(true);
@@ -36,6 +38,7 @@ export default function Dashboard() {
       fetchWalletData(),
       fetchCommittees(),
       fetchUpcomingDues(),
+      fetchUnreadCount(),
     ]);
     setRefreshing(false);
   };
@@ -58,6 +61,13 @@ export default function Dashboard() {
       fetchUpcomingDues();
     }
   }, [socketVersionSum, fetchWalletData, fetchUpcomingDues]);
+
+  // Refresh unread count when new notification arrives via socket
+  useEffect(() => {
+    if (newNotificationVersion > 0) {
+      fetchUnreadCount();
+    }
+  }, [newNotificationVersion]);
 
   const confirmLogout = async () => {
     return confirm("Logout", "Are you sure you want to logout?", { confirmLabel: "Logout", type: "warning" });
@@ -108,6 +118,20 @@ export default function Dashboard() {
         </View>
 
         <View className="flex-row gap-2.5">
+          <TouchableOpacity
+            onPress={() => router.push("/notifications")}
+            className="w-10 h-10 bg-brand-50 rounded-full items-center justify-center border border-brand-100 relative"
+          >
+            <Ionicons name="notifications-outline" size={20} color={COLORS.brandPrimary} />
+            {unreadCount > 0 && (
+              <View className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full items-center justify-center">
+                <Text className="text-white text-[10px] font-bold">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
           <TouchableOpacity
             onPress={() => router.push("/settings/change-password")}
             className="w-10 h-10 bg-brand-50 rounded-full items-center justify-center border border-brand-100"

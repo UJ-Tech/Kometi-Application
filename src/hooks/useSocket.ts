@@ -9,6 +9,7 @@ import { useAuthStore } from "../stores/auth.store";
 import { useWalletStore } from "../stores/wallet.store";
 import { useInstallmentStore } from "../stores/installment.store";
 import { useCommitteeStore } from "../stores/committee.store";
+import { useNotificationsStore } from "../stores/notifications.store";
 
 export function useSocket(): Socket | null {
   const socketRef      = useRef<Socket | null>(null);
@@ -126,6 +127,11 @@ export function useSocket(): Socket | null {
       if (currentUser && currentUser.id === data.userId) {
         useAuthStore.getState().updateKYCStatus(data.status as any);
       }
+    });
+
+    // ── Notification events ──────────────────────────────────────────────────
+    socket.on("notification:new", (_data: { type: string; title: string; body: string }) => {
+      useNotificationsStore.getState().bumpNewNotification();
     });
 
     return () => {

@@ -90,9 +90,7 @@ export default function JoinCommitteeScreen() {
             maxLength={8}
             autoFocus
           />
-          {code.length > 0 && (
-            <Text style={styles.charCount}>{code.length}/8</Text>
-          )}
+          <Text style={styles.charCount}>{code.length}/8</Text>
         </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -137,18 +135,18 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: FONT_SIZE["3xl"], fontWeight: "800", color: COLORS.text.primary, lineHeight: 36 },
   subtitle: { fontSize: FONT_SIZE.base, color: COLORS.text.secondary, lineHeight: 22 },
-  inputContainer: { alignItems: "center" },
+  inputContainer: { alignItems: "center", position: "relative" },
   codeInput: {
     width: "100%", height: 64, borderRadius: 16,
     backgroundColor: COLORS.surface.card,
     borderWidth: 1.5, borderColor: COLORS.surface.border,
     fontSize: FONT_SIZE["2xl"], fontWeight: "700",
     color: COLORS.gold[500], textAlign: "center",
-    letterSpacing: 6,
+    letterSpacing: 2,
+    paddingHorizontal: 40,
   },
   charCount: {
-    position: "absolute", right: SPACING[4], top: "50%",
-    transform: [{ translateY: -10 }],
+    position: "absolute", right: SPACING[4], bottom: -20,
     fontSize: FONT_SIZE.xs, color: COLORS.text.muted,
   },
   error: { fontSize: FONT_SIZE.sm, color: COLORS.danger.light, textAlign: "center" },

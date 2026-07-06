@@ -12,7 +12,7 @@ import {
   runNettedConservationCheck,
 } from "../../utils/committeeCalculations";
 import { WalletLedgerService } from "../wallet/wallet-ledger.service";
-import { emitToAll } from "../../config/socket";
+import { emitToAll, emitToUser } from "../../config/socket";
 
 /**
  * Generate placeholder contribution records for projection/display.
@@ -303,14 +303,48 @@ export class CommitteeMonthsService {
         const lowestBidAmount = Number(bids[0].bid_amount);
         const tiedBids = bids.filter(b => Number(b.bid_amount) === lowestBidAmount);
 
-        if (tiedBids.length > 1) {
+        // If ALL bids have the exact same amount, treat as lottery (no real bidding differentiation)
+        const allSameAmount = tiedBids.length === bids.length;
+
+        if (allSameAmount) {
+          // All bids equal → lottery among all eligible members (same as no-bid path)
+          const { data: activeMembers, error: amErr } = await supabase
+            .from("committee_members")
+            .select("id")
+            .eq("committeeId", committeeId)
+            .eq("isActive", true);
+
+          if (amErr) throw amErr;
+
+          const eligibleMembers: string[] = [];
+          for (const member of activeMembers || []) {
+            const el = await this.getMemberEligibility(committeeId, member.id, monthId);
+            if (el.canBid) {
+              eligibleMembers.push(member.id);
+            }
+          }
+
+          if (eligibleMembers.length === 0) {
+            throw new Error("No eligible members found for lottery");
+          }
+
+          winnerMemberId = this.runLottery(eligibleMembers);
+          const remainingNonWinners = Math.max(totalMembers - (month.month_number - 1), 1);
+          const interestAmount = calculateMonthlyInterest(remainingNonWinners, contributionPerPerson, 2);
+          winningBidAmount = calculateMaxBid(totalPool, interestAmount);
+          resolutionType = "lottery";
+        } else if (tiedBids.length > 1) {
+          // Only the lowest bids are tied (but higher bids exist) → tie-breaker lottery among tied
           const tiedMemberIds = tiedBids.map(b => b.member_id);
           winnerMemberId = this.runLottery(tiedMemberIds);
+          winningBidAmount = lowestBidAmount;
+          resolutionType = "bid_auction";
         } else {
+          // Sole lowest bidder wins
           winnerMemberId = tiedBids[0].member_id;
+          winningBidAmount = lowestBidAmount;
+          resolutionType = "bid_auction";
         }
-        winningBidAmount = lowestBidAmount;
-        resolutionType = "bid_auction";
       }
 
       // Mark non-winning bids as "lost"
@@ -555,6 +589,61 @@ export class CommitteeMonthsService {
       );
     }
 
+    // 6. Create notifications for all members
+    try {
+      // Get committee name and winner name for notification
+      const { data: committeeForNotif } = await supabase
+        .from("committees")
+        .select("name")
+        .eq("id", committeeId)
+        .single();
+
+      const { data: winnerUser } = await supabase
+        .from("committee_members")
+        .select("userId, user:users(name)")
+        .eq("id", winnerMemberId)
+        .single();
+
+      const committeeName = (committeeForNotif as any)?.name || "Committee";
+      const winnerName = (winnerUser as any)?.user?.name || "Member";
+      const resolutionLabel = resolutionType === "lottery" ? "Lottery" : resolutionType === "organiser_commission" ? "Organiser Commission" : "Bidding";
+
+      // Notify winner
+      if (winnerUser) {
+        await this.createNotification(
+          winnerUser.userId,
+          "COMMITTEE_PAYOUT",
+          `You Won Month #${month.month_number}!`,
+          `Congratulations! You won ${resolutionLabel} for ${committeeName} Month #${month.month_number}. ` +
+          (resolutionType !== "organiser_commission"
+            ? `Your payout of ₹${Math.round(summary.winnerNetReceivable)} will be credited after all members pay.`
+            : `Your commission has been credited to your wallet.`),
+          { committeeId, monthId, resolutionType, winningBidAmount }
+        );
+      }
+
+      // Notify non-winners
+      if (activeMembers && activeMembers.length > 0) {
+        const nonWinnerUserIds = activeMembers
+          .filter((m) => m.id !== winnerMemberId)
+          .map((m) => m.userId);
+
+        if (nonWinnerUserIds.length > 0) {
+          await this.createNotifications(
+            nonWinnerUserIds,
+            "INSTALLMENT_DUE",
+            `Month #${month.month_number} Resolved — Payment Due`,
+            `${committeeName} Month #${month.month_number} resolved via ${resolutionLabel}. ` +
+            `Winner: ${winnerName}. You need to pay ₹${Math.round(summary.nonWinnerNetPayable)} by ` +
+            `${new Date(paymentDeadline).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}.`,
+            { committeeId, monthId, resolutionType, winnerId: winnerMemberId }
+          );
+        }
+      }
+    } catch (notifErr) {
+      console.error("[resolveMonth] Notification creation failed (non-fatal):", notifErr);
+    }
+
     return {
       success: true,
       month: { id: monthId, status: "completed" },
@@ -740,8 +829,8 @@ export class CommitteeMonthsService {
         distributableAmount: Number(month.distributable_amount),
         interestAmount: Number(month.interest_amount),
         perMemberDistribution: Number(month.per_member_distribution),
-        nonWinnerNetPayable: month.non_winner_net_payable ? Number(month.non_winner_net_payable) / 100 : calculated.nonWinnerNetPayable,
-        winnerNetReceivable: month.winner_net_receivable ? Number(month.winner_net_receivable) / 100 : calculated.winnerNetReceivable,
+        nonWinnerNetPayable: month.non_winner_net_payable ? Number(month.non_winner_net_payable) : calculated.nonWinnerNetPayable,
+        winnerNetReceivable: month.winner_net_receivable ? Number(month.winner_net_receivable) : calculated.winnerNetReceivable,
         paymentDeadline: month.payment_deadline || null,
         projected: {
           interestAmount: calculated.interestAmount,
@@ -891,8 +980,8 @@ export class CommitteeMonthsService {
       distributableAmount: Number(month.distributable_amount),
       interestAmount: Number(month.interest_amount),
       perMemberDistribution: Number(month.per_member_distribution),
-      nonWinnerNetPayable: month.non_winner_net_payable ? Number(month.non_winner_net_payable) / 100 : calculated.nonWinnerNetPayable,
-      winnerNetReceivable: month.winner_net_receivable ? Number(month.winner_net_receivable) / 100 : calculated.winnerNetReceivable,
+      nonWinnerNetPayable: month.non_winner_net_payable ? Number(month.non_winner_net_payable) : calculated.nonWinnerNetPayable,
+      winnerNetReceivable: month.winner_net_receivable ? Number(month.winner_net_receivable) : calculated.winnerNetReceivable,
       paymentDeadline: month.payment_deadline || null,
       projected: {
         interestAmount: calculated.interestAmount,
@@ -1637,6 +1726,33 @@ export class CommitteeMonthsService {
       `for month ${monthId} — all obligations settled`
     );
 
+    // Notify winner that payout has been credited
+    try {
+      const { data: committeeNotif } = await supabase
+        .from("committees")
+        .select("name")
+        .eq("id", committeeId)
+        .single();
+
+      const { data: monthNotif } = await supabase
+        .from("committee_months")
+        .select("month_number")
+        .eq("id", monthId)
+        .single();
+
+      await this.createNotification(
+        winnerMember.userId,
+        "WALLET_CREDIT",
+        "Winner Payout Credited!",
+        `Your payout of ₹${Math.round(winnerPayoutPaise)} for ${(committeeNotif as any)?.name || "Committee"} ` +
+        `Month #${(monthNotif as any)?.month_number || "?"} has been credited to your wallet. ` +
+        `All members have completed their payments.`,
+        { committeeId, monthId, amountPaise: winnerPayoutPaise }
+      );
+    } catch (notifErr) {
+      console.error("[settleWinnerPayout] Notification failed (non-fatal):", notifErr);
+    }
+
     return { settled: true, reason: "Winner wallet credited", amount: winnerPayoutPaise };
   }
 
@@ -1752,5 +1868,62 @@ export class CommitteeMonthsService {
       committeeMonth: a.committeeMonth,
       repaidStatus: a.status === "paid" ? "repaid" : "pending",
     }));
+  }
+
+  // ─── Notification Helpers ─────────────────────────────────────────────────
+  private static async createNotification(
+    userId: string,
+    type: string,
+    title: string,
+    body: string,
+    metadata?: Record<string, any>
+  ) {
+    try {
+      const { error } = await supabase.from("notifications").insert({
+        userId,
+        type,
+        title,
+        body,
+        metadata: metadata || {},
+      });
+      if (error) {
+        console.error("[Notification] Failed to create:", error);
+        return;
+      }
+      // Emit real-time event so frontend badge updates instantly
+      emitToUser(userId, "notification:new", { type, title, body });
+    } catch (err) {
+      console.error("[Notification] Failed to create:", err);
+    }
+  }
+
+  private static async createNotifications(
+    userIds: string[],
+    type: string,
+    title: string,
+    body: string,
+    metadata?: Record<string, any>
+  ) {
+    if (userIds.length === 0) return;
+    try {
+      const inserts = userIds.map((userId) => ({
+        userId,
+        type,
+        title,
+        body,
+        metadata: metadata || {},
+      }));
+      const { error } = await supabase.from("notifications").insert(inserts);
+      if (error) {
+        console.error("[Notification] Failed to create batch:", error);
+        return;
+      }
+      // Emit to each user
+      for (const userId of userIds) {
+        emitToUser(userId, "notification:new", { type, title, body });
+      }
+    } catch (err) {
+      console.error("[Notification] Failed to create batch:", err);
+    }
   }
 }

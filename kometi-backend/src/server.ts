@@ -17,6 +17,7 @@ import walletRouter from "./modules/wallet/wallet.router";
 import withdrawalRouter from "./modules/wallet/withdrawal.router";
 import adminRouter from "./modules/admin/admin.router";
 import paymentsRouter from "./modules/payments/payments.router";
+import notificationsRouter from "./modules/notifications/notifications.router";
 import { startOverdueCheckScheduler } from "./jobs/overdue-check";
 
 const app = express();
@@ -41,6 +42,7 @@ app.use("/api/v1/installments", installmentsRouter);
 app.use("/api/v1/wallet", walletRouter);
 app.use("/api/v1/wallet/withdrawals", withdrawalRouter);
 app.use("/api/v1/payments", paymentsRouter);
+app.use("/api/v1/notifications", notificationsRouter);
 app.use("/api/v1/admin", adminRouter);
 
 // Base Health Check

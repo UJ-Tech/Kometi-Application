@@ -285,7 +285,7 @@ export default function OrganiserMonthDetail() {
                   const res = await committeesApi.settlePayout(id, monthId);
                   const result = res.data?.data;
                   if (result?.settled) {
-                    await notify("Success", `Winner payout of ₹${(result.amount || 0) / 100} settled!`);
+                    await notify("Success", `Winner payout of ${formatINR(result.amount || 0)} settled!`);
                   } else {
                     await notify("Info", result?.reason || "Settlement not needed");
                   }
