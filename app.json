@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Monio App",
-    "slug": "monio",
+    "name": "Monio",
+    "slug": "kometi",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/watermarklogo.png",
