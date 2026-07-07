@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.bytemetushar.kometi'
+    namespace 'com.bytemetushar.monio'
     defaultConfig {
-        applicationId 'com.bytemetushar.kometi'
+        applicationId 'com.bytemetushar.monio'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

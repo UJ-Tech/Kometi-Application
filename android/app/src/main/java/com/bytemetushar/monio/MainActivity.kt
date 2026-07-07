@@ -1,4 +1,4 @@
-package com.bytemetushar.kometi
+package com.bytemetushar.monio
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

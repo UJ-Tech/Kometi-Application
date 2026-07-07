@@ -1,4 +1,4 @@
-package com.bytemetushar.kometi
+package com.bytemetushar.monio
 
 import android.app.Application
 import android.content.res.Configuration
