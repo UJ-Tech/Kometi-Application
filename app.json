@@ -4,11 +4,11 @@
     "slug": "monio",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/watermarklogo.png",
     "scheme": "monio",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/images/icon.png"
+      "icon": "./assets/images/watermarklogo.png"
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +22,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/watermarklogo.png"
     },
     "plugins": [
       "expo-router",
@@ -30,7 +30,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#1A1A1A",
-          "image": "./assets/images/icon.png",
+          "image": "./assets/images/watermarklogo.png",
           "imageWidth": 200
         }
       ],
@@ -43,7 +43,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
+          "icon": "./assets/images/watermarklogo.png",
           "color": "#b8860b"
         }
       ]
