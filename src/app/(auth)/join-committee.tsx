@@ -1,9 +1,6 @@
-// src/app/(auth)/join-committee.tsx
-// Join committee by entering an 8-character invite code
-
 import React, { useState, useRef } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, TextInput, KeyboardAvoidingView, Platform,
+  View, Text, ScrollView, TextInput, KeyboardAvoidingView, Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -27,11 +24,9 @@ export default function JoinCommitteeScreen() {
   const digits = code.padEnd(CODE_LENGTH, "").slice(0, CODE_LENGTH).split("");
 
   const handleCharChange = (text: string, index: number) => {
-    // Strip non-alphanumeric, uppercase
     const cleaned = text.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
     if (cleaned.length > 1) {
-      // Pasted — fill all boxes
       const newCode = cleaned.slice(0, CODE_LENGTH);
       setCode(newCode);
       setError("");
@@ -101,28 +96,39 @@ export default function JoinCommitteeScreen() {
       <ScreenHeader title="Join Committee" showBack />
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + SPACING[8] }]}
+        contentContainerStyle={[{ flexGrow: 1, paddingHorizontal: SPACING[6], gap: SPACING[6], paddingTop: SPACING[4] }, { paddingBottom: insets.bottom + SPACING[8] }]}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.top}>
-          <View style={styles.iconCircle}>
-            <Ionicons name="key-outline" size={28} color={COLORS.gold[400]} />
+        <View style={{ gap: SPACING[3] }}>
+          <View style={{
+            width: 64,
+            height: 64,
+            borderRadius: 20,
+            backgroundColor: "rgba(245,158,11,0.08)",
+            alignItems: "center",
+            justifyContent: "center",
+            borderWidth: 1,
+            borderColor: "rgba(245,158,11,0.15)",
+          }}>
+            <Ionicons name="key-outline" size={30} color={COLORS.gold[500]} />
           </View>
-          <Text style={styles.title}>Enter Invite Code</Text>
-          <Text style={styles.subtitle}>
-            Ask your committee organizer for the 8-character invite code, then enter it below.
+          <Text style={{ fontSize: FONT_SIZE["2xl"], fontWeight: "800", color: COLORS.text.primary, lineHeight: 32 }}>
+            Enter Invite Code
+          </Text>
+          <Text style={{ fontSize: FONT_SIZE.base, color: COLORS.text.secondary, lineHeight: 22 }}>
+            Ask your committee organizer for the 8-character invite code.
           </Text>
         </View>
 
-        {/* Code Input — Character boxes */}
-        <View style={styles.inputContainer}>
-          <View style={styles.codeBoxes}>
+        {/* Code Input */}
+        <View style={{ alignItems: "center" }}>
+          <View style={{ flexDirection: "row", gap: 6, justifyContent: "center" }}>
             {Array.from({ length: CODE_LENGTH }).map((_, i) => {
               const filled = !!digits[i] && digits[i] !== " ";
               const borderColor = error
                 ? COLORS.danger.DEFAULT
                 : filled
-                ? COLORS.gold[500]
+                ? COLORS.brand[500]
                 : COLORS.surface.border;
 
               return (
@@ -137,25 +143,54 @@ export default function JoinCommitteeScreen() {
                   maxLength={2}
                   selectTextOnFocus
                   autoFocus={i === 0}
-                  style={[
-                    styles.codeBox,
-                    { borderColor },
-                    filled && styles.codeBoxFilled,
-                  ]}
+                  style={{
+                    width: 40,
+                    height: 54,
+                    borderRadius: BORDER_RADIUS.lg,
+                    borderWidth: 2,
+                    borderColor,
+                    backgroundColor: COLORS.surface.card,
+                    textAlign: "center",
+                    fontSize: FONT_SIZE.xl,
+                    fontWeight: "700",
+                    color: COLORS.brand[600],
+                    shadowColor: filled ? COLORS.brand[500] : "transparent",
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 4,
+                    elevation: filled ? 2 : 0,
+                  }}
                 />
               );
             })}
           </View>
-          <Text style={styles.charCount}>{code.length}/{CODE_LENGTH}</Text>
+          <Text style={{
+            fontSize: FONT_SIZE.xs,
+            color: COLORS.text.muted,
+            marginTop: SPACING[2],
+          }}>
+            {code.length}/{CODE_LENGTH}
+          </Text>
         </View>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? (
+          <Text style={{ fontSize: FONT_SIZE.sm, color: COLORS.danger.light, textAlign: "center" }}>{error}</Text>
+        ) : null}
 
-        {/* Info Box */}
-        <View style={styles.infoBox}>
+        {/* Info */}
+        <View style={{
+          flexDirection: "row",
+          gap: SPACING[2],
+          backgroundColor: "rgba(79, 70, 229, 0.06)",
+          borderRadius: BORDER_RADIUS.lg,
+          padding: SPACING[4],
+          alignItems: "flex-start",
+          borderWidth: 1,
+          borderColor: "rgba(79, 70, 229, 0.1)",
+        }}>
           <Ionicons name="information-circle-outline" size={18} color={COLORS.brand[400]} />
-          <Text style={styles.infoText}>
-            The invite code is provided by your committee organizer. It is unique to each committee and allows you to request membership.
+          <Text style={{ flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.text.secondary, lineHeight: 20 }}>
+            The invite code is provided by your committee organizer. It is unique to each committee.
           </Text>
         </View>
 
@@ -178,53 +213,3 @@ export default function JoinCommitteeScreen() {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  content: { flexGrow: 1, paddingHorizontal: SPACING[6], gap: SPACING[6], paddingTop: SPACING[4] },
-  top: { gap: SPACING[3] },
-  iconCircle: {
-    width: 64, height: 64, borderRadius: 20,
-    alignItems: "center", justifyContent: "center", marginBottom: SPACING[2],
-    backgroundColor: COLORS.surface.card,
-    borderWidth: 1,
-    borderColor: COLORS.surface.border,
-  },
-  title: { fontSize: FONT_SIZE["3xl"], fontWeight: "800", color: COLORS.text.primary, lineHeight: 36 },
-  subtitle: { fontSize: FONT_SIZE.base, color: COLORS.text.secondary, lineHeight: 22 },
-  inputContainer: { alignItems: "center", position: "relative" },
-  codeBoxes: {
-    flexDirection: "row",
-    gap: 6,
-    justifyContent: "center",
-  },
-  codeBox: {
-    width: 40,
-    height: 52,
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 2,
-    backgroundColor: COLORS.surface.card,
-    textAlign: "center",
-    fontSize: FONT_SIZE.xl,
-    fontWeight: "700",
-    color: COLORS.gold[500],
-  },
-  codeBoxFilled: {
-    shadowColor: COLORS.gold[500],
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  charCount: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.text.muted,
-    marginTop: SPACING[2],
-  },
-  error: { fontSize: FONT_SIZE.sm, color: COLORS.danger.light, textAlign: "center" },
-  infoBox: {
-    flexDirection: "row", gap: SPACING[2],
-    backgroundColor: "rgba(13,148,136,0.06)", borderRadius: 12,
-    padding: SPACING[4], alignItems: "flex-start",
-  },
-  infoText: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.text.secondary, lineHeight: 20 },
-});

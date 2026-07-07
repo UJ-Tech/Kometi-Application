@@ -130,8 +130,12 @@ export function useSocket(): Socket | null {
     });
 
     // ── Notification events ──────────────────────────────────────────────────
-    socket.on("notification:new", (_data: { type: string; title: string; body: string }) => {
-      useNotificationsStore.getState().bumpNewNotification();
+    socket.on("notification:new", (data: { type: string; title: string; body: string }) => {
+      useNotificationsStore.getState().addNotification({
+        type: data.type,
+        title: data.title,
+        body: data.body,
+      });
     });
 
     return () => {

@@ -3,9 +3,8 @@
 
 import { useEffect } from "react";
 import { useRouter } from "expo-router";
-import { View, ActivityIndicator } from "react-native";
 import { useAuthStore } from "../stores/auth.store";
-import { COLORS } from "../constants/theme";
+import BrandedLoader from "../components/brand/BrandedLoader";
 
 export default function EntryRedirect() {
   const router          = useRouter();
@@ -22,8 +21,6 @@ export default function EntryRedirect() {
   }, [isAuthenticated, isLoading]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: COLORS.surface.bg, alignItems: "center", justifyContent: "center" }}>
-      <ActivityIndicator color={COLORS.brand[500]} size="large" />
-    </View>
+    <BrandedLoader />
   );
 }

@@ -1,7 +1,7 @@
 {
-  "name": "kometi-backend",
+  "name": "monio-backend",
   "version": "1.0.0",
-  "description": "Premium fintech-grade backend for Kometi Chit Fund Application",
+  "description": "Premium fintech-grade backend for Monio Chit Fund Application",
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",

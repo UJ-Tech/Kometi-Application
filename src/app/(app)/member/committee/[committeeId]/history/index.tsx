@@ -13,12 +13,14 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import { committeesApi } from "../../../../../../services/committees.api";
+import BrandedLoader from "../../../../../../components/brand/BrandedLoader";
 import { installmentsApi } from "../../../../../../services/installments.api";
 import { useAuthStore } from "../../../../../../stores/auth.store";
 import { formatINR } from "../../../../../../utils/currency";
-import { COLORS } from "../../../../../../constants/theme";
+import { COLORS, SHADOWS, BORDER_RADIUS, SPACING } from "../../../../../../constants/theme";
 import Card from "../../../../../../components/ui/Card";
 import Badge from "../../../../../../components/ui/Badge";
+import ScreenHeader from "../../../../../../components/shared/ScreenHeader";
 import { useAlertModal } from "../../../../../../components/ui/AlertModal";
 
 const F = (p: number | bigint | null | undefined) => formatINR(p ?? 0);
@@ -92,32 +94,27 @@ export default function PaymentHistoryScreen() {
 
   if (!isValidId) {
     return (
-      <View className="flex-1 bg-surface-50 items-center justify-center px-6">
+      <View style={{ flex: 1, backgroundColor: COLORS.surface.bg, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
         <Ionicons name="alert-circle-outline" size={40} color={COLORS.danger.light} />
-        <Text className="text-slate-900 font-bold text-lg mt-4">Invalid Committee</Text>
-        <TouchableOpacity onPress={() => router.back()} className="mt-4">
-          <Text className="text-brand-600 text-sm font-medium">Go Back</Text>
+        <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 18, marginTop: 16 }}>Invalid Committee</Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 16 }}>
+          <Text style={{ color: COLORS.brand[600], fontSize: 13, fontWeight: "500" }}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   if (loading && !refreshing) {
-    return (
-      <View className="flex-1 bg-surface-50 items-center justify-center">
-        <ActivityIndicator size="large" color={COLORS.brandPrimary} />
-        <Text className="text-slate-500 text-sm mt-4">Loading payment history...</Text>
-      </View>
-    );
+    return <BrandedLoader message="Loading payment history..." />;
   }
 
   if (error && !committee) {
     return (
-      <View className="flex-1 bg-surface-50 items-center justify-center px-6">
+      <View style={{ flex: 1, backgroundColor: COLORS.surface.bg, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
         <Ionicons name="cloud-offline-outline" size={40} color={COLORS.warning.light} />
-        <Text className="text-slate-900 font-bold text-lg mt-4">{error}</Text>
-        <TouchableOpacity onPress={loadData} className="mt-4 bg-brand-500 px-5 py-2.5 rounded-xl">
-          <Text className="text-slate-900 font-bold text-sm">Retry</Text>
+        <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 18, marginTop: 16 }}>{error}</Text>
+        <TouchableOpacity onPress={loadData} style={{ backgroundColor: COLORS.brand[500], paddingHorizontal: 20, paddingVertical: 10, borderRadius: BORDER_RADIUS.xl, marginTop: 16 }}>
+          <Text style={{ color: COLORS.white, fontWeight: "700", fontSize: 13 }}>Retry</Text>
         </TouchableOpacity>
       </View>
     );
@@ -181,45 +178,37 @@ export default function PaymentHistoryScreen() {
   return (
     <>
     <ScrollView
-      className="flex-1 bg-surface-50"
-      contentContainerStyle={{ paddingTop: 64, paddingBottom: 120 }}
+      className="flex-1"
+      style={{ backgroundColor: COLORS.surface.bg }}
+      contentContainerStyle={{ paddingTop: 0, paddingBottom: 120 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.brandPrimary} />}
     >
-      {/* Header */}
-      <View className="px-4 flex-row items-center mb-5">
-        <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 bg-surface-card rounded-full items-center justify-center border border-brand-primary/10 mr-4">
-          <Ionicons name="arrow-back" size={20} color="#1a1a2e" />
-        </TouchableOpacity>
-        <View className="flex-1">
-          <Text className="text-slate-900 text-xl font-bold">Payment History</Text>
-          <Text className="text-slate-400 text-xs">{committee.name}</Text>
-        </View>
-      </View>
+      <ScreenHeader title="Payment History" subtitle={committee.name} brand />
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* Summary Cards                                                      */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <View className="px-4 mb-5">
+      <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[5] }}>
         <View className="flex-row gap-3">
-          <Card padding={0} style={{ flex: 1 }}>
+          <Card padding={0} style={{ flex: 1 }} accent="brand">
             <View className="p-3 items-center">
               <Ionicons name="wallet-outline" size={20} color={COLORS.brandPrimary} />
-              <Text className="text-slate-500 text-[9px] uppercase font-bold mt-1">Total Paid</Text>
-              <Text className="text-brand-600 font-bold text-sm mt-0.5">{F(totalPaid)}</Text>
+              <Text style={{ color: COLORS.text.secondary, fontSize: 9, fontWeight: "700", textTransform: "uppercase", marginTop: 4 }}>Total Paid</Text>
+              <Text style={{ color: COLORS.brand[600], fontWeight: "700", fontSize: 13, marginTop: 2 }}>{F(totalPaid)}</Text>
             </View>
           </Card>
-          <Card padding={0} style={{ flex: 1 }}>
+          <Card padding={0} style={{ flex: 1 }} accent="success">
             <View className="p-3 items-center">
               <Ionicons name="arrow-down-circle-outline" size={20} color={COLORS.success.light} />
-              <Text className="text-slate-500 text-[9px] uppercase font-bold mt-1">Received</Text>
-              <Text className="text-success-600 font-bold text-sm mt-0.5">{F(totalReceived)}</Text>
+              <Text style={{ color: COLORS.text.secondary, fontSize: 9, fontWeight: "700", textTransform: "uppercase", marginTop: 4 }}>Received</Text>
+              <Text style={{ color: COLORS.success.dark, fontWeight: "700", fontSize: 13, marginTop: 2 }}>{F(totalReceived)}</Text>
             </View>
           </Card>
-          <Card padding={0} style={{ flex: 1 }}>
+          <Card padding={0} style={{ flex: 1 }} accent="warning">
             <View className="p-3 items-center">
               <Ionicons name="warning-outline" size={20} color={COLORS.warning.light} />
-              <Text className="text-slate-500 text-[9px] uppercase font-bold mt-1">Late Fees</Text>
-              <Text className={`font-bold text-sm mt-0.5 ${totalLateFees > 0 ? "text-warning-600" : "text-slate-500"}`}>
+              <Text style={{ color: COLORS.text.secondary, fontSize: 9, fontWeight: "700", textTransform: "uppercase", marginTop: 4 }}>Late Fees</Text>
+              <Text style={{ color: totalLateFees > 0 ? COLORS.warning.dark : COLORS.text.secondary, fontWeight: "700", fontSize: 13, marginTop: 2 }}>
                 {totalLateFees > 0 ? F(totalLateFees) : "-"}
               </Text>
             </View>
@@ -230,20 +219,20 @@ export default function PaymentHistoryScreen() {
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* Month-by-Month History                                             */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <View className="px-4 mb-5">
-        <View className="flex-row items-center mb-3">
-          <View className="w-7 h-7 rounded-lg bg-brand-500/15 items-center justify-center mr-2">
-            <Ionicons name="receipt-outline" size={14} color={COLORS.brandPrimary} />
+      <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[5] }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <View style={{ width: 4, height: 20, borderRadius: 999, backgroundColor: COLORS.brand[500] }} />
+          <Text style={{ color: COLORS.text.primary, fontSize: 14, fontWeight: "700" }}>Month-by-Month</Text>
+          <View style={{ marginLeft: "auto" }}>
+            <Text style={{ color: COLORS.text.secondary, fontSize: 11 }}>{history.length} months</Text>
           </View>
-          <Text className="text-slate-900 font-bold text-sm">Month-by-Month</Text>
-          <Text className="text-slate-500 text-xs ml-auto">{history.length} months</Text>
         </View>
 
         {history.length === 0 ? (
-          <Card>
+          <Card style={SHADOWS.cardSm}>
             <View className="items-center py-6">
               <Ionicons name="document-outline" size={28} color={COLORS.text.muted} />
-              <Text className="text-slate-500 text-xs mt-2">No payment history yet</Text>
+              <Text style={{ color: COLORS.text.secondary, fontSize: 11, marginTop: 8 }}>No payment history yet</Text>
             </View>
           </Card>
         ) : (
@@ -255,17 +244,18 @@ export default function PaymentHistoryScreen() {
             return (
               <View key={entry.month.id} className="mb-3">
                 <TouchableOpacity onPress={() => loadMonthDetail(entry.month.id)} activeOpacity={0.7}>
-                  <Card padding={0} borderGlow={hasProblem}>
-                    <View className={`p-3.5 ${hasProblem ? "border-l-2 border-l-danger-400" : ""}`}>
+                  <Card padding={0} borderGlow={hasProblem} accent={hasProblem ? "danger" : entry.status === "PAID" ? "success" : "info"}>
+                    <View style={{ padding: 14 }}>
                       <View className="flex-row items-center justify-between mb-1.5">
-                        <View className="flex-row items-center flex-1">
-                          <Text className="text-slate-900 font-bold text-sm mr-2">Month #{entry.month.monthNumber}</Text>
+                        <View className="flex-row items-center flex-1" style={{ gap: 6 }}>
+                          <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 13, marginRight: 4 }}>Month #{entry.month.monthNumber}</Text>
                           <Badge
                             label={entry.status}
                             variant={entry.status === "PAID" ? "success" : entry.status === "OVERDUE" ? "danger" : entry.status === "PARTIAL" ? "warning" : "neutral"}
                             size="sm"
+                            dot
                           />
-                          {entry.isLate && <Badge label="Late" variant="warning" size="sm" style={{ marginLeft: 4 }} />}
+                          {entry.isLate && <Badge label="Late" variant="warning" size="sm" dot />}
                         </View>
                         {isLoadingDet ? (
                           <ActivityIndicator size="small" color={COLORS.brandPrimary} />
@@ -274,16 +264,16 @@ export default function PaymentHistoryScreen() {
                         )}
                       </View>
 
-                      <Text className="text-slate-500 text-[10px] mb-2">{fmtDate(entry.month.monthDate)}</Text>
+                      <Text style={{ color: COLORS.text.secondary, fontSize: 10, marginBottom: 8 }}>{fmtDate(entry.month.monthDate)}</Text>
 
-                      <View className="flex-row flex-wrap gap-x-4 gap-y-1">
-                        <Text className="text-slate-400 text-[10px]">Due: <Text className="text-slate-900 font-semibold">{F(entry.amountDue)}</Text></Text>
-                        <Text className="text-slate-400 text-[10px]">Paid: <Text className={`${entry.amountPaid > 0 ? "text-success-600" : "text-danger-600"} font-semibold`}>{F(entry.amountPaid)}</Text></Text>
+                      <View className="flex-row flex-wrap" style={{ gap: 8, rowGap: 4 }}>
+                        <Text style={{ color: COLORS.text.muted, fontSize: 10 }}>Due: <Text style={{ color: COLORS.text.primary, fontWeight: "600" }}>{F(entry.amountDue)}</Text></Text>
+                        <Text style={{ color: COLORS.text.muted, fontSize: 10 }}>Paid: <Text style={{ color: entry.amountPaid > 0 ? COLORS.success.dark : COLORS.danger.dark, fontWeight: "600" }}>{F(entry.amountPaid)}</Text></Text>
                         {entry.lateFee > 0 && (
-                          <Text className="text-slate-400 text-[10px]">Late Fee: <Text className="text-warning-600 font-semibold">{F(entry.lateFee)}</Text></Text>
+                          <Text style={{ color: COLORS.text.muted, fontSize: 10 }}>Late Fee: <Text style={{ color: COLORS.warning.dark, fontWeight: "600" }}>{F(entry.lateFee)}</Text></Text>
                         )}
                         {entry.totalReceived > 0 && (
-                          <Text className="text-slate-400 text-[10px]">Received: <Text className="text-success-600 font-semibold">{F(entry.totalReceived)}</Text></Text>
+                          <Text style={{ color: COLORS.text.muted, fontSize: 10 }}>Received: <Text style={{ color: COLORS.success.dark, fontWeight: "600" }}>{F(entry.totalReceived)}</Text></Text>
                         )}
                       </View>
 
@@ -296,10 +286,10 @@ export default function PaymentHistoryScreen() {
                               await alert("Payment", "Payment processing coming soon!");
                             }
                           }}
-                          className="mt-2.5 bg-brand-500/10 px-3 py-1.5 rounded-lg self-start flex-row items-center"
+                          style={{ marginTop: 10, backgroundColor: "rgba(79,70,229,0.08)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: BORDER_RADIUS.lg, alignSelf: "flex-start", flexDirection: "row", alignItems: "center" }}
                         >
                           <Ionicons name="card-outline" size={13} color={COLORS.brandPrimary} />
-                          <Text className="text-brand-600 text-[10px] font-semibold ml-1.5">Pay Now</Text>
+                          <Text style={{ color: COLORS.brand[600], fontSize: 10, fontWeight: "600", marginLeft: 6 }}>Pay Now</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -308,52 +298,52 @@ export default function PaymentHistoryScreen() {
 
                 {/* Expanded: Contribution & Distribution Details */}
                 {isExpanded && monthDetails[entry.month.id] && (
-                  <View className="ml-4 mt-2 mb-1">
+                  <View style={{ marginLeft: SPACING[4], marginTop: 8, marginBottom: 4 }}>
                     <Card gradient padding={0}>
                       <View className="p-3">
-                        <Text className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">Details</Text>
+                        <Text style={{ color: COLORS.text.muted, fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Details</Text>
 
                         {/* Contribution */}
-                        <View className="bg-surface-50 rounded-xl p-3 mb-2">
-                          <Text className="text-slate-500 text-[9px] uppercase font-bold mb-1">My Contribution</Text>
+                        <View style={{ backgroundColor: COLORS.surface.warm, borderRadius: BORDER_RADIUS.xl, padding: 12, marginBottom: 8 }}>
+                          <Text style={{ color: COLORS.text.secondary, fontSize: 9, fontWeight: "700", textTransform: "uppercase", marginBottom: 4 }}>My Contribution</Text>
                           {entry.amountPaid > 0 ? (
                             <View className="flex-row justify-between">
-                              <Text className="text-slate-400 text-xs">Amount Paid</Text>
-                              <Text className="text-success-600 font-semibold text-xs">{F(entry.amountPaid)}</Text>
+                              <Text style={{ color: COLORS.text.muted, fontSize: 11 }}>Amount Paid</Text>
+                              <Text style={{ color: COLORS.success.dark, fontWeight: "600", fontSize: 11 }}>{F(entry.amountPaid)}</Text>
                             </View>
                           ) : (
-                            <Text className="text-danger-600 text-xs">Not yet paid</Text>
+                            <Text style={{ color: COLORS.danger.dark, fontSize: 11 }}>Not yet paid</Text>
                           )}
                           {entry.lateFee > 0 && (
                             <View className="flex-row justify-between mt-1">
-                              <Text className="text-slate-400 text-xs">Late Fee</Text>
-                              <Text className="text-warning-600 font-semibold text-xs">{F(entry.lateFee)}</Text>
+                              <Text style={{ color: COLORS.text.muted, fontSize: 11 }}>Late Fee</Text>
+                              <Text style={{ color: COLORS.warning.dark, fontWeight: "600", fontSize: 11 }}>{F(entry.lateFee)}</Text>
                             </View>
                           )}
                         </View>
 
                         {/* Distribution */}
                         {entry.totalReceived > 0 ? (
-                          <View className="bg-surface-50 rounded-xl p-3">
-                            <Text className="text-slate-500 text-[9px] uppercase font-bold mb-1">My Distribution</Text>
+                          <View style={{ backgroundColor: COLORS.surface.warm, borderRadius: BORDER_RADIUS.xl, padding: 12 }}>
+                            <Text style={{ color: COLORS.text.secondary, fontSize: 9, fontWeight: "700", textTransform: "uppercase", marginBottom: 4 }}>My Distribution</Text>
                             <View className="flex-row justify-between">
-                              <Text className="text-slate-400 text-xs">Base Distribution</Text>
-                              <Text className="text-success-600 font-semibold text-xs">{F(entry.distribution)}</Text>
+                              <Text style={{ color: COLORS.text.muted, fontSize: 11 }}>Base Distribution</Text>
+                              <Text style={{ color: COLORS.success.dark, fontWeight: "600", fontSize: 11 }}>{F(entry.distribution)}</Text>
                             </View>
                             {entry.interest > 0 && (
                               <View className="flex-row justify-between mt-1">
-                                <Text className="text-slate-400 text-xs">Interest Share</Text>
-                                <Text className="text-success-600 font-semibold text-xs">{F(entry.interest)}</Text>
+                                <Text style={{ color: COLORS.text.muted, fontSize: 11 }}>Interest Share</Text>
+                                <Text style={{ color: COLORS.success.dark, fontWeight: "600", fontSize: 11 }}>{F(entry.interest)}</Text>
                               </View>
                             )}
-                            <View className="flex-row justify-between mt-1.5 pt-1.5 border-t border-brand-primary/5">
-                              <Text className="text-slate-900 text-xs font-bold">Total Received</Text>
-                              <Text className="text-success-600 font-bold text-xs">{F(entry.totalReceived)}</Text>
+                            <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: COLORS.surface.border }}>
+                              <Text style={{ color: COLORS.text.primary, fontSize: 11, fontWeight: "700" }}>Total Received</Text>
+                              <Text style={{ color: COLORS.success.dark, fontWeight: "700", fontSize: 11 }}>{F(entry.totalReceived)}</Text>
                             </View>
                           </View>
                         ) : entry.month.status === "completed" ? (
-                          <View className="bg-surface-50 rounded-xl p-3">
-                            <Text className="text-slate-500 text-xs italic">Distribution pending</Text>
+                          <View style={{ backgroundColor: COLORS.surface.warm, borderRadius: BORDER_RADIUS.xl, padding: 12 }}>
+                            <Text style={{ color: COLORS.text.secondary, fontSize: 11, fontStyle: "italic" }}>Distribution pending</Text>
                           </View>
                         ) : null}
                       </View>
@@ -368,7 +358,7 @@ export default function PaymentHistoryScreen() {
 
       {/* Footer */}
       <View className="px-4 items-center mb-6">
-        <Text className="text-slate-500 text-[10px]">Payment History &bull; {committee.name}</Text>
+        <Text style={{ color: COLORS.text.secondary, fontSize: 10 }}>Payment History &bull; {committee.name}</Text>
       </View>
     </ScrollView>
     <AlertComponent />

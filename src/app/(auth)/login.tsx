@@ -1,14 +1,13 @@
-// src/app/(auth)/login.tsx
-// Email, phone, and password sign in.
-
 import React, { useState } from "react";
-import { View, Text, KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from "react-native";
+import { View, Text, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import ScreenHeader from "../../components/shared/ScreenHeader";
+import KKMark from "../../components/brand/KKMark";
 import { authApi } from "../../services/auth.api";
 import { useAuthStore } from "../../stores/auth.store";
 import { tokenStorage } from "../../utils/storage";
@@ -72,24 +71,57 @@ export default function LoginScreen() {
 
       <ScrollView
         contentContainerStyle={[
-          styles.content,
+          { flexGrow: 1, paddingHorizontal: SPACING[5] },
           { paddingBottom: insets.bottom + SPACING[6] },
         ]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
-        <View style={styles.topSection}>
-          <View style={styles.iconCircle}>
-            <Ionicons name="phone-portrait-outline" size={28} color={COLORS.brand[500]} />
+        {/* Brand Header */}
+        <View style={{ alignItems: "center", paddingTop: SPACING[4], paddingBottom: SPACING[6] }}>
+          <View style={{
+            width: 56,
+            height: 56,
+            borderRadius: 16,
+            backgroundColor: "rgba(79, 70, 229, 0.08)",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: SPACING[3],
+          }}>
+            <KKMark size={32} color={COLORS.brand[500]} />
           </View>
-
-          <Text style={styles.title}>Sign in to{"\n"}your account</Text>
-          <Text style={styles.subtitle}>
-            Use your registered email, mobile number, and password.
+          <Text style={{
+            fontSize: FONT_SIZE["2xl"],
+            fontWeight: "800",
+            color: COLORS.text.primary,
+            textAlign: "center",
+          }}>
+            Welcome back
+          </Text>
+          <Text style={{
+            fontSize: FONT_SIZE.base,
+            color: COLORS.text.secondary,
+            textAlign: "center",
+            marginTop: SPACING[1],
+          }}>
+            Sign in to your Monio account
           </Text>
         </View>
 
-        <View style={styles.formCard}>
+        {/* Form */}
+        <View style={{
+          backgroundColor: COLORS.surface.card,
+          borderRadius: BORDER_RADIUS["2xl"],
+          padding: SPACING[5],
+          gap: SPACING[4],
+          borderWidth: 1,
+          borderColor: COLORS.surface.border,
+          shadowColor: COLORS.brand[500],
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.05,
+          shadowRadius: 12,
+          elevation: 3,
+        }}>
           <Input
             label="Email"
             required
@@ -135,37 +167,44 @@ export default function LoginScreen() {
           />
 
           {errors.form ? (
-            <Text style={styles.formError}>{errors.form}</Text>
+            <Text style={{ fontSize: FONT_SIZE.sm, color: COLORS.danger.light, lineHeight: 20 }}>
+              {errors.form}
+            </Text>
           ) : null}
 
-          <View style={{ marginTop: SPACING[3] }}>
-            <Button
-              label="Sign In"
-              variant="primary"
-              size="lg"
-              isLoading={isLoading}
-              onPress={handleLogin}
-            />
-          </View>
+          <Button
+            label="Sign In"
+            variant="primary"
+            size="lg"
+            gradient
+            isLoading={isLoading}
+            onPress={handleLogin}
+          />
 
-          <View style={{ marginTop: SPACING[2] }}>
-            <Button
-              label="Create Account"
-              variant="secondary"
-              size="md"
-              onPress={() => router.push("/(auth)/register")}
-            />
-          </View>
+          <Button
+            label="Create Account"
+            variant="secondary"
+            size="md"
+            onPress={() => router.push("/(auth)/register")}
+          />
         </View>
 
-        <View style={styles.trustRow}>
+        {/* Trust Indicators */}
+        <View style={{
+          flexDirection: "row",
+          gap: SPACING[5],
+          justifyContent: "center",
+          paddingTop: SPACING[6],
+        }}>
           {[
             { icon: "shield-checkmark-outline", label: "256-bit Encrypted" },
             { icon: "lock-closed-outline",      label: "RBI Compliant" },
           ].map(({ icon, label }) => (
-            <View key={label} style={styles.trustItem}>
+            <View key={label} style={{ flexDirection: "row", alignItems: "center", gap: SPACING[1.5] }}>
               <Ionicons name={icon as any} size={14} color={COLORS.brand[400]} />
-              <Text style={styles.trustText}>{label}</Text>
+              <Text style={{ fontSize: FONT_SIZE.xs, color: COLORS.text.muted, fontWeight: "500" }}>
+                {label}
+              </Text>
             </View>
           ))}
         </View>
@@ -173,39 +212,3 @@ export default function LoginScreen() {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    flexGrow: 1, paddingHorizontal: SPACING[6], gap: SPACING[6],
-  },
-  topSection: { gap: SPACING[2.5], paddingTop: SPACING[2] },
-  iconCircle: {
-    width: 56, height: 56, borderRadius: 14,
-    alignItems: "center", justifyContent: "center", marginBottom: SPACING[1],
-    backgroundColor: COLORS.surface.card,
-    borderWidth: 1,
-    borderColor: COLORS.surface.border,
-  },
-  title: {
-    fontSize: FONT_SIZE["3xl"], fontWeight: "700",
-    color: COLORS.text.primary, lineHeight: 36,
-  },
-  subtitle: {
-    fontSize: FONT_SIZE.base, color: COLORS.text.secondary, lineHeight: 22,
-  },
-  formCard: {
-    backgroundColor: COLORS.surface.card,
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.surface.border,
-    padding: SPACING[5],
-    gap: SPACING[4],
-  },
-  formError: { fontSize: FONT_SIZE.sm, color: COLORS.danger.light, lineHeight: 20 },
-  trustRow: {
-    flexDirection: "row", gap: SPACING[5], justifyContent: "center",
-    paddingTop: SPACING[1],
-  },
-  trustItem: { flexDirection: "row", alignItems: "center", gap: SPACING[1.5] },
-  trustText:  { fontSize: FONT_SIZE.xs, color: COLORS.text.muted, fontWeight: "500" },
-});

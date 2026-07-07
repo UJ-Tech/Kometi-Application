@@ -1,6 +1,3 @@
-// src/app/(app)/wallet/withdraw.tsx
-// Wallet withdrawal — request withdrawal to bank/UPI via Razorpay payouts.
-
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
@@ -16,7 +13,7 @@ import { useWalletStore } from "../../../stores/wallet.store";
 import { useAuthStore } from "../../../stores/auth.store";
 import { paymentsApi, type SavedPaymentMethod } from "../../../services/payments.api";
 import { formatINR } from "../../../utils/currency";
-import { COLORS } from "../../../constants/theme";
+import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from "../../../constants/theme";
 import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
 import EmptyState from "../../../components/ui/EmptyState";
@@ -25,7 +22,7 @@ import { AmountInput } from "../../../components/ui/AmountInput";
 import type { Withdrawal } from "../../../types";
 import { useAlertModal } from "../../../components/ui/AlertModal";
 
-const MIN_WITHDRAWAL_PAISE = 10_000; // ₹100
+const MIN_WITHDRAWAL_PAISE = 10_000;
 
 export default function WithdrawScreen() {
   const router = useRouter();
@@ -54,333 +51,221 @@ export default function WithdrawScreen() {
         setSelectedMethodId(defaultMethod.id);
       }
     } catch {
-      // Methods may not exist yet — user needs to add a payment method
+      // Methods may not exist yet
     } finally {
       setLoadingMethods(false);
       setRefreshing(false);
     }
-  }, [fetchWalletData, fetchWithdrawals, selectedMethodId]);
+  }, [selectedMethodId]);
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const availablePaise = BigInt(balancePaise);
-
-  const handleSubmit = async () => {
-    if (!kycVerified) {
-      await alert("KYC Required", "Please complete KYC verification in Settings before withdrawing.");
-      return;
-    }
-
+  const handleRequestWithdrawal = async () => {
     const amountNum = Number(amount);
+
     if (amountNum < MIN_WITHDRAWAL_PAISE) {
-      await alert("Minimum Amount", "Minimum withdrawal is ₹100.");
+      await alert("Minimum Amount", `Minimum withdrawal amount is ${formatINR(MIN_WITHDRAWAL_PAISE)}`);
       return;
     }
 
-    if (amountNum > balancePaise) {
-      await alert("Insufficient Balance", "You don't have enough balance for this withdrawal.");
+    if (amountNum > Number(balancePaise)) {
+      await alert("Insufficient Balance", "Withdrawal amount exceeds your available balance.");
       return;
     }
 
     if (!selectedMethodId) {
-      await alert("Payment Method", "Please select a verified bank account or UPI ID.");
+      await alert("No Payment Method", "Please add and verify a payment method first.");
       return;
     }
 
+    if (!kycVerified) {
+      await alert("KYC Required", "Please complete your KYC verification before requesting a withdrawal.");
+      return;
+    }
+
+    const ok = await confirm(
+      "Confirm Withdrawal",
+      `Request withdrawal of ${formatINR(BigInt(amountNum))}? This will be processed within 24-48 hours.`,
+      { confirmLabel: "Request" }
+    );
+    if (!ok) return;
+
     try {
-      await requestWithdrawal(
-        withdrawals[0]?.committee_id || "",
-        amountNum,
-        selectedMethodId
-      );
-      await alert("Withdrawal Requested", "Your withdrawal request has been submitted and is being processed.");
-      router.back();
+      await requestWithdrawal(amountNum, selectedMethodId);
+      await alert("Request Submitted", "Your withdrawal request has been submitted. You'll be notified once processed.");
+      setAmount(0n);
+      loadData();
     } catch (err: any) {
-      await alert("Withdrawal Failed", err.message || "Something went wrong. Please try again.");
+      await alert("Request Failed", err.message || "An error occurred.");
     }
   };
 
-  const handleCancel = async (withdrawalId: string) => {
-    const ok = await confirm("Cancel Withdrawal", "Are you sure you want to cancel this withdrawal request?", { confirmLabel: "Yes, Cancel" });
+  const handleCancelWithdrawal = async (withdrawalId: string) => {
+    const ok = await confirm("Cancel Withdrawal", "Are you sure you want to cancel this withdrawal request?");
     if (ok) {
       try {
         await cancelWithdrawal(withdrawalId);
+        await alert("Cancelled", "Withdrawal request has been cancelled.");
+        loadData();
       } catch (err: any) {
-        await alert("Error", err.message || "Failed to cancel withdrawal.");
+        await alert("Error", err.message || "Failed to cancel");
       }
     }
   };
 
-  const activeWithdrawals = withdrawals.filter(
-    (w: Withdrawal) => w.status === "requested" || w.status === "processing"
-  );
-
-  const pastWithdrawals = withdrawals.filter(
-    (w: Withdrawal) => w.status === "completed" || w.status === "failed" || w.status === "cancelled"
-  );
-
-  const statusConfig: Record<string, { color: string; bg: string; icon: string; label: string }> = {
-    requested:  { color: "#f59e0b", bg: "rgba(245,158,11,0.10)", icon: "time-outline", label: "Pending" },
-    processing: { color: "#3b82f6", bg: "rgba(59,130,246,0.10)", icon: "sync-outline", label: "Processing" },
-    completed:  { color: "#22c55e", bg: "rgba(34,197,94,0.10)",  icon: "checkmark-circle-outline", label: "Completed" },
-    failed:     { color: "#ef4444", bg: "rgba(239,68,68,0.10)",  icon: "close-circle-outline", label: "Failed" },
-    cancelled:  { color: "#a3a3a3", bg: "rgba(163,163,163,0.10)", icon: "ban-outline", label: "Cancelled" },
-  };
-
-  const renderWithdrawal = ({ item }: { item: Withdrawal }) => {
-    const sc = statusConfig[item.status] || statusConfig.requested;
-
-    return (
-      <View className="bg-surface-card border border-slate-100 rounded-xl p-4 mb-3">
-        <View className="flex-row items-center justify-between mb-2">
-          <View className="flex-row items-center">
-            <View
-              className="w-10 h-10 rounded-full items-center justify-center"
-              style={{ backgroundColor: sc.bg }}
-            >
-              <Ionicons name={sc.icon as any} size={18} color={sc.color} />
-            </View>
-            <View className="ml-3">
-              <Text className="text-slate-900 font-bold text-sm">
-                {formatINR(item.amount)}
-              </Text>
-              <Text className="text-slate-500 text-xs mt-0.5">
-                {new Date(item.requested_at).toLocaleDateString("en-IN", {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })}{" "}
-                at{" "}
-                {new Date(item.requested_at).toLocaleTimeString("en-IN", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </Text>
-            </View>
-          </View>
-
-          <View
-            className="px-2.5 py-1 rounded-full"
-            style={{ backgroundColor: sc.bg }}
-          >
-            <Text className="text-xs font-bold" style={{ color: sc.color }}>
-              {sc.label}
-            </Text>
-          </View>
-        </View>
-
-        {item.status === "failed" && item.failure_reason && (
-          <Text className="text-red-600 text-xs mt-1">{item.failure_reason}</Text>
-        )}
-
-        {item.status === "requested" && (
-          <View className="flex-row justify-end mt-2">
-            <Button
-              label="Cancel"
-              variant="ghost"
-              size="sm"
-              fullWidth={false}
-              onPress={() => handleCancel(item.id)}
-              disabled={isTransacting}
-            />
-          </View>
-        )}
-      </View>
-    );
-  };
+  const recentWithdrawals = withdrawals.filter((w: Withdrawal) => w.status !== "cancelled").slice(0, 5);
 
   return (
-    <View className="flex-1 bg-surface-bg">
-      <ScreenHeader
-        title="Withdraw Funds"
-        subtitle="Transfer wallet balance to your bank account"
-        showBack
-      />
+    <View style={{ flex: 1, backgroundColor: COLORS.surface.bg }}>
+      <ScreenHeader title="Withdraw" showBack />
 
       <FlatList
-        data={[]}
-        keyExtractor={() => "empty"}
-        renderItem={() => null}
+        data={recentWithdrawals}
+        keyExtractor={(item: Withdrawal) => item.id}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={loadData}
-            tintColor={COLORS.brandPrimary}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={loadData} tintColor={COLORS.brandPrimary} />
         }
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingHorizontal: SPACING[5], paddingBottom: 100 }}
         ListHeaderComponent={
-          <View className="px-4">
+          <View className="py-4 gap-6">
+            {/* Balance Info */}
+            <View className="bg-white rounded-2xl p-5 border border-slate-100"
+              style={{ ...SHADOWS.card }}
+            >
+              <View className="flex-row items-center gap-2 mb-2">
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.brand[400] }} />
+                <Text className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Available Balance</Text>
+              </View>
+              <Text className="text-slate-900 text-3xl font-bold" style={{ letterSpacing: -1 }}>
+                {formatINR(balancePaise)}
+              </Text>
+              <View className="mt-4">
+                <AmountInput
+                  label="Withdrawal Amount"
+                  valuePaise={amount}
+                  onChangePaise={setAmount}
+                  placeholder="Enter amount to withdraw"
+                  maxAmountPaise={BigInt(balancePaise)}
+                />
+                <Text className="text-slate-400 text-xs mt-1">
+                  Min: {formatINR(MIN_WITHDRAWAL_PAISE)}
+                </Text>
+              </View>
+            </View>
+
             {/* KYC Warning */}
             {!kycVerified && (
-              <Card style={{ marginBottom: 16, borderColor: "rgba(217,119,6,0.3)" }}>
-                <View className="p-4 flex-row items-center">
-                  <Ionicons name="warning-outline" size={20} color="#d97706" />
-                  <View className="ml-3 flex-1">
-                    <Text className="text-warning-600 font-bold text-sm">KYC Verification Required</Text>
-                    <Text className="text-slate-500 text-xs mt-0.5">
-                      Complete your KYC in Settings to enable withdrawals.
-                    </Text>
-                  </View>
+              <View className="flex-row items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                <Ionicons name="shield-outline" size={20} color={COLORS.warning.dark} />
+                <View className="flex-1">
+                  <Text className="text-amber-700 font-bold text-sm">KYC Required</Text>
+                  <Text className="text-amber-600 text-xs mt-0.5">
+                    Complete KYC verification to enable withdrawals.
+                  </Text>
                 </View>
-              </Card>
+              </View>
             )}
 
-            {/* Balance Card */}
-            <Card gradient style={{ marginBottom: 16 }}>
-              <View className="p-5">
-                <Text className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-1">
-                  Available for Withdrawal
-                </Text>
-                <Text className="text-white text-3xl font-bold">
-                  {formatINR(availablePaise)}
-                </Text>
+            {/* Payment Methods */}
+            <View>
+              <View className="flex-row items-center gap-2 mb-3">
+                <View className="w-1 h-5 rounded-full" style={{ backgroundColor: COLORS.brand[500] }} />
+                <Text className="text-slate-800 text-base font-bold">Payment Method</Text>
               </View>
-            </Card>
-
-            {/* Withdrawal Form */}
-            {kycVerified && (
-              <Card style={{ marginBottom: 16 }}>
-                <View className="p-5">
-                  <Text className="text-slate-900 font-bold text-sm mb-3">Withdraw Amount</Text>
-                  <AmountInput
-                    label="Enter Amount"
-                    valuePaise={amount}
-                    onChangePaise={setAmount}
-                    placeholder="e.g. 5,000.00"
-                    maxAmountPaise={availablePaise}
-                  />
-
-                  {/* Quick Amount Buttons */}
-                  <View className="flex-row gap-2 mb-4">
-                    {[1000_00, 5000_00, 10000_00].map((amt) => (
-                      <TouchableOpacity
-                        key={amt}
-                        onPress={() => setAmount(BigInt(Math.min(amt, Number(availablePaise))))}
-                        className="bg-brand-50 border border-brand-200/55 py-1.5 px-3 rounded-lg flex-1"
-                      >
-                        <Text className="text-brand-600 text-xs font-bold text-center">
-                          +₹{(amt / 100).toLocaleString("en-IN")}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  {/* Payment Method Selection */}
-                  {loadingMethods ? (
-                    <View className="flex-row items-center justify-center py-4">
-                      <ActivityIndicator size="small" color={COLORS.brandPrimary} />
-                      <Text className="text-slate-500 text-xs ml-2">Loading payment methods...</Text>
-                    </View>
-                  ) : paymentMethods.length === 0 ? (
-                    <View className="bg-slate-50 rounded-xl p-4 mb-4 border border-slate-100">
-                      <View className="flex-row items-center">
-                        <Ionicons name="card-outline" size={18} color="#64748b" />
-                        <View className="ml-3 flex-1">
-                          <Text className="text-slate-900 text-xs font-semibold">No verified payment methods</Text>
-                          <Text className="text-slate-500 text-[10px] mt-0.5">
-                            Add a bank account or UPI ID in Settings to enable withdrawals.
-                          </Text>
-                        </View>
+              {loadingMethods ? (
+                <ActivityIndicator size="small" color={COLORS.brand[500]} />
+              ) : paymentMethods.length > 0 ? (
+                <View className="gap-2">
+                  {paymentMethods.map((method: SavedPaymentMethod) => (
+                    <TouchableOpacity
+                      key={method.id}
+                      onPress={() => setSelectedMethodId(method.id)}
+                      className="flex-row items-center bg-white rounded-2xl p-4"
+                      style={{
+                        borderWidth: 1.5,
+                        borderColor: selectedMethodId === method.id ? COLORS.brand[500] : COLORS.surface.border,
+                        ...SHADOWS.cardSm,
+                      }}
+                    >
+                      <View className="w-10 h-10 rounded-xl items-center justify-center" style={{ backgroundColor: "rgba(99,102,241,0.08)" }}>
+                        <Ionicons name={method.type === "bank_account" ? "business-outline" : "phone-portrait-outline"} size={20} color={COLORS.brand[500]} />
                       </View>
-                    </View>
-                  ) : (
-                    <View className="mb-4">
-                      <Text className="text-slate-600 text-xs font-semibold mb-2 ml-1">
-                        Send to
-                      </Text>
-                      {paymentMethods.map((method) => (
-                        <TouchableOpacity
-                          key={method.id}
-                          onPress={() => setSelectedMethodId(method.id)}
-                          className={`flex-row items-center p-3 rounded-xl mb-2 border ${
-                            selectedMethodId === method.id
-                              ? "border-brand-500 bg-brand-50"
-                              : "border-slate-100 bg-slate-50"
-                          }`}
-                        >
-                          <View className="w-8 h-8 rounded-full items-center justify-center bg-surface-card">
-                            <Ionicons
-                              name={method.method_type === "upi" ? "phone-portrait-outline" : "business-outline"}
-                              size={14}
-                              color={selectedMethodId === method.id ? COLORS.brandPrimary : "#64748b"}
-                            />
-                          </View>
-                          <View className="ml-3 flex-1">
-                            <Text className="text-slate-900 text-xs font-bold">
-                              {method.method_type === "upi"
-                                ? method.upi_id
-                                : `${method.account_holder_name}`}
-                            </Text>
-                            {method.method_type === "bank_account" && method.ifsc_code && (
-                              <Text className="text-slate-500 text-[10px] mt-0.5">
-                                {method.bank_account_number?.slice(-4)} • {method.ifsc_code}
-                              </Text>
-                            )}
-                          </View>
-                          {selectedMethodId === method.id && (
-                            <Ionicons name="checkmark-circle" size={18} color={COLORS.brandPrimary} />
-                          )}
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-
-                  {/* Submit */}
-                  <Button
-                    label={isTransacting ? "Processing..." : `Withdraw ${formatINR(amount)}`}
-                    variant="gold"
-                    onPress={handleSubmit}
-                    isLoading={isTransacting}
-                    disabled={
-                      amount < BigInt(MIN_WITHDRAWAL_PAISE) ||
-                      amount > availablePaise ||
-                      !selectedMethodId ||
-                      isTransacting ||
-                      paymentMethods.length === 0
-                    }
-                    icon={
-                      !isTransacting ? (
-                        <Ionicons name="arrow-up-outline" size={18} color="#fff" />
-                      ) : undefined
-                    }
-                  />
+                      <View className="ml-3 flex-1">
+                        <Text className="text-slate-800 font-bold text-sm">{method.name}</Text>
+                        <Text className="text-slate-400 text-xs mt-0.5">
+                          {method.type === "bank_account" ? "Bank Account" : "UPI"} · {method.is_default ? "Default" : ""}
+                        </Text>
+                      </View>
+                      {selectedMethodId === method.id && (
+                        <Ionicons name="checkmark-circle" size={20} color={COLORS.brand[500]} />
+                      )}
+                    </TouchableOpacity>
+                  ))}
                 </View>
-              </Card>
-            )}
+              ) : (
+                <View className="bg-white rounded-2xl p-4 border border-dashed border-slate-200 items-center">
+                  <Text className="text-slate-400 text-sm">No payment methods added yet.</Text>
+                </View>
+              )}
+            </View>
 
-            {/* Active Withdrawals */}
-            {activeWithdrawals.length > 0 && (
-              <View className="mb-4">
-                <Text className="text-slate-900 text-base font-bold mb-3">Active Withdrawals</Text>
-                {activeWithdrawals.map((w: Withdrawal) => (
-                  <View key={w.id}>{renderWithdrawal({ item: w })}</View>
-                ))}
+            <Button
+              label="Request Withdrawal"
+              variant="primary"
+              size="lg"
+              gradient
+              isLoading={isTransacting}
+              onPress={handleRequestWithdrawal}
+              disabled={amount <= 0n || isTransacting || !selectedMethodId || !kycVerified}
+            />
+
+            {/* Recent Withdrawals */}
+            {recentWithdrawals.length > 0 && (
+              <View>
+                <View className="flex-row items-center gap-2 mb-3">
+                  <View className="w-1 h-5 rounded-full" style={{ backgroundColor: COLORS.brand[500] }} />
+                  <Text className="text-slate-800 text-base font-bold">Recent Requests</Text>
+                </View>
               </View>
-            )}
-
-            {/* Past Withdrawals */}
-            {pastWithdrawals.length > 0 && (
-              <View className="mb-4">
-                <Text className="text-slate-900 text-base font-bold mb-3">Withdrawal History</Text>
-                {pastWithdrawals.map((w: Withdrawal) => (
-                  <View key={w.id}>{renderWithdrawal({ item: w })}</View>
-                ))}
-              </View>
-            )}
-
-            {/* Empty State */}
-            {withdrawals.length === 0 && !refreshing && (
-              <EmptyState
-                icon={<Ionicons name="arrow-up-outline" size={36} color={COLORS.brandPrimary} />}
-                title="No withdrawals yet"
-                description="Your withdrawal history will appear here."
-              />
             )}
           </View>
         }
+        renderItem={({ item }: { item: Withdrawal }) => {
+          const statusColor = item.status === "completed" ? COLORS.success.DEFAULT :
+            item.status === "failed" ? COLORS.danger.DEFAULT :
+            item.status === "cancelled" ? COLORS.text.muted : COLORS.warning.DEFAULT;
+          return (
+            <View className="flex-row items-center bg-white rounded-2xl p-4 mb-3"
+              style={{ borderWidth: 1, borderColor: COLORS.surface.border, ...SHADOWS.cardSm }}
+            >
+              <View className="w-10 h-10 rounded-xl items-center justify-center"
+                style={{ backgroundColor: `${statusColor}15` }}
+              >
+                <Ionicons
+                  name={item.status === "completed" ? "checkmark" : item.status === "failed" ? "close" : "time"}
+                  size={18}
+                  color={statusColor}
+                />
+              </View>
+              <View className="ml-3 flex-1">
+                <Text className="text-slate-800 font-bold text-sm">{formatINR(item.amount)}</Text>
+                <Text className="text-slate-400 text-xs mt-0.5">
+                  {new Date(item.requested_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                  {" · "}
+                  <Text style={{ color: statusColor, fontWeight: "600" }}>{item.status}</Text>
+                </Text>
+              </View>
+              {(item.status === "requested" || item.status === "processing") && (
+                <TouchableOpacity onPress={() => handleCancelWithdrawal(item.id)}>
+                  <Text className="text-red-500 text-xs font-semibold">Cancel</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          );
+        }}
+        ListEmptyComponent={null}
       />
       <AlertComponent />
     </View>

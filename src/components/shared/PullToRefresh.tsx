@@ -1,6 +1,6 @@
 // src/components/shared/PullToRefresh.tsx
 // Stylized pull-to-refresh container wrapper.
-// Wraps ScrollView with standard RefreshControl tailored to the Kometi dark/gold design palette.
+// Wraps ScrollView with standard RefreshControl tailored to the Monio dark/gold design palette.
 
 import React from "react";
 import { ScrollView, RefreshControl, type ScrollViewProps } from "react-native";

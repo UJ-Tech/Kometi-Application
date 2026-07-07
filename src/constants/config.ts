@@ -8,9 +8,9 @@ const socketUrl  = "https://kometi-application.onrender.com";
 // const socketUrl  = "http://localhost:5000";
 
 export const APP_CONFIG = {
-  name:    "Kometi",
+  name:    "Monio",
   version: "1.0.0",
-  scheme:  "kometi",
+  scheme:  "monio",
 
   // API
   API_BASE_URL:    apiBaseUrl,
@@ -22,9 +22,9 @@ export const APP_CONFIG = {
   OTP_EXPIRY_SECONDS:     300,  // 5 min
   OTP_MAX_ATTEMPTS:       3,
   MPIN_LENGTH:            6,
-  ACCESS_TOKEN_KEY:       "kometi_access_token",
-  REFRESH_TOKEN_KEY:      "kometi_refresh_token",
-  USER_KEY:               "kometi_user",
+  ACCESS_TOKEN_KEY:       "monio_access_token",
+  REFRESH_TOKEN_KEY:      "monio_refresh_token",
+  USER_KEY:               "monio_user",
 
   // Pagination
   PAGE_SIZE: 20,

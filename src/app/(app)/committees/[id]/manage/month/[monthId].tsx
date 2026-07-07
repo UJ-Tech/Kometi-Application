@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { committeesApi } from "../../../../../../services/committees.api";
 import { useAuthStore } from "../../../../../../stores/auth.store";
+import BrandedLoader from "../../../../../../components/brand/BrandedLoader";
 import { useCommitteeStore } from "../../../../../../stores/committee.store";
 import { formatINR } from "../../../../../../utils/currency";
 import { COLORS } from "../../../../../../constants/theme";
@@ -166,11 +167,7 @@ export default function OrganiserMonthDetail() {
   }
 
   if (loading && !refreshing) {
-    return (
-      <View className="flex-1 bg-surface-50 items-center justify-center">
-        <ActivityIndicator size="large" color={COLORS.brandPrimary} />
-      </View>
-    );
+    return <BrandedLoader />;
   }
 
   if (!month || !committee) {

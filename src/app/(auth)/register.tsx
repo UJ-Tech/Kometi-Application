@@ -1,9 +1,6 @@
-// src/app/(auth)/register.tsx
-// New user registration with required account details.
-
 import React, { useState } from "react";
 import {
-  View, Text, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
+  View, Text, KeyboardAvoidingView, Platform, ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import ScreenHeader from "../../components/shared/ScreenHeader";
+import KKMark from "../../components/brand/KKMark";
 import { authApi } from "../../services/auth.api";
 import { useAuthStore } from "../../stores/auth.store";
 import { tokenStorage } from "../../utils/storage";
@@ -85,21 +83,55 @@ export default function RegisterScreen() {
       <ScreenHeader title="Create Account" showBack />
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + SPACING[6] }]}
+        contentContainerStyle={[{ flexGrow: 1, paddingHorizontal: SPACING[5] }, { paddingBottom: insets.bottom + SPACING[6] }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
-        <View style={styles.top}>
-          <View style={styles.iconCircle}>
-            <Ionicons name="person-outline" size={28} color={COLORS.brand[400]} />
+        {/* Brand Header */}
+        <View style={{ alignItems: "center", paddingTop: SPACING[4], paddingBottom: SPACING[6] }}>
+          <View style={{
+            width: 56,
+            height: 56,
+            borderRadius: 16,
+            backgroundColor: "rgba(79, 70, 229, 0.08)",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: SPACING[3],
+          }}>
+            <Ionicons name="person-add-outline" size={28} color={COLORS.brand[500]} />
           </View>
-          <Text style={styles.title}>Tell us about{"\n"}yourself</Text>
-          <Text style={styles.subtitle}>
-            Create your account with the details required for login.
+          <Text style={{
+            fontSize: FONT_SIZE["2xl"],
+            fontWeight: "800",
+            color: COLORS.text.primary,
+            textAlign: "center",
+          }}>
+            Tell us about yourself
+          </Text>
+          <Text style={{
+            fontSize: FONT_SIZE.base,
+            color: COLORS.text.secondary,
+            textAlign: "center",
+            marginTop: SPACING[1],
+          }}>
+            Create your Monio account
           </Text>
         </View>
 
-        <View style={styles.formCard}>
+        {/* Form */}
+        <View style={{
+          backgroundColor: COLORS.surface.card,
+          borderRadius: BORDER_RADIUS["2xl"],
+          padding: SPACING[5],
+          gap: SPACING[4],
+          borderWidth: 1,
+          borderColor: COLORS.surface.border,
+          shadowColor: COLORS.brand[500],
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.05,
+          shadowRadius: 12,
+          elevation: 3,
+        }}>
           <Input
             label="Full Name"
             required
@@ -170,18 +202,19 @@ export default function RegisterScreen() {
           />
 
           {errors.form ? (
-            <Text style={styles.formError}>{errors.form}</Text>
+            <Text style={{ fontSize: FONT_SIZE.sm, color: COLORS.danger.light, lineHeight: 20 }}>
+              {errors.form}
+            </Text>
           ) : null}
 
-          <View style={{ marginTop: SPACING[2] }}>
-            <Button
-              label="Create Account"
-              variant="primary"
-              size="lg"
-              isLoading={isLoading}
-              onPress={handleRegister}
-            />
-          </View>
+          <Button
+            label="Create Account"
+            variant="primary"
+            size="lg"
+            gradient
+            isLoading={isLoading}
+            onPress={handleRegister}
+          />
 
           <Button
             label="Back to Sign In"
@@ -194,35 +227,3 @@ export default function RegisterScreen() {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  content: { flexGrow: 1, paddingHorizontal: SPACING[6], gap: SPACING[5] },
-  top:     { gap: SPACING[2.5], paddingTop: SPACING[2] },
-  iconCircle: {
-    width: 60, height: 60, borderRadius: 18,
-    alignItems: "center", justifyContent: "center", marginBottom: SPACING[1],
-    backgroundColor: COLORS.surface.card,
-    borderWidth: 1,
-    borderColor: COLORS.surface.border,
-    shadowColor: COLORS.brand[500],
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-  },
-  title:    { fontSize: FONT_SIZE["3xl"], fontWeight: "800", color: COLORS.text.primary, lineHeight: 36 },
-  subtitle: { fontSize: FONT_SIZE.base, color: COLORS.text.secondary, lineHeight: 22 },
-  formCard: {
-    backgroundColor: COLORS.surface.card,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    borderColor: COLORS.surface.border,
-    padding: SPACING[5],
-    gap: SPACING[4],
-    shadowColor: COLORS.brand[500],
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.05,
-    shadowRadius: 20,
-    elevation: 4,
-  },
-  formError:{ fontSize: FONT_SIZE.sm, color: COLORS.danger.light, lineHeight: 20 },
-});

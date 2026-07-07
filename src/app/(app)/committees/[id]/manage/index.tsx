@@ -16,10 +16,12 @@ import { committeesApi } from "../../../../../services/committees.api";
 import { useAuthStore } from "../../../../../stores/auth.store";
 import { useCommitteeStore } from "../../../../../stores/committee.store";
 import { formatINR } from "../../../../../utils/currency";
-import { COLORS } from "../../../../../constants/theme";
+import { COLORS, SHADOWS, BORDER_RADIUS, SPACING } from "../../../../../constants/theme";
 import Card from "../../../../../components/ui/Card";
 import Badge from "../../../../../components/ui/Badge";
 import Button from "../../../../../components/ui/Button";
+import GradientHero from "../../../../../components/brand/GradientHero";
+import BrandedLoader from "../../../../../components/brand/BrandedLoader";
 import { useAlertModal } from "../../../../../components/ui/AlertModal";
 
 export default function OrganiserManageTimeline() {
@@ -241,44 +243,41 @@ export default function OrganiserManageTimeline() {
   // ─── Invalid ID ─────────────────────────────────────────────────────────
   if (!isValidId) {
     return (
-      <View className="flex-1 bg-surface-50 items-center justify-center px-6">
-        <View className="w-16 h-16 rounded-full bg-danger-500/10 items-center justify-center mb-4">
+      <View style={{ flex: 1, backgroundColor: COLORS.surface.bg, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
+        <View style={{ width: 64, height: 64, borderRadius: 999, backgroundColor: "rgba(220,38,38,0.10)", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
           <Ionicons name="alert-circle-outline" size={32} color={COLORS.danger.light} />
         </View>
-        <Text className="text-slate-900 font-bold text-lg text-center">Invalid Committee</Text>
-        <Text className="text-slate-500 text-sm text-center mt-2">
+        <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 18, textAlign: "center" }}>Invalid Committee</Text>
+        <Text style={{ color: COLORS.text.secondary, fontSize: 13, textAlign: "center", marginTop: 8 }}>
           This committee could not be found. Please go back and try again.
         </Text>
-        <Button
-          label="Back to Chits"
-          variant="secondary"
-          size="sm"
-          onPress={() => router.replace("/committees")}
-          icon={<Ionicons name="arrow-back" size={16} color={COLORS.brandPrimary} />}
-        />
+        <View style={{ marginTop: 16 }}>
+          <Button
+            label="Back to Chits"
+            variant="secondary"
+            size="sm"
+            onPress={() => router.replace("/committees")}
+            icon={<Ionicons name="arrow-back" size={16} color={COLORS.brandPrimary} />}
+          />
+        </View>
       </View>
     );
   }
 
   // ─── Loading ────────────────────────────────────────────────────────────
   if (loading && !refreshing) {
-    return (
-      <View className="flex-1 bg-surface-50 items-center justify-center">
-        <ActivityIndicator size="large" color={COLORS.brandPrimary} />
-        <Text className="text-slate-500 text-sm mt-4">Loading dashboard...</Text>
-      </View>
-    );
+    return <BrandedLoader message="Loading dashboard..." />;
   }
 
   // ─── Error State ────────────────────────────────────────────────────────
   if (error && !committee) {
     return (
-      <View className="flex-1 bg-surface-50 items-center justify-center px-6">
-        <View className="w-16 h-16 rounded-full bg-warning-500/10 items-center justify-center mb-4">
+      <View style={{ flex: 1, backgroundColor: COLORS.surface.bg, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
+        <View style={{ width: 64, height: 64, borderRadius: 999, backgroundColor: "rgba(217,119,6,0.10)", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
           <Ionicons name="cloud-offline-outline" size={32} color={COLORS.warning.light} />
         </View>
-        <Text className="text-slate-900 font-bold text-lg text-center">Something went wrong</Text>
-        <Text className="text-slate-500 text-sm text-center mt-2 mb-6">{error}</Text>
+        <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 18, textAlign: "center" }}>Something went wrong</Text>
+        <Text style={{ color: COLORS.text.secondary, fontSize: 13, textAlign: "center", marginTop: 8, marginBottom: 24 }}>{error}</Text>
         <Button
           label="Try Again"
           variant="primary"
@@ -288,9 +287,9 @@ export default function OrganiserManageTimeline() {
         />
         <TouchableOpacity
           onPress={() => router.back()}
-          className="mt-3"
+          style={{ marginTop: 12 }}
         >
-          <Text className="text-brand-600 text-sm font-medium">Go Back</Text>
+          <Text style={{ color: COLORS.brand[600], fontSize: 13, fontWeight: "500" }}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -301,12 +300,12 @@ export default function OrganiserManageTimeline() {
     const isOrganizer = committee.organizerId === currentUser?.id;
     if (!isOrganizer) {
       return (
-        <View className="flex-1 bg-surface-50 items-center justify-center px-6">
-          <View className="w-16 h-16 rounded-full bg-danger-500/10 items-center justify-center mb-4">
+        <View style={{ flex: 1, backgroundColor: COLORS.surface.bg, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
+          <View style={{ width: 64, height: 64, borderRadius: 999, backgroundColor: "rgba(220,38,38,0.10)", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
             <Ionicons name="lock-closed-outline" size={32} color={COLORS.danger.light} />
           </View>
-          <Text className="text-slate-900 font-bold text-lg text-center">Access Denied</Text>
-          <Text className="text-slate-500 text-sm text-center mt-2 mb-6">
+          <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 18, textAlign: "center" }}>Access Denied</Text>
+          <Text style={{ color: COLORS.text.secondary, fontSize: 13, textAlign: "center", marginTop: 8, marginBottom: 24 }}>
             Only the committee organiser can access this dashboard.
           </Text>
           <Button
@@ -335,93 +334,95 @@ export default function OrganiserManageTimeline() {
   // ─── Render ─────────────────────────────────────────────────────────────
   return (
     <ScrollView
-      className="flex-1 bg-surface-bg"
-      contentContainerStyle={{ paddingTop: 64, paddingBottom: 120 }}
+      style={{ flex: 1, backgroundColor: COLORS.surface.bg }}
+      contentContainerStyle={{ paddingTop: 0, paddingBottom: 120 }}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.brandPrimary} />
       }
     >
-      {/* Header */}
-      <View className="px-4 flex-row items-center mb-6">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="w-10 h-10 bg-surface-card rounded-full items-center justify-center border border-slate-100 mr-4"
-        >
-          <Ionicons name="arrow-back" size={20} color="#64748b" />
-        </TouchableOpacity>
-        <View className="flex-1">
-          <Text className="text-slate-900 text-xl font-bold">Fund Management</Text>
-          <Text className="text-slate-500 text-xs">{committee.name}</Text>
+      {/* Hero Header */}
+      <GradientHero
+        gradient={["#1e1b4b", "#312e81", "#3730a3"]}
+        borderRadius={BORDER_RADIUS["4xl"]}
+      >
+        <View className="flex-row items-center justify-between mb-6">
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={{
+              width: 38, height: 38, borderRadius: BORDER_RADIUS.lg,
+              backgroundColor: "rgba(255,255,255,0.1)",
+              alignItems: "center", justifyContent: "center",
+            }}
+          >
+            <Ionicons name="arrow-back" size={20} color={COLORS.white} />
+          </TouchableOpacity>
+          <Badge
+            label={committee.status}
+            variant={committee.status === "ACTIVE" ? "success" : committee.status === "DRAFT" ? "brand" : "neutral"}
+            size="sm"
+            dot
+          />
         </View>
-        <View className="w-10 h-10 bg-brand-50 rounded-full items-center justify-center">
-          <Ionicons name="wallet-outline" size={18} color={COLORS.brandPrimary} />
+
+        <View className="mb-4">
+          <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 11, fontWeight: "700", letterSpacing: 1, marginBottom: 4, textTransform: "uppercase" }}>
+            Organiser Dashboard
+          </Text>
+          <Text style={{ color: COLORS.white, fontSize: 22, fontWeight: "700" }} numberOfLines={1}>
+            {committee.name}
+          </Text>
         </View>
-      </View>
+
+        <View style={{ borderRadius: BORDER_RADIUS["2xl"], padding: 16, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" }}>
+          <View className="flex-row flex-wrap">
+            <View style={{ width: "50%", marginBottom: 16 }}>
+              <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>Total Pool</Text>
+              <Text style={{ color: COLORS.gold[300], fontWeight: "700", fontSize: 16, marginTop: 4 }}>{formatINR(totalPool)}</Text>
+            </View>
+            <View style={{ width: "50%", marginBottom: 16, alignItems: "flex-end" }}>
+              <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>Organiser Reward</Text>
+              <Text style={{ color: COLORS.gold[300], fontWeight: "700", fontSize: 16, marginTop: 4 }}>Month 1</Text>
+            </View>
+            <View style={{ width: "50%" }}>
+              <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>Members</Text>
+              <Text style={{ color: COLORS.white, fontWeight: "700", fontSize: 16, marginTop: 4 }}>{totalMembers}</Text>
+            </View>
+            <View style={{ width: "50%", alignItems: "flex-end" }}>
+              <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>Progress</Text>
+              <Text style={{ color: COLORS.gold[300], fontWeight: "700", fontSize: 16, marginTop: 4 }}>
+                {completedMonths} / {totalMembers} Months
+              </Text>
+            </View>
+          </View>
+        </View>
+      </GradientHero>
 
       {/* Error Banner (partial — committee loaded but months failed) */}
       {error && (
-        <View className="mx-4 mb-4 bg-warning-500/10 border border-warning-500/20 rounded-xl p-4 flex-row items-center">
+        <View style={{ marginHorizontal: SPACING[5], marginBottom: SPACING[4], backgroundColor: "rgba(217,119,6,0.10)", borderWidth: 1, borderColor: "rgba(217,119,6,0.20)", borderRadius: BORDER_RADIUS.xl, padding: 16, flexDirection: "row", alignItems: "center" }}>
           <Ionicons name="warning-outline" size={18} color={COLORS.warning.dark} />
-          <Text className="text-warning-dark text-xs ml-2 flex-1">{error}</Text>
+          <Text style={{ color: COLORS.warning.dark, fontSize: 11, marginLeft: 8, flex: 1 }}>{error}</Text>
           <TouchableOpacity onPress={loadData}>
             <Ionicons name="refresh" size={16} color={COLORS.warning.dark} />
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Summary Stats */}
-      <View className="px-4 mb-5">
-        <Card padding={0}>
-          <View className="p-5">
-            <View className="flex-row items-center mb-4">
-              <View className="w-8 h-8 rounded-lg bg-gold-500/15 items-center justify-center mr-3">
-                <Ionicons name="stats-chart-outline" size={16} color={COLORS.goldPrimary} />
-              </View>
-              <Text className="text-slate-900 font-bold text-sm">Committee Overview</Text>
-            </View>
-            <View className="flex-row flex-wrap">
-              <View className="w-1/2 mb-4">
-                <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Total Pool</Text>
-                <Text className="text-gold-600 font-bold text-base mt-1">{formatINR(totalPool)}</Text>
-              </View>
-              <View className="w-1/2 mb-4 items-end">
-                <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Organiser Reward</Text>
-                <Text className="text-gold-600 font-bold text-base mt-1">Month 1</Text>
-              </View>
-              <View className="w-1/2">
-                <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Members</Text>
-                <Text className="text-slate-900 font-bold text-base mt-1">{totalMembers}</Text>
-              </View>
-              <View className="w-1/2 items-end">
-                <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Progress</Text>
-                <Text className="text-brand-600 font-bold text-base mt-1">
-                  {completedMonths} / {totalMembers} Months
-                </Text>
-              </View>
-            </View>
-          </View>
-        </Card>
-      </View>
-
       {/* Overdue Payment Obligations */}
 
       {/* Members List with Remove */}
-      <View className="px-4 mb-4">
-        <Card>
-          <View className="p-5">
-            <View className="flex-row items-center justify-between mb-4">
-              <View className="flex-row items-center">
-                <View className="w-8 h-8 rounded-lg bg-brand-50 border border-brand-200/50 items-center justify-center mr-3">
-                  <Ionicons name="people-outline" size={16} color={COLORS.brandPrimary} />
-                </View>
-                <Text className="text-slate-900 font-bold text-sm">
-                  Committee Members ({members.length})
-                </Text>
-              </View>
+      <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[4] }}>
+        <Card accent="info" style={SHADOWS.cardSm}>
+          <View style={{ padding: 16 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 16 }}>
+              <View style={{ width: 4, height: 20, borderRadius: 999, backgroundColor: COLORS.info.dark }} />
+              <Text style={{ color: COLORS.text.primary, fontSize: 14, fontWeight: "700" }}>
+                Committee Members ({members.length})
+              </Text>
             </View>
             {members.length === 0 ? (
-              <View className="bg-red-50 border border-red-200 rounded-xl p-3">
-                <Text className="text-red-700 text-xs text-center">
+              <View style={{ backgroundColor: "#fef2f2", borderWidth: 1, borderColor: "#fecaca", borderRadius: BORDER_RADIUS.xl, padding: 12 }}>
+                <Text style={{ color: "#b91c1c", fontSize: 11, textAlign: "center" }}>
                   No members found in database. Re-add members to continue.
                 </Text>
               </View>
@@ -430,16 +431,20 @@ export default function OrganiserManageTimeline() {
                 const userName = member.user?.name || "Unknown";
                 const isBlocked = member.is_blocked;
                 return (
-                  <View key={member.id} className={`border rounded-xl p-3 mb-2 ${isBlocked ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-100"}`}>
+                  <View key={member.id} style={{
+                    borderWidth: 1, borderRadius: BORDER_RADIUS.xl, padding: 12, marginBottom: 8,
+                    backgroundColor: isBlocked ? "#fef2f2" : COLORS.surface.warm,
+                    borderColor: isBlocked ? "#fecaca" : COLORS.surface.border,
+                  }}>
                     <View className="flex-row justify-between items-center">
-                      <View className="flex-1">
-                        <View className="flex-row items-center">
-                          <Text className="text-slate-900 font-semibold text-xs">{userName}</Text>
-                          {isBlocked && <Badge label="Blocked" variant="danger" size="sm" />}
+                      <View style={{ flex: 1 }}>
+                        <View className="flex-row items-center" style={{ gap: 6 }}>
+                          <Text style={{ color: COLORS.text.primary, fontWeight: "600", fontSize: 11 }}>{userName}</Text>
+                          {isBlocked && <Badge label="Blocked" variant="danger" size="sm" dot />}
                         </View>
-                        <Text className="text-slate-500 text-[10px]">Slot #{member.slotNumber}</Text>
+                        <Text style={{ color: COLORS.text.secondary, fontSize: 10 }}>Slot #{member.slotNumber}</Text>
                       </View>
-                        <TouchableOpacity
+                      <TouchableOpacity
                         onPress={async () => {
                           const confirmed = await confirmAction(
                             "Remove Member",
@@ -459,8 +464,7 @@ export default function OrganiserManageTimeline() {
                           }
                         }}
                         disabled={removingMember === member.id}
-                        style={{ opacity: removingMember === member.id ? 0.5 : 1 }}
-                        className="bg-red-50 border border-red-150 px-3 py-1.5 rounded-lg"
+                        style={{ opacity: removingMember === member.id ? 0.5 : 1, backgroundColor: "#fef2f2", borderWidth: 1, borderColor: "#fecaca", paddingHorizontal: 12, paddingVertical: 6, borderRadius: BORDER_RADIUS.lg }}
                       >
                         {removingMember === member.id ? (
                           <ActivityIndicator size="small" color="#ef4444" />
@@ -479,48 +483,45 @@ export default function OrganiserManageTimeline() {
 
       {/* Overdue Payment Obligations */}
       {overdueObligations.length > 0 && (
-        <View className="px-4 mb-4">
-          <Card>
-            <View className="p-5">
-              <View className="flex-row items-center mb-4">
-                <View className="w-8 h-8 rounded-lg bg-danger-500/15 items-center justify-center mr-3">
-                  <Ionicons name="warning-outline" size={16} color={COLORS.danger.light} />
-                </View>
-                <Text className="text-red-700 font-bold text-sm">Overdue Payments ({overdueObligations.length})</Text>
+        <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[4] }}>
+          <Card accent="danger" style={SHADOWS.cardSm}>
+            <View style={{ padding: 16 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                <View style={{ width: 4, height: 20, borderRadius: 999, backgroundColor: COLORS.danger.light }} />
+                <Text style={{ color: COLORS.danger.dark, fontWeight: "700", fontSize: 13 }}>Overdue Payments ({overdueObligations.length})</Text>
               </View>
               {overdueObligations.map((obl: any) => {
                 const memberName = obl.committeeMember?.user?.name || "Member";
                 const daysOverdue = obl.daysOverdue || 0;
                 const canAdvance = daysOverdue >= 3 && obl.direction === "pay";
                 return (
-                  <View key={obl.id} className="bg-red-50 border border-red-200 rounded-xl p-3 mb-2">
+                  <View key={obl.id} style={{ backgroundColor: "#fef2f2", borderWidth: 1, borderColor: "#fecaca", borderRadius: BORDER_RADIUS.xl, padding: 12, marginBottom: 8 }}>
                     <View className="flex-row justify-between items-center mb-1">
-                      <Text className="text-slate-900 font-semibold text-xs">{memberName}</Text>
-                      <Text className="text-red-600 font-bold text-xs">{formatINR(obl.netAmount / 100)}</Text>
+                      <Text style={{ color: COLORS.text.primary, fontWeight: "600", fontSize: 11 }}>{memberName}</Text>
+                      <Text style={{ color: COLORS.danger.dark, fontWeight: "700", fontSize: 11 }}>{formatINR(obl.netAmount / 100)}</Text>
                     </View>
                     <View className="flex-row justify-between items-center mb-2">
-                      <Text className="text-slate-500 text-[10px]">Month {obl.committeeMonth?.month_number || "?"}</Text>
-                      <Text className="text-red-600 text-[10px] font-semibold">{daysOverdue} day{daysOverdue !== 1 ? "s" : ""} overdue</Text>
+                      <Text style={{ color: COLORS.text.secondary, fontSize: 10 }}>Month {obl.committeeMonth?.month_number || "?"}</Text>
+                      <Text style={{ color: COLORS.danger.dark, fontSize: 10, fontWeight: "600" }}>{daysOverdue} day{daysOverdue !== 1 ? "s" : ""} overdue</Text>
                     </View>
                     {canAdvance && (
                       <TouchableOpacity
                         onPress={() => handleAdvancePayment(obl.committeeMonth?.id, obl.memberId, memberName)}
                         disabled={advancingMember === obl.memberId}
-                        className="bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg flex-row items-center justify-center"
-                        style={{ opacity: advancingMember === obl.memberId ? 0.6 : 1 }}
+                        style={{ opacity: advancingMember === obl.memberId ? 0.6 : 1, backgroundColor: "#fffbeb", borderWidth: 1, borderColor: "#fde68a", paddingHorizontal: 12, paddingVertical: 8, borderRadius: BORDER_RADIUS.lg, flexDirection: "row", alignItems: "center", justifyContent: "center" }}
                       >
                         {advancingMember === obl.memberId ? (
                           <ActivityIndicator size="small" color="#d97706" />
                         ) : (
                           <>
                             <Ionicons name="cash-outline" size={14} color="#d97706" />
-                            <Text className="text-amber-700 font-bold text-[11px] ml-1.5">Advance Payment for {memberName}</Text>
+                            <Text style={{ color: COLORS.gold[700], fontWeight: "700", fontSize: 11, marginLeft: 6 }}>Advance Payment for {memberName}</Text>
                           </>
                         )}
                       </TouchableOpacity>
                     )}
                     {!canAdvance && (
-                      <Text className="text-slate-500 text-[10px] italic text-center">
+                      <Text style={{ color: COLORS.text.secondary, fontSize: 10, fontStyle: "italic", textAlign: "center" }}>
                         Advance available after 3-day deadline
                       </Text>
                     )}
@@ -534,26 +535,28 @@ export default function OrganiserManageTimeline() {
 
       {/* Organiser Advances Made */}
       {organiserAdvances.length > 0 && (
-        <View className="px-4 mb-4">
-          <Card>
-            <View className="p-5">
-              <View className="flex-row items-center mb-4">
-                <View className="w-8 h-8 rounded-lg bg-gold-500/15 items-center justify-center mr-3">
-                  <Ionicons name="wallet-outline" size={16} color={COLORS.goldPrimary} />
-                </View>
-                <Text className="text-slate-900 font-bold text-sm">My Advances ({organiserAdvances.length})</Text>
+        <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[4] }}>
+          <Card accent="gold" style={SHADOWS.cardSm}>
+            <View style={{ padding: 16 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                <View style={{ width: 4, height: 20, borderRadius: 999, backgroundColor: COLORS.gold[500] }} />
+                <Text style={{ color: COLORS.text.primary, fontSize: 14, fontWeight: "700" }}>My Advances ({organiserAdvances.length})</Text>
               </View>
               {organiserAdvances.map((adv: any) => {
                 const memberName = adv.committeeMember?.user?.name || "Member";
                 const isRepaid = adv.repaidStatus === "repaid";
                 return (
-                  <View key={adv.id} className={`border rounded-xl p-3 mb-2 ${isRepaid ? "bg-green-50 border-green-200" : "bg-slate-50 border-slate-100"}`}>
+                  <View key={adv.id} style={{
+                    borderWidth: 1, borderRadius: BORDER_RADIUS.xl, padding: 12, marginBottom: 8,
+                    backgroundColor: isRepaid ? "#f0fdf4" : COLORS.surface.warm,
+                    borderColor: isRepaid ? "#bbf7d0" : COLORS.surface.border,
+                  }}>
                     <View className="flex-row justify-between items-center mb-1">
-                      <Text className="text-slate-900 font-semibold text-xs">{memberName}</Text>
-                      <Text className={`font-bold text-xs ${isRepaid ? "text-green-700" : "text-gold-600"}`}>{formatINR(adv.netAmount / 100)}</Text>
+                      <Text style={{ color: COLORS.text.primary, fontWeight: "600", fontSize: 11 }}>{memberName}</Text>
+                      <Text style={{ color: isRepaid ? COLORS.success.dark : COLORS.gold[600], fontWeight: "700", fontSize: 11 }}>{formatINR(adv.netAmount / 100)}</Text>
                     </View>
                     <View className="flex-row justify-between items-center">
-                      <Text className="text-slate-500 text-[10px]">Month {adv.committeeMonth?.month_number || "?"}</Text>
+                      <Text style={{ color: COLORS.text.secondary, fontSize: 10 }}>Month {adv.committeeMonth?.month_number || "?"}</Text>
                       <Badge
                         label={isRepaid ? "Repaid" : "Pending"}
                         variant={isRepaid ? "success" : "warning"}
@@ -570,38 +573,36 @@ export default function OrganiserManageTimeline() {
 
       {/* Blocked Members */}
       {blockedMembers.length > 0 && (
-        <View className="px-4 mb-4">
-          <Card>
-            <View className="p-5">
-              <View className="flex-row items-center mb-4">
-                <View className="w-8 h-8 rounded-lg bg-danger-500/15 items-center justify-center mr-3">
-                  <Ionicons name="lock-closed" size={16} color="#ef4444" />
-                </View>
-                <Text className="text-red-700 font-bold text-sm">
+        <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[4] }}>
+          <Card accent="danger" style={SHADOWS.cardSm}>
+            <View style={{ padding: 16 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                <View style={{ width: 4, height: 20, borderRadius: 999, backgroundColor: COLORS.danger.light }} />
+                <Text style={{ color: COLORS.danger.dark, fontWeight: "700", fontSize: 13 }}>
                   Blocked Members ({blockedMembers.length})
                 </Text>
               </View>
               {blockedMembers.map((member: any) => (
-                <View key={member.id} className="bg-red-50 border border-red-200 rounded-xl p-3 mb-2">
+                <View key={member.id} style={{ backgroundColor: "#fef2f2", borderWidth: 1, borderColor: "#fecaca", borderRadius: BORDER_RADIUS.xl, padding: 12, marginBottom: 8 }}>
                   <View className="flex-row justify-between items-center mb-1">
-                    <Text className="text-slate-900 font-semibold text-xs">{member.name}</Text>
-                    <Text className="text-red-600 text-[10px]">
+                    <Text style={{ color: COLORS.text.primary, fontWeight: "600", fontSize: 11 }}>{member.name}</Text>
+                    <Text style={{ color: COLORS.danger.dark, fontSize: 10 }}>
                       Slot #{member.slotNumber}
                     </Text>
                   </View>
-                  <Text className="text-slate-500 text-[10px] mb-1">
+                  <Text style={{ color: COLORS.text.secondary, fontSize: 10, marginBottom: 4 }}>
                     {member.blockedReason}
                   </Text>
                   {member.blockedAt && (
-                    <Text className="text-slate-500 text-[10px] mb-2">
+                    <Text style={{ color: COLORS.text.secondary, fontSize: 10, marginBottom: 8 }}>
                       Blocked: {new Date(member.blockedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                     </Text>
                   )}
                   <TouchableOpacity
                     onPress={() => handleUnblock(member.id, member.name)}
-                    className="bg-green-50 border border-green-200 px-3 py-2 rounded-lg"
+                    style={{ backgroundColor: "#f0fdf4", borderWidth: 1, borderColor: "#bbf7d0", paddingHorizontal: 12, paddingVertical: 8, borderRadius: BORDER_RADIUS.lg }}
                   >
-                    <Text className="text-green-700 font-bold text-[11px] text-center">
+                    <Text style={{ color: COLORS.success.dark, fontWeight: "700", fontSize: 11, textAlign: "center" }}>
                       Unblock {member.name}
                     </Text>
                   </TouchableOpacity>
@@ -612,16 +613,19 @@ export default function OrganiserManageTimeline() {
         </View>
       )}
 
-      <View className="px-4 mb-3 flex-row items-center justify-between">
-        <Text className="text-slate-900 text-base font-bold">Monthly Timeline</Text>
+      <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[3], flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View style={{ width: 4, height: 20, borderRadius: 999, backgroundColor: COLORS.brand[500] }} />
+          <Text style={{ color: COLORS.text.primary, fontSize: 15, fontWeight: "700" }}>Monthly Timeline</Text>
+        </View>
         {months.length > 0 && (
-          <Text className="text-slate-500 text-xs">{months.length} months</Text>
+          <Text style={{ color: COLORS.text.secondary, fontSize: 11 }}>{months.length} months</Text>
         )}
       </View>
 
       {/* Delete Month Button (local only — not wired to DB yet) */}
       {months.length > 0 && (
-        <View className="px-4 mb-4">
+        <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[4] }}>
           <TouchableOpacity
             onPress={async () => {
               const confirmed = await confirmAction(
@@ -634,53 +638,53 @@ export default function OrganiserManageTimeline() {
               setMonthsData({ ...monthsData, months: updatedMonths });
               await notify("Done", "Month removed from view. Recreate it from the app.");
             }}
-            className="bg-red-50 border border-red-200 px-4 py-3 rounded-xl flex-row items-center justify-center"
+            style={{ backgroundColor: "#fef2f2", borderWidth: 1, borderColor: "#fecaca", paddingHorizontal: 16, paddingVertical: 12, borderRadius: BORDER_RADIUS.xl, flexDirection: "row", alignItems: "center", justifyContent: "center" }}
           >
             <Ionicons name="trash-outline" size={16} color="#ef4444" />
-            <Text className="text-red-700 font-bold text-sm ml-2">Delete Last Month (Local Only)</Text>
+            <Text style={{ color: COLORS.danger.dark, fontWeight: "700", fontSize: 13, marginLeft: 8 }}>Delete Last Month (Local Only)</Text>
           </TouchableOpacity>
         </View>
       )}
 
       {/* Create Month Button */}
-      <View className="px-4 mb-4">
+      <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[4] }}>
         {committee && committee.status !== "ACTIVE" ? (
-          <Card>
-            <View className="flex-row items-center gap-3">
-              <View className="w-10 h-10 rounded-full bg-amber-50 items-center justify-center border border-amber-200">
+          <Card accent="warning" style={SHADOWS.cardSm}>
+            <View className="flex-row items-center" style={{ gap: 12 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 999, backgroundColor: "#fffbeb", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#fde68a" }}>
                 <Ionicons name="time-outline" size={18} color="#d97706" />
               </View>
-              <View className="flex-1">
-                <Text className="text-slate-900 font-semibold text-sm">Committee not started</Text>
-                <Text className="text-slate-500 text-[11px] mt-0.5">
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: COLORS.text.primary, fontWeight: "600", fontSize: 13 }}>Committee not started</Text>
+                <Text style={{ color: COLORS.text.secondary, fontSize: 11, marginTop: 2 }}>
                   Start the committee from the dashboard once all {committee.totalSlots} slots are filled ({committee.filledSlots ?? 0}/{committee.totalSlots} joined).
                 </Text>
               </View>
             </View>
           </Card>
         ) : committee && (committee.filledSlots ?? 0) < committee.totalSlots ? (
-          <Card>
-            <View className="flex-row items-center gap-3">
-              <View className="w-10 h-10 rounded-full bg-amber-50 items-center justify-center border border-amber-200">
+          <Card accent="warning" style={SHADOWS.cardSm}>
+            <View className="flex-row items-center" style={{ gap: 12 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 999, backgroundColor: "#fffbeb", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#fde68a" }}>
                 <Ionicons name="people-outline" size={18} color="#d97706" />
               </View>
-              <View className="flex-1">
-                <Text className="text-slate-900 font-semibold text-sm">Waiting for members</Text>
-                <Text className="text-slate-500 text-[11px] mt-0.5">
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: COLORS.text.primary, fontWeight: "600", fontSize: 13 }}>Waiting for members</Text>
+                <Text style={{ color: COLORS.text.secondary, fontSize: 11, marginTop: 2 }}>
                   All {committee.totalSlots} slots must be filled before creating months. Currently {committee.filledSlots ?? 0}/{committee.totalSlots} joined.
                 </Text>
               </View>
             </View>
           </Card>
         ) : months.length >= (committee?.totalSlots ?? 0) ? (
-          <Card>
-            <View className="flex-row items-center gap-3">
-              <View className="w-10 h-10 rounded-full bg-success-50 items-center justify-center border border-success-200">
+          <Card accent="success" style={SHADOWS.cardSm}>
+            <View className="flex-row items-center" style={{ gap: 12 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 999, backgroundColor: "#f0fdf4", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#bbf7d0" }}>
                 <Ionicons name="checkmark-circle-outline" size={18} color="#16a34a" />
               </View>
-              <View className="flex-1">
-                <Text className="text-slate-900 font-semibold text-sm">All months created</Text>
-                <Text className="text-slate-500 text-[11px] mt-0.5">
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: COLORS.text.primary, fontWeight: "600", fontSize: 13 }}>All months created</Text>
+                <Text style={{ color: COLORS.text.secondary, fontSize: 11, marginTop: 2 }}>
                   {months.length} of {committee?.totalSlots} months have been created.
                 </Text>
               </View>
@@ -694,65 +698,64 @@ export default function OrganiserManageTimeline() {
               setNewMonthDate(new Date().toISOString().split("T")[0]);
               setShowCreateMonth(true);
             }}
-            className="bg-brand-50 border border-brand-200/50 px-4 py-3 rounded-xl flex-row items-center justify-center"
+            style={{ backgroundColor: "rgba(79,70,229,0.08)", borderWidth: 1, borderColor: COLORS.brand[200], paddingHorizontal: 16, paddingVertical: 12, borderRadius: BORDER_RADIUS.xl, flexDirection: "row", alignItems: "center", justifyContent: "center" }}
           >
             <Ionicons name="add-circle-outline" size={18} color={COLORS.brandPrimary} />
-            <Text className="text-brand-700 font-bold text-sm ml-2">Create New Month</Text>
+            <Text style={{ color: COLORS.brand[700], fontWeight: "700", fontSize: 13, marginLeft: 8 }}>Create New Month</Text>
           </TouchableOpacity>
           ) : (
-            <Card padding={0}>
+            <Card padding={0} accent="brand" style={SHADOWS.cardSm}>
               <View className="p-4">
                 <View className="flex-row items-center justify-between mb-3">
-                  <Text className="text-slate-500 text-xs font-semibold uppercase tracking-wider">New Month Details</Text>
+                  <Text style={{ color: COLORS.text.secondary, fontSize: 11, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 }}>New Month Details</Text>
                   <TouchableOpacity onPress={() => setShowCreateMonth(false)}>
                     <Ionicons name="close" size={18} color={COLORS.text.muted} />
                   </TouchableOpacity>
                 </View>
 
-                <Text className="text-slate-500 text-xs font-semibold mb-1.5">Month Number</Text>
-                <View className="bg-slate-50 border border-slate-200 rounded-xl px-4 h-11 justify-center mb-3">
+                <Text style={{ color: COLORS.text.secondary, fontSize: 11, fontWeight: "600", marginBottom: 6 }}>Month Number</Text>
+                <View style={{ backgroundColor: COLORS.surface.warm, borderWidth: 1, borderColor: COLORS.surface.border, borderRadius: BORDER_RADIUS.xl, paddingHorizontal: 16, height: 44, justifyContent: "center", marginBottom: 12 }}>
                   <TextInput
                     value={newMonthNumber}
                     onChangeText={setNewMonthNumber}
                     keyboardType="numeric"
                     placeholder="1"
-                    placeholderTextColor="#94a3b8"
-                    className="text-slate-900 font-semibold text-sm"
+                    placeholderTextColor={COLORS.text.muted}
+                    style={{ color: COLORS.text.primary, fontWeight: "600", fontSize: 13 }}
                   />
                 </View>
 
-                <Text className="text-slate-500 text-xs font-semibold mb-1.5">Month Date</Text>
-                <View className="bg-slate-50 border border-slate-200 rounded-xl px-4 h-11 justify-center mb-3">
+                <Text style={{ color: COLORS.text.secondary, fontSize: 11, fontWeight: "600", marginBottom: 6 }}>Month Date</Text>
+                <View style={{ backgroundColor: COLORS.surface.warm, borderWidth: 1, borderColor: COLORS.surface.border, borderRadius: BORDER_RADIUS.xl, paddingHorizontal: 16, height: 44, justifyContent: "center", marginBottom: 12 }}>
                   <TextInput
                     value={newMonthDate}
                     onChangeText={setNewMonthDate}
                     placeholder="YYYY-MM-DD"
-                    placeholderTextColor="#94a3b8"
-                    className="text-slate-900 font-semibold text-sm"
+                    placeholderTextColor={COLORS.text.muted}
+                    style={{ color: COLORS.text.primary, fontWeight: "600", fontSize: 13 }}
                   />
                 </View>
 
-                <Text className="text-slate-500 text-[10px] mb-4">
+                <Text style={{ color: COLORS.text.secondary, fontSize: 10, marginBottom: 16 }}>
                   Month 1 = Organiser commission. Months 2+ = Auto-detected based on bids.
                 </Text>
 
                 <View className="flex-row gap-3">
                   <TouchableOpacity
                     onPress={() => setShowCreateMonth(false)}
-                    className="flex-1 h-11 rounded-xl items-center justify-center border border-slate-200"
+                    style={{ flex: 1, height: 44, borderRadius: BORDER_RADIUS.xl, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: COLORS.surface.border }}
                   >
-                    <Text className="text-slate-500 font-bold text-sm">Cancel</Text>
+                    <Text style={{ color: COLORS.text.secondary, fontWeight: "700", fontSize: 13 }}>Cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={handleCreateMonth}
                     disabled={isCreating}
-                    className="flex-1 bg-brand-500 h-11 rounded-xl items-center justify-center"
-                    style={{ opacity: isCreating ? 0.6 : 1 }}
+                    style={{ flex: 1, backgroundColor: COLORS.brand[500], height: 44, borderRadius: BORDER_RADIUS.xl, alignItems: "center", justifyContent: "center", opacity: isCreating ? 0.6 : 1 }}
                   >
                     {isCreating ? (
                       <ActivityIndicator size="small" color="#fff" />
                     ) : (
-                      <Text className="text-white font-bold text-sm">Create Month</Text>
+                      <Text style={{ color: COLORS.white, fontWeight: "700", fontSize: 13 }}>Create Month</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -763,14 +766,14 @@ export default function OrganiserManageTimeline() {
 
       {/* Empty State */}
       {months.length === 0 && !showCreateMonth && (
-        <View className="px-4">
-          <Card>
+        <View style={{ paddingHorizontal: SPACING[5] }}>
+          <Card style={SHADOWS.cardSm}>
             <View className="items-center py-8">
-              <View className="w-14 h-14 rounded-full bg-brand-50 items-center justify-center mb-4">
+              <View style={{ width: 56, height: 56, borderRadius: 999, backgroundColor: "rgba(79,70,229,0.08)", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
                 <Ionicons name="calendar-outline" size={28} color={COLORS.brandPrimary} />
               </View>
-              <Text className="text-slate-900 font-bold text-sm mb-1">No Months Created</Text>
-              <Text className="text-slate-500 text-xs text-center px-4 mb-4">
+              <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 13, marginBottom: 4 }}>No Months Created</Text>
+              <Text style={{ color: COLORS.text.secondary, fontSize: 11, textAlign: "center", paddingHorizontal: 16, marginBottom: 16 }}>
                 Create your first month to start managing fund disbursements.
               </Text>
               <Button
@@ -825,10 +828,10 @@ export default function OrganiserManageTimeline() {
                     }}
                     padding={0}
                   >
-                    <View className="p-4">
-                       <View className="flex-row justify-between items-center mb-2">
+                    <View style={{ padding: 16 }}>
+                      <View className="flex-row justify-between items-center mb-2">
                         <View className="flex-row items-center">
-                          <Text className="text-slate-900 font-bold text-sm">Month {month.monthNumber}</Text>
+                          <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 13 }}>Month {month.monthNumber}</Text>
                           {(isCompleted || isBiddingOpen) && (
                             <Ionicons name="chevron-forward" size={14} color={COLORS.text.muted} style={{ marginLeft: 4 }} />
                           )}
@@ -842,7 +845,7 @@ export default function OrganiserManageTimeline() {
                         />
                       </View>
 
-                      <Text className="text-slate-500 text-[10px]">
+                      <Text style={{ color: COLORS.text.secondary, fontSize: 10 }}>
                         {new Date(month.monthDate).toLocaleDateString("en-IN", {
                           day: "numeric",
                           month: "short",
@@ -851,26 +854,26 @@ export default function OrganiserManageTimeline() {
                       </Text>
 
                       {isCompleted && (
-                        <View className="mt-3 bg-slate-50 rounded-lg p-3">
+                        <View style={{ marginTop: 12, backgroundColor: COLORS.surface.warm, borderRadius: BORDER_RADIUS.lg, padding: 12 }}>
                           <View className="flex-row justify-between mb-2">
-                            <Text className="text-slate-500 text-xs">Winner Payout</Text>
-                            <Text className="text-gold-600 font-bold text-xs">{formatINR(month.winningBidAmount || 0)}</Text>
+                            <Text style={{ color: COLORS.text.secondary, fontSize: 11 }}>Winner Payout</Text>
+                            <Text style={{ color: COLORS.gold[600], fontWeight: "700", fontSize: 11 }}>{formatINR(month.winningBidAmount || 0)}</Text>
                           </View>
                           <View className="flex-row justify-between mb-2">
-                            <Text className="text-slate-500 text-xs">Member Dividend</Text>
-                            <Text className="text-green-700 font-bold text-xs">+{formatINR(month.perMemberDistribution || 0)}</Text>
+                            <Text style={{ color: COLORS.text.secondary, fontSize: 11 }}>Member Dividend</Text>
+                            <Text style={{ color: COLORS.success.dark, fontWeight: "700", fontSize: 11 }}>+{formatINR(month.perMemberDistribution || 0)}</Text>
                           </View>
                           {month.nonWinnerNetPayable > 0 && (
-                            <View className="flex-row justify-between pt-2 border-t border-slate-100">
-                              <Text className="text-slate-500 text-xs">Non-Winner Net Pay</Text>
-                              <Text className="text-red-600 font-bold text-xs">{formatINR(month.nonWinnerNetPayable)}</Text>
+                            <View style={{ flexDirection: "row", justifyContent: "space-between", paddingTop: 8, borderTopWidth: 1, borderTopColor: COLORS.surface.border }}>
+                              <Text style={{ color: COLORS.text.secondary, fontSize: 11 }}>Non-Winner Net Pay</Text>
+                              <Text style={{ color: COLORS.danger.dark, fontWeight: "700", fontSize: 11 }}>{formatINR(month.nonWinnerNetPayable)}</Text>
                             </View>
                           )}
                         </View>
                       )}
 
                       {isCurrent && isPending && month.monthNumber > 1 && month.monthNumber < totalMembers && (
-                        <View className="mt-3">
+                        <View style={{ marginTop: 12 }}>
                           <Button
                             label={processingOpen === month.monthNumber ? "Opening..." : "Open Bidding"}
                             variant="primary"
@@ -879,18 +882,18 @@ export default function OrganiserManageTimeline() {
                             isLoading={processingOpen === month.monthNumber}
                             onPress={() => handleOpenBidding(month.monthNumber)}
                           />
-                          <Text className="text-slate-500 text-[10px] text-center mt-2 italic">
+                          <Text style={{ color: COLORS.text.secondary, fontSize: 10, textAlign: "center", marginTop: 8, fontStyle: "italic" }}>
                             Members pay after resolution (netted flow).
                           </Text>
                         </View>
                       )}
 
                       {isCurrent && isPending && month.monthNumber === 1 && (
-                        <View className="mt-3 bg-teal-50 p-3 rounded-lg">
-                          <Text className="text-teal-700 text-xs text-center font-bold">
+                        <View style={{ marginTop: 12, backgroundColor: "#f0fdfa", padding: 12, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: "rgba(20,184,166,0.20)" }}>
+                          <Text style={{ color: "#0f766e", fontSize: 11, fontWeight: "700", textAlign: "center" }}>
                             Organiser Commission
                           </Text>
-                          <Text className="text-slate-500 text-[10px] text-center mt-1">
+                          <Text style={{ color: COLORS.text.secondary, fontSize: 10, textAlign: "center", marginTop: 4 }}>
                             Month 1 is auto-resolved. Organiser receives the full pool.
                           </Text>
                         </View>
@@ -898,31 +901,31 @@ export default function OrganiserManageTimeline() {
 
                       {isBiddingOpen && (
                         <TouchableOpacity
-                          className="mt-3 bg-brand-50 p-3 rounded-lg flex-row items-center justify-between"
+                          style={{ marginTop: 12, backgroundColor: "rgba(79,70,229,0.08)", padding: 12, borderRadius: BORDER_RADIUS.lg, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
                           onPress={() => router.push(`/committees/${id}/manage/month/${month.id}`)}
                         >
                           <View className="flex-row items-center">
-                            <View className="w-2 h-2 rounded-full bg-brand-400 mr-2" />
-                            <Text className="text-brand-700 font-semibold text-xs">Active Bidding Session</Text>
+                            <View style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: COLORS.brand[400], marginRight: 8 }} />
+                            <Text style={{ color: COLORS.brand[700], fontWeight: "600", fontSize: 11 }}>Active Bidding Session</Text>
                           </View>
                           <Ionicons name="chevron-forward" size={16} color={COLORS.brandPrimary} />
                         </TouchableOpacity>
                       )}
 
                       {isCurrent && !isPending && !isBiddingOpen && (
-                        <View className="mt-3 bg-slate-50 p-3 rounded-lg">
-                          <Text className="text-slate-500 text-xs text-center italic">
+                        <View style={{ marginTop: 12, backgroundColor: COLORS.surface.warm, padding: 12, borderRadius: BORDER_RADIUS.lg }}>
+                          <Text style={{ color: COLORS.text.secondary, fontSize: 11, textAlign: "center", fontStyle: "italic" }}>
                             Month is not yet active. Create a new month above.
                           </Text>
                         </View>
                       )}
 
                       {isCurrent && isPending && month.monthNumber === totalMembers && (
-                        <View className="mt-3 bg-amber-50 p-3 rounded-lg">
-                          <Text className="text-amber-700 text-xs text-center font-bold">
+                        <View style={{ marginTop: 12, backgroundColor: "#fffbeb", padding: 12, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: "rgba(217,119,6,0.20)" }}>
+                          <Text style={{ color: COLORS.gold[700], fontSize: 11, fontWeight: "700", textAlign: "center" }}>
                             Last month — auto-resolves when created
                           </Text>
-                          <Text className="text-slate-500 text-[10px] text-center mt-1">
+                          <Text style={{ color: COLORS.text.secondary, fontSize: 10, textAlign: "center", marginTop: 4 }}>
                             Only 1 member remains, no bidding needed
                           </Text>
                         </View>

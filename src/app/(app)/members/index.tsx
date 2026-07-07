@@ -1,6 +1,3 @@
-// src/app/(app)/members/index.tsx
-// Kometi Member Directory with Search, Filter, and KYC Status verification.
-
 import React, { useState, useEffect } from "react";
 import { View, Text, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,7 +5,7 @@ import { useRouter } from "expo-router";
 import { useMemberStore } from "../../../stores/member.store";
 import { useCommitteeStore } from "../../../stores/committee.store";
 import { membersApi } from "../../../services/members.api";
-import { COLORS } from "../../../constants/theme";
+import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from "../../../constants/theme";
 import Input from "../../../components/ui/Input";
 import Avatar from "../../../components/ui/Avatar";
 import Badge, { kycVariant } from "../../../components/ui/Badge";
@@ -81,43 +78,22 @@ export default function Members() {
     }
   };
 
-  const filteredMembers = members.filter(
-    (m) =>
-      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.phone.includes(searchQuery)
-  );
-
-  if (!canViewMembers(hasCommittee)) {
-    return null;
-  }
-
   return (
-    <View className="flex-1 bg-surface-bg px-4">
-      <ScreenHeader
-        title="Members"
-        subtitle="View members of your chits"
-        transparent
-      />
+    <View style={{ flex: 1, backgroundColor: COLORS.surface.bg, paddingHorizontal: SPACING[5] }}>
+      <ScreenHeader title="Members" subtitle="Manage committee members and KYC" transparent />
 
-      <View className="mb-4">
+      <View style={{ marginBottom: 16 }}>
         <Input
-          placeholder="Search by name or phone..."
+          placeholder="Search members..."
           value={searchQuery}
           onChangeText={setSearchQuery}
-          leftIcon={<Ionicons name="search" size={18} color="#64748b" />}
-          rightElement={
-            searchQuery ? (
-              <TouchableOpacity onPress={() => setSearchQuery("")}>
-                <Ionicons name="close-circle" size={18} color="#64748b" />
-              </TouchableOpacity>
-            ) : undefined
-          }
+          leftIcon={<Ionicons name="search-outline" size={18} color={COLORS.text.muted} />}
         />
       </View>
 
       <FlatList
-        data={filteredMembers}
-        keyExtractor={(item) => item.id}
+        data={members}
+        keyExtractor={(item: any) => item.id}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -125,48 +101,74 @@ export default function Members() {
             tintColor={COLORS.brandPrimary}
           />
         }
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 100, flexGrow: 1 }}
         ListEmptyComponent={
           !isLoading ? (
             <EmptyState
               icon="people-outline"
               title="No members found"
-              description="Invite members to join your committees."
+              description={searchQuery ? "Try a different search term." : "Members will appear here once they join your committee."}
             />
           ) : null
         }
-        renderItem={({ item }) => (
-          <View className="flex-row items-center justify-between bg-surface-card border border-slate-100 rounded-xl p-4 mb-3">
-            <View className="flex-row items-center flex-1">
-              <Avatar name={item.name} size={44} />
-              <View className="ml-3 flex-1">
-                <Text className="text-slate-900 font-bold text-sm">{item.name}</Text>
-                <Text className="text-slate-500 text-xs mt-0.5">{item.phone}</Text>
+        renderItem={({ item }: { item: any }) => (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            className="flex-row items-center bg-white rounded-2xl p-4 mb-3"
+            style={{
+              borderWidth: 1,
+              borderColor: COLORS.surface.border,
+              ...SHADOWS.cardSm,
+            }}
+          >
+            <Avatar
+              name={item.user?.name || item.name || "Member"}
+              imageUrl={item.user?.profileImageUrl}
+              size={48}
+            />
+            <View className="ml-3 flex-1">
+              <Text className="text-slate-800 font-bold text-sm">
+                {item.user?.name || item.name || "Unknown Member"}
+              </Text>
+              <View className="flex-row items-center gap-2 mt-0.5">
+                <Text className="text-slate-400 text-xs">
+                  {item.user?.phone || ""}
+                </Text>
+                {item.slotNumber && (
+                  <>
+                    <View style={{ width: 3, height: 3, borderRadius: 1.5, backgroundColor: COLORS.text.muted }} />
+                    <Text className="text-slate-400 text-xs">Slot #{item.slotNumber}</Text>
+                  </>
+                )}
               </View>
             </View>
-
-            <View className="items-end">
-              <Badge label={item.kycStatus} variant={kycVariant(item.kycStatus)} />
-              {item.kycStatus === "PENDING" && (
-                <TouchableOpacity
-                  onPress={() => handleVerifyKYC(item.id, item.name)}
-                  disabled={isProcessing === item.id}
-                  className="mt-2 py-1 px-2.5 bg-brand-50 border border-brand-200 rounded min-w-[80px] items-center"
-                >
-                  {isProcessing === item.id ? (
-                    <ActivityIndicator size="small" color={COLORS.brandPrimary} />
-                  ) : (
-                    <Text className="text-brand-600 text-[10px] font-bold uppercase">
-                      Verify KYC
-                    </Text>
-                  )}
-                </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => handleVerifyKYC(item.id, item.user?.name || item.name || "Member")}
+              disabled={isProcessing === item.id}
+              className="rounded-full px-3 py-1"
+              style={{
+                backgroundColor: item.user?.kycStatus === "VERIFIED" ? "rgba(34,197,94,0.1)" :
+                  item.user?.kycStatus === "REJECTED" ? "rgba(239,68,68,0.1)" :
+                  item.user?.kycStatus === "SUBMITTED" ? "rgba(59,130,246,0.1)" :
+                  "rgba(245,158,11,0.1)",
+              }}
+            >
+              {isProcessing === item.id ? (
+                <ActivityIndicator size="small" color={COLORS.brand[500]} />
+              ) : (
+                <View className="flex-row items-center gap-1">
+                  <Badge
+                    label={item.user?.kycStatus || "PENDING"}
+                    variant={kycVariant(item.user?.kycStatus || "PENDING")}
+                    size="sm"
+                    dot
+                  />
+                </View>
               )}
-            </View>
-          </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
         )}
       />
-
       <AlertComponent />
     </View>
   );

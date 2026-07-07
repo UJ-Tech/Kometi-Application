@@ -1,4 +1,3 @@
-// src/components/ui/Input.tsx
 import React, { forwardRef } from "react";
 import {
   View,
@@ -44,28 +43,32 @@ const Input = forwardRef<TextInput, InputProps>(({
     <View style={[{ width: "100%" }, containerStyle]}>
       {label && (
         <Text style={{
-          fontSize:    FONT_SIZE.sm,
-          fontWeight:  "500",
-          color:       COLORS.text.secondary,
+          fontSize: FONT_SIZE.sm,
+          fontWeight: "600",
+          color: COLORS.text.secondary,
           marginBottom: SPACING[1.5],
+          letterSpacing: 0.3,
         }}>
           {label}
           {required && <Text style={{ color: COLORS.danger.DEFAULT }}> *</Text>}
         </Text>
       )}
 
-      <View style={[
-        {
-          flexDirection:   "row",
-          alignItems:      "center",
-          backgroundColor: COLORS.surface.card,
-          borderRadius:    BORDER_RADIUS.md,
-          borderWidth:     1.5,
-          borderColor,
-          paddingHorizontal: SPACING[3],
-          height:          52,
-        },
-      ]}>
+      <View style={[{
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: COLORS.surface.card,
+        borderRadius: BORDER_RADIUS.lg,
+        borderWidth: 1.5,
+        borderColor,
+        paddingHorizontal: SPACING[3],
+        height: 54,
+        shadowColor: COLORS.brand[500],
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.03,
+        shadowRadius: 3,
+        elevation: 1,
+      }]}>
         {leftIcon && (
           <View style={{ marginRight: SPACING[2] }}>{leftIcon}</View>
         )}
@@ -73,9 +76,9 @@ const Input = forwardRef<TextInput, InputProps>(({
         <TextInput
           ref={ref}
           style={{
-            flex:       1,
-            fontSize:   FONT_SIZE.base,
-            color:      COLORS.text.primary,
+            flex: 1,
+            fontSize: FONT_SIZE.base,
+            color: COLORS.text.primary,
             paddingVertical: 0,
           }}
           placeholderTextColor={COLORS.text.muted}
@@ -96,16 +99,17 @@ const Input = forwardRef<TextInput, InputProps>(({
 
       {error ? (
         <Text style={{
-          fontSize:  FONT_SIZE.xs,
-          color:     COLORS.danger.light,
+          fontSize: FONT_SIZE.xs,
+          color: COLORS.danger.light,
           marginTop: SPACING[1],
+          fontWeight: "500",
         }}>
           {error}
         </Text>
       ) : hint ? (
         <Text style={{
-          fontSize:  FONT_SIZE.xs,
-          color:     COLORS.text.muted,
+          fontSize: FONT_SIZE.xs,
+          color: COLORS.text.muted,
           marginTop: SPACING[1],
         }}>
           {hint}

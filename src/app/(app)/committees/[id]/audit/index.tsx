@@ -17,6 +17,7 @@ import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { committeesApi } from "../../../../../services/committees.api";
 import { useAuthStore } from "../../../../../stores/auth.store";
+import BrandedLoader from "../../../../../components/brand/BrandedLoader";
 import { formatINR } from "../../../../../utils/currency";
 import { COLORS } from "../../../../../constants/theme";
 import Card from "../../../../../components/ui/Card";
@@ -43,7 +44,7 @@ export default function AuditLogScreen() {
   const [search, setSearch] = useState("");
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState<string | null>(null);
-  const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
+  const [generatingReport, setGeneratingReport] = useState(false);
   const { alert, confirm, AlertComponent } = useAlertModal();
 
   const loadData = useCallback(async () => {
@@ -103,12 +104,7 @@ export default function AuditLogScreen() {
   }
 
   if (loading && !refreshing) {
-    return (
-      <View className="flex-1 bg-surface-50 items-center justify-center">
-        <ActivityIndicator size="large" color={COLORS.brandPrimary} />
-        <Text className="text-slate-500 text-sm mt-4">Loading audit log...</Text>
-      </View>
-    );
+    return <BrandedLoader message="Loading audit log..." />;
   }
 
   if (error && !committee) {
@@ -190,65 +186,106 @@ export default function AuditLogScreen() {
     return { ...m, hasWon, totalContrib, totalRecv, status };
   });
 
-  // ─── PDF Generation ──────────────────────────────────────────────────
-  const generatePDF = async (monthData: any) => {
+  // ─── Full Report PDF Generation ──────────────────────────────────────
+  const generateFullReport = async () => {
     try {
-      setGeneratingPdf(monthData.id);
-      const detail = monthData.id ? monthDetails[monthData.id] : null;
-      const bids = detail?.bids || [];
+      setGeneratingReport(true);
 
-      const html = `
-<!DOCTYPE html>
+      const totalMonths = months.length;
+      const completedMonths = months.filter((m: any) => m.status === "completed").length;
+      const totalPoolAll = months.reduce((s: number, m: any) => s + (m.totalPool || 0), 0);
+      const totalInterest = months.reduce((s: number, m: any) => s + (m.interestAmount || 0), 0);
+      const monthRows = months.map((m: any, i: number) => {
+        const winner = members.find((mem: any) => mem.id === m.winnerMemberId);
+        return `<tr${i % 2 === 1 ? ' style="background:#fafafa"' : ''}>
+          <td style="font-weight:700">#${m.monthNumber}</td>
+          <td>${fmtDate(m.monthDate)}</td>
+          <td>${m.resolutionType?.replace("_", " ") || "-"}</td>
+          <td style="text-align:right">${F(m.winningBidAmount)}</td>
+          <td style="text-align:right">${F(m.interestAmount)}</td>
+          <td style="text-align:right">${F(m.perMemberDistribution)}</td>
+          <td style="text-align:right">${F(m.totalPool)}</td>
+          <td style="text-align:right">${F(m.remainingBalance)}</td>
+          <td>${winner?.user?.name || "-"}</td>
+        </tr>`;
+      }).join("");
+
+      const memberRows = memberBoard.map((m: any, i: number) => {
+        const statusDot = m.status === "Won" ? "#059669" : m.status === "Exited" ? "#dc2626" : "#6366f1";
+        return `<tr${i % 2 === 1 ? ' style="background:#fafafa"' : ''}>
+          <td>${m.slotNumber || "-"}</td>
+          <td style="font-weight:600">${m.user?.name || "Member"}</td>
+          <td style="text-align:center">${m.hasWon ? "✓" : "—"}</td>
+          <td style="text-align:right;color:#dc2626;font-weight:600">${F(m.totalContrib)}</td>
+          <td style="text-align:right;color:#059669;font-weight:600">${F(m.totalRecv)}</td>
+          <td style="text-align:center"><span style="display:inline-block;width:8px;height:8px;border-radius:4px;background:${statusDot};margin-right:4px;vertical-align:middle"></span>${m.status}</td>
+        </tr>`;
+      }).join("");
+
+      const html = `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"/>
 <style>
-  body { font-family: Arial, sans-serif; padding: 30px; color: #333; }
-  h1 { font-size: 20px; margin-bottom: 4px; }
-  h2 { font-size: 16px; color: #555; margin-top: 20px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
-  .meta { font-size: 12px; color: #888; margin-bottom: 20px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
-  th { background: #f5f5f5; text-align: left; padding: 8px; border-bottom: 2px solid #ddd; font-weight: 600; }
-  td { padding: 8px; border-bottom: 1px solid #eee; }
-  .amount { text-align: right; font-weight: 600; }
-  .footer { margin-top: 30px; font-size: 11px; color: #aaa; text-align: center; }
+  body { font-family: Arial, sans-serif; margin: 0; padding: 0; color: #1a1a2e; }
+  .hdr { background: #1e1b4b; color: #fff; padding: 28px 24px; }
+  .hdr h1 { font-size: 20px; margin: 0 0 2px; }
+  .hdr .sub { font-size: 11px; color: #a5b4fc; margin-bottom: 14px; }
+  .hdr table { width: 100%; border: 0; }
+  .hdr td { padding: 4px 8px 4px 0; border: 0; font-size: 11px; }
+  .hdr .lbl { font-size: 8px; text-transform: uppercase; color: #818cf8; }
+  .hdr .val { font-size: 14px; font-weight: 700; color: #fbbf24; }
+  .sec { padding: 20px 24px 4px; }
+  .sec h2 { font-size: 13px; font-weight: 700; color: #1e1b4b; border-bottom: 2px solid #e0e7ff; padding-bottom: 6px; margin: 0 0 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; }
+  th { background: #f8f7f4; padding: 6px 4px; border-bottom: 2px solid #e0e7ff; font-size: 8px; text-transform: uppercase; color: #6366f1; text-align: left; white-space: nowrap; }
+  td { padding: 5px 4px; border-bottom: 1px solid #eee; font-size: 10px; }
+  .r { text-align: right; }
+  .c { text-align: center; }
+  .tr { background: #f8f7f4; font-weight: 700; }
+  .ftr { margin-top: 20px; padding: 12px 24px; background: #f8f7f4; font-size: 9px; color: #a8a29e; text-align: center; border-top: 1px solid #e0e7ff; }
 </style></head>
 <body>
-  <h1>${committee.name} — Monthly Statement</h1>
-  <div class="meta">Month #${monthData.monthNumber} &bull; ${fmtDate(monthData.monthDate)} &bull; ${monthData.resolutionType?.replace("_", " ")}</div>
-  <div class="meta">Generated: ${new Date().toLocaleString("en-IN")} &bull; Committee Organiser: ${committee.organizer?.name || "N/A"}</div>
 
-  <h2>Month Summary</h2>
+<table cellpadding="0" cellspacing="0" style="width:100%;background:#1e1b4b"><tr><td style="padding:28px 24px;border:0">
+  <div style="font-size:20px;font-weight:800;color:#fff;margin-bottom:2px">${(committee.name || "").replace(/</g,"&lt;")}</div>
+  <div style="font-size:11px;color:#a5b4fc;margin-bottom:14px">Full Audit Report &bull; Generated ${new Date().toLocaleString("en-IN")}</div>
+  <table cellpadding="0" cellspacing="0" style="width:100%"><tr>
+    <td style="border:0;padding:4px 8px 4px 0"><div style="font-size:8px;text-transform:uppercase;color:#818cf8">Organiser</div><div style="font-size:14px;font-weight:700;color:#fbbf24">${(committee.organizer?.name || "N/A").replace(/</g,"&lt;")}</div></td>
+    <td style="border:0;padding:4px 8px 4px 0"><div style="font-size:8px;text-transform:uppercase;color:#818cf8">Slots</div><div style="font-size:14px;font-weight:700;color:#fbbf24">${members.length}/${committee.totalSlots}</div></td>
+    <td style="border:0;padding:4px 8px 4px 0"><div style="font-size:8px;text-transform:uppercase;color:#818cf8">Months</div><div style="font-size:14px;font-weight:700;color:#fbbf24">${completedMonths}/${totalMonths}</div></td>
+    <td style="border:0;padding:4px 0"><div style="font-size:8px;text-transform:uppercase;color:#818cf8">Total Pool</div><div style="font-size:14px;font-weight:700;color:#fbbf24">${F(totalPoolAll)}</div></td>
+  </tr></table>
+</td></tr></table>
+
+<div style="padding:20px 24px 4px">
+  <h2 style="font-size:13px;font-weight:700;color:#1e1b4b;border-bottom:2px solid #e0e7ff;padding-bottom:6px;margin:0 0 10px">Monthly Summary &nbsp;<span style="font-size:9px;color:#6366f1;background:#eef2ff;padding:1px 6px">${totalMonths} months</span></h2>
   <table>
-    <tr><td>Total Pool</td><td class="amount">${F(monthData.totalPool)}</td></tr>
-    <tr><td>Winning Bid</td><td class="amount">${F(monthData.winningBidAmount)}</td></tr>
-    <tr><td>Interest Amount</td><td class="amount">${F(monthData.interestAmount)}</td></tr>
-    <tr><td>Per-Member Distribution</td><td class="amount">${F(monthData.perMemberDistribution)}</td></tr>
-    <tr><td>Remaining Balance</td><td class="amount">${F(monthData.remainingBalance)}</td></tr>
+    <tr><th style="width:36px">#</th><th>Date</th><th>Type</th><th class="r">Bid</th><th class="r">Interest</th><th class="r">/Share</th><th class="r">Pool</th><th class="r">Balance</th><th>Winner</th></tr>
+    ${monthRows}
+    <tr class="tr"><td colspan="3" style="font-size:9px">Totals</td><td class="r">—</td><td class="r" style="color:#d97706">${F(totalInterest)}</td><td class="r">—</td><td class="r">${F(totalPoolAll)}</td><td class="r">${F(months.reduce((s: number, m: any) => s + (m.remainingBalance || 0), 0))}</td><td></td></tr>
   </table>
+</div>
 
-  ${bids.length > 0 ? `
-  <h2>Bids Placed</h2>
+<div style="padding:16px 24px 4px">
+  <h2 style="font-size:13px;font-weight:700;color:#1e1b4b;border-bottom:2px solid #e0e7ff;padding-bottom:6px;margin:0 0 10px">Member Status Board &nbsp;<span style="font-size:9px;color:#6366f1;background:#eef2ff;padding:1px 6px">${members.length} members</span></h2>
   <table>
-    <tr><th>#</th><th>Member</th><th>Slot</th><th class="amount">Bid Amount</th><th>Status</th></tr>
-    ${bids.map((b: any, i: number) => `
-    <tr>
-      <td>${i + 1}</td>
-      <td>${b.committeeMember?.user?.name || "Member"}</td>
-      <td>${b.committeeMember?.slotNumber || "-"}</td>
-      <td class="amount">${F(b.bidAmount)}</td>
-      <td>${b.status}</td>
-    </tr>`).join("")}
-  </table>` : "<p>No bids were placed for this month (lottery resolution).</p>"}
+    <tr><th style="width:24px">Slot</th><th>Name</th><th style="width:24px" class="c">Won</th><th class="r">Contributed</th><th class="r">Received</th><th style="width:48px" class="c">Status</th></tr>
+    ${memberRows}
+  </table>
+</div>
 
-  <div class="footer">This is a system-generated statement from Kometi App.</div>
+<div style="margin-top:20px;padding:12px 24px;background:#f8f7f4;font-size:9px;color:#a8a29e;text-align:center;border-top:1px solid #e0e7ff">
+  System-generated from <strong>Monio App</strong> &bull; ${new Date().toLocaleDateString("en-IN")} &bull; All amounts in INR
+</div>
+
 </body></html>`;
 
       const { uri } = await Print.printToFileAsync({ html });
-      await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: `Month ${monthData.monthNumber} Statement` });
+      await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: `${committee.name} — Full Audit Report` });
     } catch {
       await alert("Error", "Failed to generate PDF.");
     } finally {
-      setGeneratingPdf(null);
+      setGeneratingReport(false);
     }
   };
 
@@ -268,9 +305,20 @@ export default function AuditLogScreen() {
           <Text className="text-slate-900 text-xl font-bold">Audit Log</Text>
           <Text className="text-slate-400 text-xs">{committee.name}</Text>
         </View>
-        <View className="w-10 h-10 bg-brand-500/10 rounded-full items-center justify-center">
-          <Ionicons name="document-text-outline" size={18} color={COLORS.brandPrimary} />
-        </View>
+        <TouchableOpacity
+          onPress={generateFullReport}
+          disabled={generatingReport}
+          className="bg-brand-500/10 px-3 py-2 rounded-xl flex-row items-center"
+        >
+          {generatingReport ? (
+            <ActivityIndicator size="small" color={COLORS.brandPrimary} />
+          ) : (
+            <Ionicons name="download-outline" size={16} color={COLORS.brandPrimary} />
+          )}
+          <Text className="text-brand-600 text-xs font-semibold ml-1.5">
+            {generatingReport ? "Generating..." : "PDF"}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Search */}
@@ -347,21 +395,7 @@ export default function AuditLogScreen() {
                         <Text className="text-slate-400 text-[10px]">/share: <Text className="text-success-600 font-semibold">{F(month.perMemberDistribution)}</Text></Text>
                       </View>
 
-                      {/* Download PDF */}
-                      <TouchableOpacity
-                        onPress={() => generatePDF(month)}
-                        disabled={generatingPdf === month.id}
-                        className="mt-2.5 bg-brand-500/10 px-3 py-1.5 rounded-lg self-start flex-row items-center"
-                      >
-                        {generatingPdf === month.id ? (
-                          <ActivityIndicator size="small" color={COLORS.brandPrimary} />
-                        ) : (
-                          <Ionicons name="download-outline" size={13} color={COLORS.brandPrimary} />
-                        )}
-                        <Text className="text-brand-600 text-[10px] font-semibold ml-1.5">
-                          {generatingPdf === month.id ? "Generating..." : "Download PDF"}
-                        </Text>
-                      </TouchableOpacity>
+
                     </View>
                   </Card>
                 </TouchableOpacity>

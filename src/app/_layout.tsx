@@ -1,6 +1,3 @@
-// src/app/_layout.tsx
-// Root layout — wraps the entire app with all global providers.
-
 import "../global.css";
 import React, { useEffect, useState } from "react";
 import { Stack } from "expo-router";

@@ -2,7 +2,7 @@
 // Admin panel — deprecated, redirects to dashboard.
 import { useEffect } from "react";
 import { useRouter } from "expo-router";
-import { View, ActivityIndicator } from "react-native";
+import BrandedLoader from "../../../components/brand/BrandedLoader";
 import { COLORS } from "../../../constants/theme";
 
 export default function AdminDashboard() {
@@ -11,8 +11,6 @@ export default function AdminDashboard() {
     router.replace("/(app)/dashboard");
   }, []);
   return (
-    <View style={{ flex: 1, backgroundColor: COLORS.surface.bg, alignItems: "center", justifyContent: "center" }}>
-      <ActivityIndicator color={COLORS.brand[500]} size="large" />
-    </View>
+    <BrandedLoader />
   );
 }

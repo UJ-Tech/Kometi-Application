@@ -1,53 +1,43 @@
-// src/app/(app)/settings/change-password.tsx
 import React, { useState } from "react";
-import { View, Text, ScrollView, StyleSheet, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { COLORS, SPACING } from "../../../constants/theme";
-import ScreenHeader from "../../../components/shared/ScreenHeader";
+import { Ionicons } from "@expo/vector-icons";
 import Input from "../../../components/ui/Input";
 import Button from "../../../components/ui/Button";
-import Card from "../../../components/ui/Card";
+import ScreenHeader from "../../../components/shared/ScreenHeader";
 import { authApi } from "../../../services/auth.api";
+import { useAuthStore } from "../../../stores/auth.store";
+import { COLORS, FONT_SIZE, SPACING, BORDER_RADIUS } from "../../../constants/theme";
 import { useAlertModal } from "../../../components/ui/AlertModal";
 
-export default function ChangePassword() {
+export default function ChangePasswordScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { alert, confirm, AlertComponent } = useAlertModal();
+  const user = useAuthStore((s) => s.user);
+  const { alert, AlertComponent } = useAlertModal();
+
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [errors, setErrors] = useState<{ current?: string; new?: string; confirm?: string; form?: string }>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [form, setForm] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const validate = () => {
-    const newErrors: Record<string, string> = {};
-    if (!form.currentPassword) newErrors.currentPassword = "Current password is required";
-    if (!form.newPassword) newErrors.newPassword = "New password is required";
-    if (form.newPassword.length < 8) newErrors.newPassword = "Must be at least 8 characters";
-    if (form.newPassword !== form.confirmPassword) newErrors.confirmPassword = "Passwords do not match";
-    if (form.currentPassword === form.newPassword) newErrors.newPassword = "New password must be different";
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  const handleSubmit = async () => {
+    const e: typeof errors = {};
+    if (!currentPassword) e.current = "Enter your current password";
+    if (newPassword.length < 8) e.new = "New password must be at least 8 characters";
+    if (confirmPassword !== newPassword) e.confirm = "Passwords do not match";
+    setErrors(e);
+    if (Object.keys(e).length > 0) return;
 
-  const handleChangePassword = async () => {
-    if (!validate()) return;
-
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      await authApi.changePassword({
-        currentPassword: form.currentPassword,
-        newPassword: form.newPassword,
-      });
-      await alert("Success", "Password changed successfully");
+      await authApi.changePassword({ currentPassword, newPassword });
+      await alert("Success", "Password changed successfully!");
       router.back();
-    } catch (err) {
-      await alert("Error", err instanceof Error ? err.message : "Failed to change password");
+    } catch (err: any) {
+      setErrors({ form: err.message || "Failed to change password" });
     } finally {
       setIsLoading(false);
     }
@@ -58,92 +48,79 @@ export default function ChangePassword() {
       style={{ flex: 1, backgroundColor: COLORS.surface.bg }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScreenHeader
-        title="Change Password"
-        subtitle="Update your account password"
-        showBack
-      />
+      <ScreenHeader title="Change Password" showBack />
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + SPACING[6] }]}
-        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: SPACING[5], paddingBottom: insets.bottom + 40 }}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive"
       >
-        <Card style={{ marginBottom: 20 }}>
-          <View style={styles.cardContent}>
-            <Ionicons name="lock-closed-outline" size={24} color={COLORS.brandPrimary} />
-            <Text style={styles.securityNote}>
-              For your security, please enter your current password before setting a new one.
-            </Text>
+        <View className="items-center py-6">
+          <View className="w-16 h-16 rounded-2xl items-center justify-center mb-4"
+            style={{ backgroundColor: "rgba(99,102,241,0.08)" }}
+          >
+            <Ionicons name="lock-closed-outline" size={28} color={COLORS.brand[500]} />
           </View>
-        </Card>
+          <Text className="text-xl font-bold text-slate-900 mb-1">Update Password</Text>
+          <Text className="text-sm text-slate-500 text-center">
+            Enter your current password and a new one.
+          </Text>
+        </View>
 
-        <Input
-          label="Current Password"
-          placeholder="Enter current password"
-          value={form.currentPassword}
-          onChangeText={(val) => setForm({ ...form, currentPassword: val })}
-          error={errors.currentPassword}
-          secureTextEntry
-          returnKeyType="next"
-          required
-        />
+        <View className="bg-white rounded-2xl p-5 border border-slate-100 gap-4"
+          style={{
+            shadowColor: COLORS.brand[500],
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.05,
+            shadowRadius: 12,
+            elevation: 3,
+          }}
+        >
+          <Input
+            label="Current Password"
+            required
+            placeholder="Enter current password"
+            value={currentPassword}
+            onChangeText={(t) => { setCurrentPassword(t); setErrors({}); }}
+            secureTextEntry
+            leftIcon={<Ionicons name="lock-closed-outline" size={18} color={COLORS.text.muted} />}
+            error={errors.current}
+          />
+          <Input
+            label="New Password"
+            required
+            placeholder="At least 8 characters"
+            value={newPassword}
+            onChangeText={(t) => { setNewPassword(t); setErrors({}); }}
+            secureTextEntry
+            leftIcon={<Ionicons name="key-outline" size={18} color={COLORS.text.muted} />}
+            error={errors.new}
+          />
+          <Input
+            label="Confirm New Password"
+            required
+            placeholder="Re-enter new password"
+            value={confirmPassword}
+            onChangeText={(t) => { setConfirmPassword(t); setErrors({}); }}
+            secureTextEntry
+            leftIcon={<Ionicons name="shield-checkmark-outline" size={18} color={COLORS.text.muted} />}
+            error={errors.confirm}
+          />
 
-        <Input
-          label="New Password"
-          placeholder="Enter new password"
-          value={form.newPassword}
-          onChangeText={(val) => setForm({ ...form, newPassword: val })}
-          error={errors.newPassword}
-          secureTextEntry
-          returnKeyType="next"
-          containerStyle={{ marginTop: 16 }}
-          required
-        />
+          {errors.form && (
+            <Text className="text-red-500 text-sm">{errors.form}</Text>
+          )}
 
-        <Input
-          label="Confirm New Password"
-          placeholder="Re-enter new password"
-          value={form.confirmPassword}
-          onChangeText={(val) => setForm({ ...form, confirmPassword: val })}
-          error={errors.confirmPassword}
-          secureTextEntry
-          returnKeyType="done"
-          onSubmitEditing={handleChangePassword}
-          containerStyle={{ marginTop: 16 }}
-          required
-        />
-
-        <Button
-          label="Update Password"
-          onPress={handleChangePassword}
-          isLoading={isLoading}
-          variant="primary"
-          size="lg"
-        />
+          <Button
+            label="Update Password"
+            variant="primary"
+            size="lg"
+            gradient
+            isLoading={isLoading}
+            onPress={handleSubmit}
+          />
+        </View>
       </ScrollView>
-
       <AlertComponent />
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    padding: 20,
-    flexGrow: 1,
-  },
-  cardContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 16,
-  },
-  securityNote: {
-    flex: 1,
-    fontSize: 13,
-    color: COLORS.text.secondary,
-    lineHeight: 18,
-  },
-});

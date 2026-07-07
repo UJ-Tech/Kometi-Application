@@ -39,7 +39,7 @@ export interface RazorpayResponse {
   razorpay_signature: string;
 }
 
-const DEEP_LINK_SCHEME = "kometi://payment-callback";
+const DEEP_LINK_SCHEME = "monio://payment-callback";
 
 // ─── Web: Checkout.js script ───────────────────────────────────────────────
 

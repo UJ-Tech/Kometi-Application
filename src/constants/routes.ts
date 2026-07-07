@@ -10,7 +10,7 @@ export const ROUTES = {
     REGISTER:        "/(auth)/register",
     MPIN_SETUP:      "/(auth)/mpin-setup",
     MPIN_ENTER:      "/(auth)/mpin-enter",
-    ROLE_SELECT:     "/(auth)/role-select",
+    // ROLE_SELECT removed — roles are context-dependent
     JOIN_COMMITTEE:  "/(auth)/join-committee",
     JOIN_PENDING:    "/(auth)/join-pending",
   },

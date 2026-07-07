@@ -16,12 +16,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { committeesApi } from "../../../../../../services/committees.api";
 import { useAuthStore } from "../../../../../../stores/auth.store";
+import BrandedLoader from "../../../../../../components/brand/BrandedLoader";
 import { useCommitteeStore } from "../../../../../../stores/committee.store";
 import { formatINR } from "../../../../../../utils/currency";
-import { COLORS } from "../../../../../../constants/theme";
+import { COLORS, SHADOWS, BORDER_RADIUS, SPACING } from "../../../../../../constants/theme";
 import Card from "../../../../../../components/ui/Card";
 import Badge from "../../../../../../components/ui/Badge";
 import Button from "../../../../../../components/ui/Button";
+import ScreenHeader from "../../../../../../components/shared/ScreenHeader";
 import { useAlertModal } from "../../../../../../components/ui/AlertModal";
 
 const F = (p: number | bigint | null | undefined) => formatINR(p ?? 0);
@@ -108,32 +110,27 @@ export default function PlaceBidScreen() {
 
   if (!isValidId) {
     return (
-      <View className="flex-1 bg-surface-50 items-center justify-center px-6">
+      <View style={{ flex: 1, backgroundColor: COLORS.surface.bg, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
         <Ionicons name="alert-circle-outline" size={40} color={COLORS.danger.light} />
-        <Text className="text-slate-900 font-bold text-lg mt-4">Invalid Committee</Text>
-        <TouchableOpacity onPress={() => router.back()} className="mt-4">
-          <Text className="text-brand-600 text-sm font-medium">Go Back</Text>
+        <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 18, marginTop: 16 }}>Invalid Committee</Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 16 }}>
+          <Text style={{ color: COLORS.brand[600], fontSize: 13, fontWeight: "500" }}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   if (loading) {
-    return (
-      <View className="flex-1 bg-surface-50 items-center justify-center">
-        <ActivityIndicator size="large" color={COLORS.brandPrimary} />
-        <Text className="text-slate-500 text-sm mt-4">Loading bid screen...</Text>
-      </View>
-    );
+    return <BrandedLoader message="Loading bid screen..." />;
   }
 
   if (error || !committee) {
     return (
-      <View className="flex-1 bg-surface-50 items-center justify-center px-6">
+      <View style={{ flex: 1, backgroundColor: COLORS.surface.bg, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
         <Ionicons name="cloud-offline-outline" size={40} color={COLORS.warning.light} />
-        <Text className="text-slate-900 font-bold text-lg mt-4">{error || "Committee not found"}</Text>
-        <TouchableOpacity onPress={loadData} className="mt-4 bg-brand-500 px-5 py-2.5 rounded-xl">
-          <Text className="text-slate-900 font-bold text-sm">Retry</Text>
+        <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 18, marginTop: 16 }}>{error || "Committee not found"}</Text>
+        <TouchableOpacity onPress={loadData} style={{ backgroundColor: COLORS.brand[500], paddingHorizontal: 20, paddingVertical: 10, borderRadius: BORDER_RADIUS.xl, marginTop: 16 }}>
+          <Text style={{ color: COLORS.white, fontWeight: "700", fontSize: 13 }}>Retry</Text>
         </TouchableOpacity>
       </View>
     );
@@ -237,43 +234,36 @@ export default function PlaceBidScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
-        contentContainerStyle={{ paddingTop: 64, paddingBottom: 120 }}
+        contentContainerStyle={{ paddingTop: 0, paddingBottom: 120 }}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Header */}
-        <View className="px-4 flex-row items-center mb-5">
-          <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 bg-surface-card rounded-full items-center justify-center border border-brand-primary/10 mr-4">
-            <Ionicons name="arrow-back" size={20} color="#1a1a2e" />
-          </TouchableOpacity>
-          <View className="flex-1">
-            <Text className="text-slate-900 text-xl font-bold">Place Your Bid</Text>
-            <Text className="text-slate-400 text-xs">{committee.name}</Text>
-          </View>
-          {myBid && (
-            <Badge label="Bid Active" variant="success" size="sm" />
-          )}
-        </View>
+        <ScreenHeader
+          title="Place Your Bid"
+          subtitle={committee.name}
+          brand
+          rightElement={myBid ? <Badge label="Bid Active" variant="success" size="sm" dot /> : undefined}
+        />
 
         {/* ═══════════════════════════════════════════════════════════════════ */}
         {/* Pool & Max Bid Info                                                */}
         {/* ═══════════════════════════════════════════════════════════════════ */}
-        <View className="px-4 mb-5">
+        <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[5] }}>
           <Card gradient>
             <View className="flex-row items-center justify-between mb-3">
               <View>
-                <Text className="text-white/70 text-[10px] uppercase font-bold tracking-wider">Total Pool</Text>
-                <Text className="text-white font-extrabold text-2xl mt-0.5">{F(totalPool)}</Text>
+                <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>Total Pool</Text>
+                <Text style={{ color: COLORS.white, fontWeight: "800", fontSize: 24, marginTop: 2 }}>{F(totalPool)}</Text>
               </View>
               <View className="items-end">
-                <Text className="text-white/70 text-[10px] uppercase font-bold tracking-wider">Your Max Bid</Text>
-                <Text className="text-gold-300 font-extrabold text-2xl mt-0.5">{F(maxBidAllowed)}</Text>
+                <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>Your Max Bid</Text>
+                <Text style={{ color: COLORS.gold[300], fontWeight: "800", fontSize: 24, marginTop: 2 }}>{F(maxBidAllowed)}</Text>
               </View>
             </View>
 
-            <View className="bg-white/10 rounded-xl p-3">
+            <View style={{ backgroundColor: "rgba(255,255,255,0.10)", borderRadius: BORDER_RADIUS.xl, padding: 12 }}>
               <View className="flex-row items-center">
                 <Ionicons name="bulb-outline" size={16} color="#fbbf24" />
-                <Text className="text-white/80 text-xs ml-2 flex-1">
+                <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 11, marginLeft: 8, flex: 1 }}>
                   If you bid LOW, everyone gets MORE in distribution. Strategise wisely!
                 </Text>
               </View>
@@ -284,12 +274,10 @@ export default function PlaceBidScreen() {
         {/* ═══════════════════════════════════════════════════════════════════ */}
         {/* Lowest Bid Strategy Card                                           */}
         {/* ═══════════════════════════════════════════════════════════════════ */}
-        <View className="px-4 mb-5">
-          <View className="flex-row items-center mb-3">
-            <View className="w-7 h-7 rounded-lg bg-gold-500/15 items-center justify-center mr-2">
-              <Ionicons name="trending-down-outline" size={14} color={COLORS.goldPrimary} />
-            </View>
-            <Text className="text-slate-900 font-bold text-sm">Lowest Bid Strategy</Text>
+        <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[5] }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <View style={{ width: 4, height: 20, borderRadius: 999, backgroundColor: COLORS.gold[500] }} />
+            <Text style={{ color: COLORS.text.primary, fontSize: 14, fontWeight: "700" }}>Lowest Bid Strategy</Text>
           </View>
 
           <Card gradient>
@@ -297,42 +285,45 @@ export default function PlaceBidScreen() {
               <View>
                 <View className="flex-row items-center justify-between mb-3">
                   <View>
-                    <Text className="text-white/70 text-[10px] uppercase font-bold tracking-wider">Current Lowest Bid</Text>
-                    <Text className="text-gold-300 font-extrabold text-xl mt-0.5">
+                    <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>Current Lowest Bid</Text>
+                    <Text style={{ color: COLORS.gold[300], fontWeight: "800", fontSize: 20, marginTop: 2 }}>
                       {F(lowestBid.bidAmount)}
                     </Text>
                   </View>
-                  <View className="w-12 h-12 rounded-full bg-white/10 items-center justify-center">
+                  <View style={{ width: 48, height: 48, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.10)", alignItems: "center", justifyContent: "center" }}>
                     <Ionicons name="trophy-outline" size={22} color="#fbbf24" />
                   </View>
                 </View>
 
-                <View className="bg-white/10 rounded-xl p-3 mb-2">
+                <View style={{ backgroundColor: "rgba(255,255,255,0.10)", borderRadius: BORDER_RADIUS.xl, padding: 12, marginBottom: 8 }}>
                   <View className="flex-row items-center mb-2">
                     <Ionicons name="information-circle-outline" size={14} color="#67e8f9" />
-                    <Text className="text-white/80 text-xs ml-2 font-semibold">How the auction works</Text>
+                    <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 11, marginLeft: 8, fontWeight: "600" }}>How the auction works</Text>
                   </View>
-                  <Text className="text-white/70 text-[11px] leading-5">
+                  <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 11, lineHeight: 18 }}>
                     The LOWEST bidder wins the full pool. If you bid {F(lowestBid.bidAmount)}, the winner takes {F(lowestBid.bidAmount)} and each member gets a share of the remaining {F(totalPool - lowestBid.bidAmount)}.
                   </Text>
                 </View>
 
                 {/* Bid comparison when user is typing */}
                 {bidPaise > 0 && !bidError && (
-                  <View className={`rounded-xl p-3 ${isLowerThanLowest ? "bg-success-500/10" : "bg-warning-500/10"}`}>
+                  <View style={{
+                    borderRadius: BORDER_RADIUS.xl, padding: 12,
+                    backgroundColor: isLowerThanLowest ? "rgba(22,163,74,0.10)" : "rgba(217,119,6,0.10)",
+                  }}>
                     <View className="flex-row items-center mb-1.5">
                       {isLowerThanLowest ? (
                         <Ionicons name="checkmark-circle-outline" size={14} color={COLORS.success.light} />
                       ) : (
                         <Ionicons name="alert-circle-outline" size={14} color={COLORS.warning.light} />
                       )}
-                      <Text className={`text-xs ml-1.5 font-bold ${isLowerThanLowest ? "text-success-600" : "text-warning-600"}`}>
+                      <Text style={{ color: isLowerThanLowest ? COLORS.success.dark : COLORS.warning.dark, fontSize: 11, marginLeft: 6, fontWeight: "700" }}>
                         {isLowerThanLowest ? "You will be the new lowest!" : "You need to go lower to win"}
                       </Text>
                     </View>
                     <View className="flex-row justify-between">
-                      <Text className="text-white/60 text-[10px]">Difference from lowest</Text>
-                      <Text className={`text-xs font-bold ${isLowerThanLowest ? "text-success-600" : "text-danger-600"}`}>
+                      <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 10 }}>Difference from lowest</Text>
+                      <Text style={{ color: isLowerThanLowest ? COLORS.success.dark : COLORS.danger.dark, fontSize: 11, fontWeight: "700" }}>
                         {savingsVsLowest > 0 ? `-${F(savingsVsLowest)}` : `+${F(Math.abs(savingsVsLowest))}`}
                       </Text>
                     </View>
@@ -342,7 +333,7 @@ export default function PlaceBidScreen() {
             ) : (
               <View className="items-center py-4">
                 <Ionicons name="eye-outline" size={24} color="rgba(255,255,255,0.5)" />
-                <Text className="text-white/60 text-xs mt-2 text-center">No bids yet. You could be the first!</Text>
+                <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 11, marginTop: 8, textAlign: "center" }}>No bids yet. You could be the first!</Text>
               </View>
             )}
           </Card>
@@ -352,43 +343,46 @@ export default function PlaceBidScreen() {
         {/* All Bids                                                           */}
         {/* ═══════════════════════════════════════════════════════════════════ */}
         {otherBids.length > 0 && (
-          <View className="px-4 mb-5">
-            <View className="flex-row items-center mb-3">
-              <View className="w-7 h-7 rounded-lg bg-brand-500/15 items-center justify-center mr-2">
-                <Ionicons name="list-outline" size={14} color={COLORS.brandPrimary} />
+          <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[5] }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <View style={{ width: 4, height: 20, borderRadius: 999, backgroundColor: COLORS.brand[500] }} />
+              <Text style={{ color: COLORS.text.primary, fontSize: 14, fontWeight: "700" }}>All Bids</Text>
+              <View style={{ marginLeft: 8 }}>
+                <Text style={{ color: COLORS.text.secondary, fontSize: 11 }}>{bids.length} bid{bids.length !== 1 ? "s" : ""}</Text>
               </View>
-              <Text className="text-slate-900 font-bold text-sm">All Bids</Text>
-              <Text className="text-slate-500 text-xs ml-2">{bids.length} bid{bids.length !== 1 ? "s" : ""}</Text>
             </View>
 
-            <Card padding={0}>
-              <View className="p-3.5">
+            <Card padding={0} style={SHADOWS.cardSm}>
+              <View style={{ padding: 14 }}>
                 {sortedBids.map((bid: any, i: number) => {
                   const bidder = members.find((m: any) => m.id === bid.committeeMemberId);
                   const isMe = bid.committeeMemberId === myMemberId;
                   const isLowest = i === 0;
                   return (
-                    <View key={bid.id} className={`flex-row items-center py-2.5 ${i < sortedBids.length - 1 ? "border-b border-brand-primary/5" : ""}`}>
-                      <View className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${isLowest ? "bg-gold-500/15" : "bg-surface-elevated"}`}>
+                    <View key={bid.id} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: i < sortedBids.length - 1 ? 1 : 0, borderBottomColor: COLORS.surface.border }}>
+                      <View style={{
+                        width: 32, height: 32, borderRadius: 999, alignItems: "center", justifyContent: "center", marginRight: 12,
+                        backgroundColor: isLowest ? "rgba(245,158,11,0.12)" : COLORS.surface.warm,
+                      }}>
                         {isLowest ? (
                           <Ionicons name="trophy-outline" size={14} color={COLORS.goldPrimary} />
                         ) : (
-                          <Text className="text-slate-500 text-[10px] font-bold">{i + 1}</Text>
+                          <Text style={{ color: COLORS.text.secondary, fontSize: 10, fontWeight: "700" }}>{i + 1}</Text>
                         )}
                       </View>
-                      <View className="flex-1">
-                        <Text className={`text-xs ${isMe ? "text-brand-600 font-bold" : "text-slate-900"}`}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: isMe ? COLORS.brand[600] : COLORS.text.primary, fontSize: 11, fontWeight: isMe ? "700" : "400" }}>
                           {bidder?.user?.name || "Member"}{isMe ? " (You)" : ""}
                         </Text>
-                        <Text className="text-slate-500 text-[10px]">
+                        <Text style={{ color: COLORS.text.secondary, fontSize: 10 }}>
                           {isLowest ? "Currently winning" : `#${i + 1} bid`}
                         </Text>
                       </View>
                       <View className="items-end">
-                        <Text className={`text-xs font-bold ${isLowest ? "text-gold-600" : "text-slate-600"}`}>
+                        <Text style={{ color: isLowest ? COLORS.gold[600] : COLORS.text.secondary, fontSize: 11, fontWeight: "700" }}>
                           {F(bid.bidAmount)}
                         </Text>
-                        <Text className="text-slate-500 text-[9px]">
+                        <Text style={{ color: COLORS.text.secondary, fontSize: 9 }}>
                           {((bid.bidAmount / totalPool) * 100).toFixed(1)}% of pool
                         </Text>
                       </View>
@@ -404,19 +398,24 @@ export default function PlaceBidScreen() {
         {/* Bid Input                                                          */}
         {/* ═══════════════════════════════════════════════════════════════════ */}
         {!hasWon && currentMonth?.status === "bidding_open" && (
-          <View className="px-4 mb-5">
-            <View className="flex-row items-center mb-3">
-              <View className="w-7 h-7 rounded-lg bg-brand-500/15 items-center justify-center mr-2">
-                <Ionicons name="create-outline" size={14} color={COLORS.brandPrimary} />
-              </View>
-              <Text className="text-slate-900 font-bold text-sm">Your Bid Amount</Text>
+          <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[5] }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <View style={{ width: 4, height: 20, borderRadius: 999, backgroundColor: COLORS.brand[500] }} />
+              <Text style={{ color: COLORS.text.primary, fontSize: 14, fontWeight: "700" }}>Your Bid Amount</Text>
             </View>
 
-            <Card>
+            <Card style={SHADOWS.cardSm} accent="brand">
               <View className="mb-4">
-                <Text className="text-slate-400 text-xs mb-2">Enter your bid (in ₹)</Text>
-                <View className={`flex-row items-center bg-surface-50 rounded-xl px-4 h-14 border ${bidError ? "border-danger-400" : bidPaise > 0 ? "border-brand-primary/40" : "border-brand-primary/20"}`}>
-                  <Text className="text-brand-600 font-bold text-lg mr-2">₹</Text>
+                <Text style={{ color: COLORS.text.muted, fontSize: 11, marginBottom: 8 }}>Enter your bid (in ₹)</Text>
+                <View style={{
+                  flexDirection: "row", alignItems: "center",
+                  backgroundColor: COLORS.surface.warm,
+                  borderRadius: BORDER_RADIUS.xl,
+                  paddingHorizontal: 16, height: 56,
+                  borderWidth: 1,
+                  borderColor: bidError ? COLORS.danger.DEFAULT : bidPaise > 0 ? COLORS.brand[300] : COLORS.surface.border,
+                }}>
+                  <Text style={{ color: COLORS.brand[600], fontWeight: "700", fontSize: 18, marginRight: 8 }}>₹</Text>
                   <TextInput
                     value={bidInput}
                     onChangeText={(t) => {
@@ -425,9 +424,9 @@ export default function PlaceBidScreen() {
                       setBidInput(cleaned);
                     }}
                     placeholder="0"
-                    placeholderTextColor="#525252"
+                    placeholderTextColor={COLORS.text.muted}
                     keyboardType="decimal-pad"
-                    className="flex-1 text-slate-900 font-bold text-lg"
+                    style={{ flex: 1, color: COLORS.text.primary, fontWeight: "700", fontSize: 18 }}
                   />
                   {bidInput.length > 0 && (
                     <TouchableOpacity onPress={() => setBidInput("")}>
@@ -436,7 +435,7 @@ export default function PlaceBidScreen() {
                   )}
                 </View>
                 {bidError && (
-                  <Text className="text-danger-600 text-xs mt-1.5">{bidError}</Text>
+                  <Text style={{ color: COLORS.danger.dark, fontSize: 11, marginTop: 6 }}>{bidError}</Text>
                 )}
               </View>
 
@@ -449,10 +448,10 @@ export default function PlaceBidScreen() {
                     <TouchableOpacity
                       key={pct}
                       onPress={() => setBidInput(String(amtRupees))}
-                      className="flex-1 bg-brand-500/10 rounded-lg py-2 items-center"
+                      style={{ flex: 1, backgroundColor: "rgba(79,70,229,0.08)", borderRadius: BORDER_RADIUS.lg, paddingVertical: 8, alignItems: "center" }}
                     >
-                      <Text className="text-brand-600 text-[10px] font-bold">{Math.round(pct * 100)}%</Text>
-                      <Text className="text-slate-600 text-[9px]">{F(amtPaise)}</Text>
+                      <Text style={{ color: COLORS.brand[600], fontSize: 10, fontWeight: "700" }}>{Math.round(pct * 100)}%</Text>
+                      <Text style={{ color: COLORS.text.secondary, fontSize: 9 }}>{F(amtPaise)}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -473,7 +472,7 @@ export default function PlaceBidScreen() {
                   <TouchableOpacity
                     onPress={handleCancelBid}
                     disabled={submitting}
-                    className="w-14 h-14 bg-danger-500/15 rounded-xl items-center justify-center"
+                    style={{ width: 56, height: 56, backgroundColor: "rgba(220,38,38,0.12)", borderRadius: BORDER_RADIUS.xl, alignItems: "center", justifyContent: "center" }}
                   >
                     <Ionicons name="trash-outline" size={20} color={COLORS.danger.light} />
                   </TouchableOpacity>
@@ -494,12 +493,12 @@ export default function PlaceBidScreen() {
 
         {/* Already won notice */}
         {hasWon && (
-          <View className="px-4 mb-5">
-            <Card>
+          <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[5] }}>
+            <Card accent="success" style={SHADOWS.cardSm}>
               <View className="items-center py-4">
                 <Ionicons name="checkmark-done-circle-outline" size={32} color={COLORS.success.light} />
-                <Text className="text-slate-900 font-bold text-sm mt-2">You have already received a payout</Text>
-                <Text className="text-slate-500 text-xs mt-1 text-center">
+                <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 13, marginTop: 8 }}>You have already received a payout</Text>
+                <Text style={{ color: COLORS.text.secondary, fontSize: 11, marginTop: 4, textAlign: "center" }}>
                   You are not eligible to bid in future months. Thank you for participating!
                 </Text>
               </View>
@@ -509,12 +508,12 @@ export default function PlaceBidScreen() {
 
         {/* Bidding closed notice */}
         {currentMonth?.status !== "bidding_open" && !hasWon && (
-          <View className="px-4 mb-5">
-            <Card>
+          <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[5] }}>
+            <Card accent="info" style={SHADOWS.cardSm}>
               <View className="items-center py-4">
                 <Ionicons name="pause-circle-outline" size={32} color={COLORS.warning.light} />
-                <Text className="text-slate-900 font-bold text-sm mt-2">Bidding is not open</Text>
-                <Text className="text-slate-500 text-xs mt-1 text-center">
+                <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 13, marginTop: 8 }}>Bidding is not open</Text>
+                <Text style={{ color: COLORS.text.secondary, fontSize: 11, marginTop: 4, textAlign: "center" }}>
                   Wait for the organiser to open bidding for the next month.
                 </Text>
               </View>
@@ -526,15 +525,13 @@ export default function PlaceBidScreen() {
         {/* Live Preview (shown when typing valid bid)                         */}
         {/* ═══════════════════════════════════════════════════════════════════ */}
         {bidRupees > 0 && !bidError && (
-          <View className="px-4 mb-5">
-            <View className="flex-row items-center mb-3">
-              <View className="w-7 h-7 rounded-lg bg-success-500/15 items-center justify-center mr-2">
-                <Ionicons name="calculator-outline" size={14} color={COLORS.success.light} />
-              </View>
-              <Text className="text-slate-900 font-bold text-sm">Live Preview</Text>
+          <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[5] }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <View style={{ width: 4, height: 20, borderRadius: 999, backgroundColor: COLORS.success.dark }} />
+              <Text style={{ color: COLORS.text.primary, fontSize: 14, fontWeight: "700" }}>Live Preview</Text>
               {isLowerThanLowest && (
-                <View className="ml-2 bg-success-500/15 px-2 py-0.5 rounded-full">
-                  <Text className="text-success-600 text-[9px] font-bold">LOWEST</Text>
+                <View style={{ marginLeft: 4, backgroundColor: "rgba(22,163,74,0.12)", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }}>
+                  <Text style={{ color: COLORS.success.dark, fontSize: 9, fontWeight: "700" }}>LOWEST</Text>
                 </View>
               )}
             </View>
@@ -542,23 +539,23 @@ export default function PlaceBidScreen() {
             <Card gradient>
               <View className="mb-4">
                 <View className="flex-row justify-between items-center mb-2">
-                  <Text className="text-white/70 text-xs">Your payout if you win</Text>
-                  <Text className="text-white font-extrabold text-lg">{F(bidPaise)}</Text>
+                  <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 11 }}>Your payout if you win</Text>
+                  <Text style={{ color: COLORS.white, fontWeight: "800", fontSize: 18 }}>{F(bidPaise)}</Text>
                 </View>
                 <View className="flex-row justify-between items-center">
-                  <Text className="text-white/70 text-xs">Interest you will owe if you win</Text>
-                  <Text className="text-amber-300 font-bold text-sm">{F(interestAmount)}</Text>
+                  <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 11 }}>Interest you will owe if you win</Text>
+                  <Text style={{ color: "#fcd34d", fontWeight: "700", fontSize: 13 }}>{F(interestAmount)}</Text>
                 </View>
               </View>
 
               {/* Savings visualization */}
-              <View className="bg-white/10 rounded-xl p-3 mb-3">
+              <View style={{ backgroundColor: "rgba(255,255,255,0.10)", borderRadius: BORDER_RADIUS.xl, padding: 12, marginBottom: 12 }}>
                 <View className="flex-row justify-between items-center mb-2">
-                  <Text className="text-white/70 text-xs font-semibold">You save for others</Text>
-                  <Text className="text-emerald-300 font-extrabold text-lg">{F(savingsForOthers)}</Text>
+                  <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: "600" }}>You save for others</Text>
+                  <Text style={{ color: "#6ee7b7", fontWeight: "800", fontSize: 18 }}>{F(savingsForOthers)}</Text>
                 </View>
                 {/* Savings bar */}
-                <View className="h-2.5 bg-white/10 rounded-full overflow-hidden mb-1.5">
+                <View style={{ height: 10, backgroundColor: "rgba(255,255,255,0.10)", borderRadius: 999, overflow: "hidden", marginBottom: 6 }}>
                   <LinearGradient
                     colors={["#34d399", "#6ee7b7"]}
                     start={{ x: 0, y: 0 }}
@@ -566,15 +563,15 @@ export default function PlaceBidScreen() {
                     style={{ width: `${savingsPercentage}%`, height: "100%", borderRadius: 9999 }}
                   />
                 </View>
-                <Text className="text-white/50 text-[10px] text-right">
+                <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, textAlign: "right" }}>
                   {savingsPercentage.toFixed(1)}% of pool saved for distribution
                 </Text>
               </View>
 
               {/* Distribution preview */}
-              <View className="flex-row justify-between items-center py-2 border-t border-white/10">
-                <Text className="text-white/70 text-xs">Estimated distribution each</Text>
-                <Text className="text-emerald-300 font-bold text-sm">{F(perMemberDistribution)}</Text>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 8, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.10)" }}>
+                <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 11 }}>Estimated distribution each</Text>
+                <Text style={{ color: "#6ee7b7", fontWeight: "700", fontSize: 13 }}>{F(perMemberDistribution)}</Text>
               </View>
             </Card>
           </View>
@@ -585,40 +582,40 @@ export default function PlaceBidScreen() {
       {/* Confirmation Modal                                                 */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {showConfirm && (
-        <View className="absolute inset-0 bg-black/60 items-center justify-center px-6" style={{ zIndex: 50 }}>
+        <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center", paddingHorizontal: 24, zIndex: 50 }}>
           <Card style={{ width: "100%", maxWidth: 360 }}>
             <View className="items-center mb-4">
-              <View className="w-14 h-14 rounded-full bg-brand-500/15 items-center justify-center mb-3">
+              <View style={{ width: 56, height: 56, borderRadius: 999, backgroundColor: "rgba(79,70,229,0.12)", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
                 <Ionicons name="hammer" size={28} color={COLORS.brandPrimary} />
               </View>
-              <Text className="text-slate-900 font-bold text-lg text-center">Confirm Your Bid</Text>
+              <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 18, textAlign: "center" }}>Confirm Your Bid</Text>
               {isLowerThanLowest && (
-                <Badge label="New Lowest Bid" variant="success" size="sm" style={{ marginTop: 8 }} />
+                <Badge label="New Lowest Bid" variant="success" size="sm" style={{ marginTop: 8 }} dot />
               )}
             </View>
 
-            <View className="bg-surface-50 rounded-xl p-4 mb-4">
+            <View style={{ backgroundColor: COLORS.surface.warm, borderRadius: BORDER_RADIUS.xl, padding: 16, marginBottom: 16 }}>
               <View className="flex-row justify-between mb-2">
-                <Text className="text-slate-400 text-sm">Your Bid</Text>
-                <Text className="text-brand-600 font-bold text-lg">{F(bidPaise)}</Text>
+                <Text style={{ color: COLORS.text.muted, fontSize: 13 }}>Your Bid</Text>
+                <Text style={{ color: COLORS.brand[600], fontWeight: "700", fontSize: 18 }}>{F(bidPaise)}</Text>
               </View>
               <View className="flex-row justify-between mb-2">
-                <Text className="text-slate-400 text-sm">Total Pool</Text>
-                <Text className="text-slate-900 font-semibold text-sm">{F(totalPool)}</Text>
+                <Text style={{ color: COLORS.text.muted, fontSize: 13 }}>Total Pool</Text>
+                <Text style={{ color: COLORS.text.primary, fontWeight: "600", fontSize: 13 }}>{F(totalPool)}</Text>
               </View>
               <View className="flex-row justify-between mb-2">
-                <Text className="text-slate-400 text-sm">Savings for others</Text>
-                <Text className="text-success-600 font-semibold text-sm">{F(totalPool - bidPaise)}</Text>
+                <Text style={{ color: COLORS.text.muted, fontSize: 13 }}>Savings for others</Text>
+                <Text style={{ color: COLORS.success.dark, fontWeight: "600", fontSize: 13 }}>{F(totalPool - bidPaise)}</Text>
               </View>
               {lowestBid && (
                 <View className="flex-row justify-between">
-                  <Text className="text-slate-400 text-sm">Current lowest</Text>
-                  <Text className="text-gold-600 font-semibold text-sm">{F(lowestBid.bidAmount)}</Text>
+                  <Text style={{ color: COLORS.text.muted, fontSize: 13 }}>Current lowest</Text>
+                  <Text style={{ color: COLORS.gold[600], fontWeight: "600", fontSize: 13 }}>{F(lowestBid.bidAmount)}</Text>
                 </View>
               )}
             </View>
 
-            <Text className="text-slate-500 text-xs text-center mb-4">
+            <Text style={{ color: COLORS.text.secondary, fontSize: 11, textAlign: "center", marginBottom: 16 }}>
               This bid cannot be changed once bidding closes. You can edit or cancel before then.
             </Text>
 

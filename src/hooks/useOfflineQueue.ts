@@ -48,7 +48,7 @@ export const useOfflineQueueStore = create<OfflineQueueState>()(
       clearQueue: () => set({ queue: [] }),
     }),
     {
-      name: "kometi-offline-queue",
+      name: "monio-offline-queue",
       storage: createJSONStorage(() => AsyncStorage),
     }
   )

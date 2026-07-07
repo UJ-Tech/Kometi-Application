@@ -1,10 +1,9 @@
-// src/components/ui/Badge.tsx
 import React from "react";
 import { View, Text } from "react-native";
 import { COLORS, BORDER_RADIUS, FONT_SIZE } from "../../constants/theme";
 import type { KYCStatus, InstallmentStatus, CommitteeStatus } from "../../types";
 
-type BadgeVariant = "success" | "warning" | "danger" | "info" | "neutral" | "brand";
+type BadgeVariant = "success" | "warning" | "danger" | "info" | "neutral" | "brand" | "gold";
 
 interface BadgeProps {
   label:      string;
@@ -13,15 +12,17 @@ interface BadgeProps {
   dot?:       boolean;
   style?:     object;
   textStyle?: object;
+  outline?:   boolean;
 }
 
-const VARIANT_STYLES: Record<BadgeVariant, { bg: string; text: string; dot: string }> = {
-  success: { bg: "rgba(22,163,74,0.10)",  text: COLORS.success.dark, dot: COLORS.success.DEFAULT },
-  warning: { bg: "rgba(217,119,6,0.10)",  text: COLORS.warning.dark, dot: COLORS.warning.DEFAULT },
-  danger:  { bg: "rgba(220,38,38,0.10)",  text: COLORS.danger.dark,  dot: COLORS.danger.DEFAULT  },
-  info:    { bg: "rgba(2,132,199,0.10)",  text: COLORS.info.dark,    dot: COLORS.info.DEFAULT    },
-  neutral: { bg: "rgba(0,0,0,0.05)",      text: COLORS.text.secondary,dot: COLORS.text.muted     },
-  brand:   { bg: "rgba(13,148,136,0.10)", text: COLORS.brand[700],   dot: COLORS.brand[500]     },
+const VARIANT_STYLES: Record<BadgeVariant, { bg: string; text: string; dot: string; border: string }> = {
+  success: { bg: "rgba(22,163,74,0.10)",  text: COLORS.success.dark, dot: COLORS.success.DEFAULT, border: "rgba(22,163,74,0.20)" },
+  warning: { bg: "rgba(217,119,6,0.10)",  text: COLORS.warning.dark, dot: COLORS.warning.DEFAULT, border: "rgba(217,119,6,0.20)" },
+  danger:  { bg: "rgba(220,38,38,0.10)",  text: COLORS.danger.dark,  dot: COLORS.danger.DEFAULT,  border: "rgba(220,38,38,0.20)" },
+  info:    { bg: "rgba(2,132,199,0.10)",  text: COLORS.info.dark,    dot: COLORS.info.DEFAULT,    border: "rgba(2,132,199,0.20)" },
+  neutral: { bg: COLORS.surface.warm,      text: COLORS.text.secondary, dot: COLORS.text.muted,   border: COLORS.surface.border },
+  brand:   { bg: "rgba(79,70,229,0.10)",  text: COLORS.brand[700],   dot: COLORS.brand[500],     border: "rgba(79,70,229,0.20)" },
+  gold:    { bg: "rgba(245,158,11,0.10)", text: COLORS.gold[700],    dot: COLORS.gold[500],      border: "rgba(245,158,11,0.20)" },
 };
 
 export function kycVariant(status: KYCStatus): BadgeVariant {
@@ -43,7 +44,7 @@ export function committeeVariant(status: CommitteeStatus): BadgeVariant {
          status === "CANCELLED" ? "danger"  : "brand";
 }
 
-export default function Badge({ label, variant = "brand", size = "sm", dot, style, textStyle }: BadgeProps) {
+export default function Badge({ label, variant = "brand", size = "sm", dot, style, textStyle, outline = false }: BadgeProps) {
   const s        = VARIANT_STYLES[variant] ?? VARIANT_STYLES.brand;
   const fontSize = size === "sm" ? FONT_SIZE.xs : FONT_SIZE.sm;
 
@@ -55,12 +56,14 @@ export default function Badge({ label, variant = "brand", size = "sm", dot, styl
       paddingHorizontal: size === "sm" ? 8 : 12,
       paddingVertical:   size === "sm" ? 3 : 5,
       borderRadius:     BORDER_RADIUS.full,
-      backgroundColor:  s.bg,
+      backgroundColor:  outline ? "transparent" : s.bg,
+      borderWidth:      outline ? 1 : 0,
+      borderColor:      outline ? s.border : "transparent",
       alignSelf:        "flex-start",
     }, style as any]}>
       {dot && (
         <View style={{
-          width:        5, height: 5,
+          width: 5, height: 5,
           borderRadius: 9999,
           backgroundColor: s.dot,
         }} />

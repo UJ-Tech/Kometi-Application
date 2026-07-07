@@ -1,17 +1,16 @@
-// src/app/(app)/_layout.tsx
-// Authenticated App group tab layout navigator.
-
 import React, { useEffect } from "react";
 import { Tabs, useRouter } from "expo-router";
-import { ActivityIndicator, Platform, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS } from "../../constants/theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { COLORS, BORDER_RADIUS } from "../../constants/theme";
 import { useAuthStore } from "../../stores/auth.store";
+import BrandedLoader from "../../components/brand/BrandedLoader";
 import { useCommitteeStore } from "../../stores/committee.store";
 import { canViewMembers } from "../../utils/rbac";
 
 export default function AppLayout() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isLoading = useAuthStore((s) => s.isLoading);
   const committees = useCommitteeStore((s) => s.committees);
@@ -25,16 +24,7 @@ export default function AppLayout() {
 
   if (isLoading) {
     return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: COLORS.surface.bg,
-        }}
-      >
-        <ActivityIndicator size="large" color={COLORS.brandPrimary} />
-      </View>
+      <BrandedLoader />
     );
   }
 
@@ -45,23 +35,28 @@ export default function AppLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: COLORS.brandPrimary,
-        tabBarInactiveTintColor: "#64748b",
+        tabBarInactiveTintColor: "#a8a29e",
         tabBarStyle: {
           backgroundColor: COLORS.surface.card,
-          borderTopWidth: 1,
+          borderTopWidth: 0,
           borderTopColor: COLORS.surface.border,
-          height: Platform.OS === "ios" ? 88 : 64,
-          paddingBottom: Platform.OS === "ios" ? 28 : 10,
+          height: 64 + insets.bottom,
+          paddingBottom: insets.bottom + 8,
           paddingTop: 8,
           position: "absolute",
           bottom: 0,
           left: 0,
           right: 0,
-          elevation: 4,
-          shadowColor: "#0f172a",
+          elevation: 8,
+          shadowColor: "#000",
           shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.05,
-          shadowRadius: 8,
+          shadowOpacity: 0.06,
+          shadowRadius: 12,
+          borderTopLeftRadius: BORDER_RADIUS["2xl"],
+          borderTopRightRadius: BORDER_RADIUS["2xl"],
+        },
+        tabBarItemStyle: {
+          gap: 2,
         },
         tabBarLabelStyle: {
           fontSize: 10,
@@ -113,6 +108,12 @@ export default function AppLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "wallet" : "wallet-outline"} size={22} color={color} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="committees/create"
+        options={{
+          href: null,
         }}
       />
       <Tabs.Screen

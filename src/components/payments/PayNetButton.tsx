@@ -4,7 +4,7 @@
 // Shows countdown, penalty warnings, and amount breakdown.
 
 import React, { useState, useEffect } from "react";
-import { View, Text } from "react-native";
+import { View, Text, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { committeesApi } from "../../services/committees.api";
 import { walletApi } from "../../services/wallet.api";
@@ -280,7 +280,7 @@ export default function PayNetButton({
             <Text className="text-slate-400 text-xs ml-1.5">Wallet Balance</Text>
           </View>
           {balanceLoading ? (
-            <Text className="text-slate-500 text-xs">Loading...</Text>
+            <ActivityIndicator size="small" color={COLORS.brand[500]} />
           ) : (
             <Text className={`font-bold text-sm ${hasSufficientBalance ? "text-success-400" : "text-danger-400"}`}>
               {walletBalance !== null ? F(walletBalance) : "N/A"}

@@ -1,6 +1,3 @@
-// src/app/(app)/committees/create.tsx
-// Organiser Committee (Chit) Creation Screen
-
 import React, { useState } from "react";
 import {
   View,
@@ -16,6 +13,8 @@ import Card from "../../../components/ui/Card";
 import { committeesApi } from "../../../services/committees.api";
 import { useCommitteeStore } from "../../../stores/committee.store";
 import { useAlertModal } from "../../../components/ui/AlertModal";
+import { COLORS, SHADOWS } from "../../../constants/theme";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function CreateCommittee() {
   const router = useRouter();
@@ -79,7 +78,7 @@ export default function CreateCommittee() {
   };
 
   return (
-    <View className="flex-1 bg-surface-bg px-4">
+    <View className="flex-1 px-4" style={{ backgroundColor: COLORS.surface.bg }}>
       <ScreenHeader
         title="Create New Chit"
         subtitle="Setup a new chit fund pool"
@@ -88,9 +87,9 @@ export default function CreateCommittee() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 60 }}
+        contentContainerStyle={{ paddingBottom: 120 }}
       >
-        <Card style={{ marginBottom: 24 }}>
+        <Card accent="brand" style={{ marginBottom: 24 }}>
           <View className="p-5">
             <Input
               label="Chit Name"
@@ -113,8 +112,11 @@ export default function CreateCommittee() {
           </View>
         </Card>
 
-        <Text className="text-slate-900 font-bold text-base mb-3 ml-1">Chit Economics</Text>
-        <Card style={{ marginBottom: 24 }}>
+        <View className="flex-row items-center gap-2 mb-3 ml-1">
+          <View className="w-1 h-5 rounded-full" style={{ backgroundColor: COLORS.gold[500] }} />
+          <Text className="text-slate-800 text-base font-bold">Chit Economics</Text>
+        </View>
+        <Card accent="gold" style={{ marginBottom: 24 }}>
           <View className="p-5">
             <AmountInput
               label="Installment Per Slot"
@@ -144,10 +146,10 @@ export default function CreateCommittee() {
               </View>
             </View>
 
-            <View className="mt-4 bg-brand-50 p-3 rounded-lg border border-brand-200/50">
+            <View className="mt-4 p-3 rounded-xl" style={{ backgroundColor: "rgba(245,158,11,0.08)", borderWidth: 1, borderColor: "rgba(245,158,11,0.15)" }}>
               <View className="flex-row justify-between items-center">
                 <Text className="text-slate-500 text-xs font-semibold">Total Pot Value</Text>
-                <Text className="text-gold-600 font-bold">
+                <Text className="font-bold text-sm" style={{ color: COLORS.gold[600] }}>
                   {new Intl.NumberFormat("en-IN", {
                     style: "currency",
                     currency: "INR",
@@ -159,11 +161,13 @@ export default function CreateCommittee() {
           </View>
         </Card>
 
-        <Card style={{ marginBottom: 24 }}>
+        <Card accent="brand" style={{ marginBottom: 24 }}>
           <View className="p-5">
             <View className="flex-row items-center gap-3">
-              <View className="w-10 h-10 rounded-full bg-brand-50 items-center justify-center border border-brand-200">
-                <Text className="text-brand-600 text-lg font-bold">1</Text>
+              <View className="w-10 h-10 rounded-xl items-center justify-center"
+                style={{ backgroundColor: "rgba(99,102,241,0.1)", borderWidth: 1, borderColor: "rgba(99,102,241,0.2)" }}
+              >
+                <Ionicons name="shield-checkmark" size={20} color={COLORS.brand[600]} />
               </View>
               <View className="flex-1">
                 <Text className="text-slate-900 font-semibold text-sm">You are included as slot #1</Text>

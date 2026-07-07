@@ -4,6 +4,7 @@
 import { useEffect, useRef } from "react";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+import { useRouter } from "expo-router";
 import { useAuthStore } from "../stores/auth.store";
 import apiClient from "../services/api.client";
 
@@ -19,6 +20,7 @@ Notifications.setNotificationHandler({
 });
 
 export function usePushNotifications() {
+  const router = useRouter();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const userId = useAuthStore((s) => s.user?.id);
   const tokenRegistered = useRef(false);
@@ -28,6 +30,13 @@ export function usePushNotifications() {
 
     registerForPushNotifications();
   }, [isAuthenticated, userId]);
+
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      router.push("/(app)/notifications");
+    });
+    return () => sub.remove();
+  }, []);
 
   async function registerForPushNotifications() {
     try {
@@ -52,7 +61,7 @@ export function usePushNotifications() {
       // 3. Android channel setup
       if (Platform.OS === "android") {
         await Notifications.setNotificationChannelAsync("default", {
-          name: "Kometi Notifications",
+          name: "Monio Notifications",
           importance: Notifications.AndroidImportance.HIGH,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: "#b8860b",

@@ -14,17 +14,21 @@ import {
   Keyboard,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Clipboard from "expo-clipboard";
 
 import { committeesApi } from "../../../../services/committees.api";
 import { useAuthStore } from "../../../../stores/auth.store";
+import BrandedLoader from "../../../../components/brand/BrandedLoader";
 import { useCommitteeStore } from "../../../../stores/committee.store";
 import { formatINR } from "../../../../utils/currency";
-import { COLORS } from "../../../../constants/theme";
+import { COLORS, BORDER_RADIUS, SPACING, SHADOWS } from "../../../../constants/theme";
 import Card from "../../../../components/ui/Card";
 import Badge from "../../../../components/ui/Badge";
 import Button from "../../../../components/ui/Button";
+import KKMark, { KKMarkWatermark } from "../../../../components/brand/KKMark";
 import { useAlertModal } from "../../../../components/ui/AlertModal";
 
 export default function CommitteeDetail() {
@@ -32,6 +36,7 @@ export default function CommitteeDetail() {
   const id = Array.isArray(rawId) ? rawId[0] : rawId;
   const isValidId = id && id !== "undefined" && id !== "null";
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const currentUser = useAuthStore((s) => s.user);
   const { alert, confirm, AlertComponent } = useAlertModal();
 
@@ -161,22 +166,20 @@ export default function CommitteeDetail() {
 
   if (!isValidId) {
     return (
-      <View className="flex-1 bg-surface-bg items-center justify-center px-6">
-        <View className="w-20 h-20 rounded-full bg-surface-card items-center justify-center mb-5 border border-slate-100">
-          <Ionicons name="alert-circle-outline" size={36} color="#64748b" />
+      <View style={{ flex: 1, backgroundColor: COLORS.surface.bg, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
+        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: COLORS.surface.card, alignItems: "center", justifyContent: "center", marginBottom: 20, borderWidth: 1, borderColor: COLORS.surface.border }}>
+          <Ionicons name="alert-circle-outline" size={36} color={COLORS.text.muted} />
         </View>
-        <Text className="text-slate-900 font-bold text-lg text-center mb-2">
+        <Text style={{ color: COLORS.text.primary, fontSize: 18, fontWeight: "700", textAlign: "center", marginBottom: 8 }}>
           Committee Not Found
         </Text>
-        <Text className="text-slate-500 text-sm text-center mb-6 leading-5">
-          {"The committee you're looking for doesn't exist or the link is invalid."}
+        <Text style={{ color: COLORS.text.secondary, fontSize: 14, textAlign: "center", lineHeight: 20, marginBottom: 24 }}>
+          The committee you're looking for doesn't exist or the link is invalid.
         </Text>
-        <TouchableOpacity
-          onPress={() => router.replace("/committees")}
-          className="bg-brand-500 px-6 py-3 rounded-xl"
-          activeOpacity={0.8}
+        <TouchableOpacity onPress={() => router.replace("/committees")} activeOpacity={0.8}
+          style={{ backgroundColor: COLORS.brand[500], paddingHorizontal: 24, paddingVertical: 12, borderRadius: BORDER_RADIUS.xl }}
         >
-          <Text className="text-white font-bold text-sm">Back to Chits</Text>
+          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Back to Chits</Text>
         </TouchableOpacity>
       </View>
     );
@@ -333,7 +336,7 @@ export default function CommitteeDetail() {
   const handleShareInviteCode = async () => {
     try {
       await Share.share({
-        message: `Join my chit committee "${committee.name}" using this invite code:\n\n${committee.inviteCode}\n\nOpen Kometi app → Enter this code to request membership.`,
+        message: `Join my chit committee "${committee.name}" using this invite code:\n\n${committee.inviteCode}\n\nOpen Monio app → Enter this code to request membership.`,
       });
     } catch {}
   };
@@ -397,11 +400,7 @@ export default function CommitteeDetail() {
   };
 
   if (loading && !refreshing) {
-    return (
-      <View className="flex-1 bg-surface-bg items-center justify-center">
-        <ActivityIndicator size="large" color={COLORS.brandPrimary} />
-      </View>
-    );
+    return <BrandedLoader />;
   }
 
   if (!committee) return null;
@@ -424,615 +423,445 @@ export default function CommitteeDetail() {
   const maxDiscRate = Number(committee.maxDiscountPct || 30);
   const maxDiscountPaise = (totalPot * maxDiscRate) / 100;
   const minPayoutAllowed = totalPot - maxDiscountPaise;
-  const maxPayoutAllowed = totalPot; // No organiser fee — full pool available
+  const maxPayoutAllowed = totalPot;
   const pendingJoinRequests = joinRequests.filter((request) => request.status === "PENDING");
 
   return (
     <ScrollView
-      className="flex-1 bg-surface-bg px-4"
-      contentContainerStyle={{ paddingTop: 64, paddingBottom: 120 }}
+      style={{ flex: 1, backgroundColor: COLORS.surface.bg }}
+      contentContainerStyle={{ paddingBottom: 120 }}
       refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-          tintColor={COLORS.brandPrimary}
-        />
+        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.brandPrimary} />
       }
     >
-      {/* Header */}
-      <View className="flex-row items-center justify-between mb-6">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="w-10 h-10 bg-surface-card rounded-full items-center justify-center border border-slate-100"
-        >
-          <Ionicons name="arrow-back" size={20} color="#64748b" />
-        </TouchableOpacity>
+      {/* ── Hero ── */}
+      <LinearGradient
+        colors={["#1e1b4b", "#312e81", "#3730a3"]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={{
+          paddingTop: insets.top + SPACING[4],
+          paddingHorizontal: SPACING[5],
+          paddingBottom: SPACING[12],
+          borderBottomLeftRadius: BORDER_RADIUS["4xl"],
+          borderBottomRightRadius: BORDER_RADIUS["4xl"],
+          position: "relative", overflow: "hidden",
+        }}
+      >
+        <KKMarkWatermark size={180} color={COLORS.white} opacity={0.05} />
 
-        <Badge label={committee.status} variant="info" />
-      </View>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+          <TouchableOpacity onPress={() => router.back()}
+            style={{ width: 38, height: 38, borderRadius: BORDER_RADIUS.lg, backgroundColor: "rgba(255,255,255,0.1)", alignItems: "center", justifyContent: "center" }}
+          >
+            <Ionicons name="arrow-back" size={20} color={COLORS.white} />
+          </TouchableOpacity>
+          <Badge label={committee.status} variant={committee.status === "ACTIVE" ? "success" : committee.status === "DRAFT" ? "brand" : "neutral"} />
+        </View>
 
-      {/* Hero Card */}
-      <Card style={{ marginBottom: 20 }} padding={0}>
-        <View className="p-6">
-          <Text className="text-slate-500 text-xs font-semibold uppercase tracking-wider">
-            Auction Chit
+        <View style={{ marginBottom: 20 }}>
+          <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>
+            {isOrganizer ? "Your Committee" : "Auction Chit"}
           </Text>
-          <Text className="text-slate-900 text-2xl font-bold mt-1">{committee.name}</Text>
+          <Text style={{ color: COLORS.white, fontSize: 22, fontWeight: "700" }}>{committee.name}</Text>
           {committee.description ? (
-            <Text className="text-slate-500 text-sm mt-1">{committee.description}</Text>
+            <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 13, marginTop: 4 }}>{committee.description}</Text>
           ) : null}
+        </View>
 
-          <View className="flex-row justify-between mt-5 pt-4 border-t border-slate-100">
+        <View style={{ borderRadius: BORDER_RADIUS["2xl"], padding: 16, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 12 }}>
             <View>
-              <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Total Value</Text>
-              <Text className="text-gold-600 text-lg font-bold mt-0.5">{formatINR(totalPot)}</Text>
+              <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>Total Pot</Text>
+              <Text style={{ color: COLORS.gold[300], fontSize: 18, fontWeight: "700", marginTop: 2 }}>{formatINR(totalPot)}</Text>
             </View>
-            <View className="items-end">
-              <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Installment / Member</Text>
-              <Text className="text-slate-900 text-lg font-bold mt-0.5">{formatINR(committee.installmentAmountPaise)}</Text>
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>Installment</Text>
+              <Text style={{ color: COLORS.white, fontSize: 18, fontWeight: "700", marginTop: 2 }}>{formatINR(committee.installmentAmountPaise)}</Text>
             </View>
           </View>
-
-          <View className="flex-row justify-between mt-4">
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 12 }}>
             <View>
-              <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Cycle duration</Text>
-              <Text className="text-slate-900 font-semibold text-sm mt-0.5">{committee.cycleDurationDays} days</Text>
+              <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>Cycle</Text>
+              <Text style={{ color: COLORS.white, fontSize: 13, fontWeight: "600", marginTop: 2 }}>{committee.cycleDurationDays} days</Text>
             </View>
-            <View className="items-end">
-              <Text className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Current Cycle</Text>
-              <Text className="text-slate-900 font-semibold text-sm mt-0.5">#{committee.currentCycleNo} / {committee.totalSlots}</Text>
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>Current Cycle</Text>
+              <Text style={{ color: COLORS.white, fontSize: 13, fontWeight: "600", marginTop: 2 }}>#{committee.currentCycleNo} / {committee.totalSlots}</Text>
+            </View>
+          </View>
+          <View>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+              <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>Slots Filled</Text>
+              <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: "600" }}>{committee.filledSlots} / {committee.totalSlots}</Text>
+            </View>
+            <View style={{ height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.15)", overflow: "hidden" }}>
+              <View style={{ width: `${(committee.filledSlots / committee.totalSlots) * 100}%`, height: "100%", borderRadius: 2, backgroundColor: COLORS.gold[400] }} />
             </View>
           </View>
         </View>
-      </Card>
+      </LinearGradient>
 
-      {/* Organiser Management Dashboard Button */}
-      {isOrganizer && (
-        <View className="mb-6">
-          <Button
-            label="Organiser Dashboard"
-            variant="secondary"
-            onPress={() => router.push(`/committees/${id}/manage`)}
-            icon={<Ionicons name="settings-outline" size={20} color={COLORS.brandPrimary} />}
-          />
-          <Text className="text-slate-500 text-[10px] text-center mt-2 italic">
-            Manage fund disbursements, bids, and month resolutions.
-          </Text>
-        </View>
-      )}
+      {/* ── Content ── */}
+      <View style={{ paddingHorizontal: SPACING[5], marginTop: SPACING[3] }}>
 
-      {/* Audit Log — Visible to ALL members */}
-      <View className="mb-6">
-        <Button
-          label="View Audit Log"
-          variant="secondary"
-          onPress={() => router.push(`/committees/${id}/audit`)}
-          icon={<Ionicons name="document-text-outline" size={20} color={COLORS.success.DEFAULT} />}
-        />
-        <Text className="text-slate-500 text-[10px] text-center mt-2 italic">
-          Transparency panel — view full monthly summary and personal ledger.
-        </Text>
-      </View>
-
-      {/* Place Bid — Member CTA (when month bidding is open) */}
-      {!isOrganizer && (() => {
-        const latestMonth = monthsData && monthsData.length > 0 ? monthsData[monthsData.length - 1] : null;
-        const isBiddingOpen = latestMonth?.status === "bidding_open";
-        const alreadyWon = myMembership?.hasReceivedPayout === true;
-        const canMemberBid = isBiddingOpen && !alreadyWon;
-        return canMemberBid ? (
-          <View className="mb-6">
-            <Button
-              label="Place Your Bid"
-              variant="gold"
-              onPress={() => router.push(`/member/committee/${id}/bid` as any)}
-              icon={<Ionicons name="hammer-outline" size={20} color="#fff" />}
-            />
-            <Text className="text-slate-500 text-[10px] text-center mt-2 italic">
-              Enter the reverse auction — lowest bidder wins the pool.
-            </Text>
+        {/* Quick Actions */}
+        <View style={{ marginBottom: 24 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <View style={{ width: 4, height: 20, borderRadius: 2, backgroundColor: COLORS.brand[400] }} />
+            <Text style={{ color: COLORS.text.primary, fontSize: 15, fontWeight: "700" }}>Quick Actions</Text>
           </View>
-        ) : null;
-      })()}
-
-      {/* Member Dashboard — Visible to ALL members */}
-      <View className="mb-6">
-        <Button
-          label="Member Dashboard"
-          variant="secondary"
-          onPress={() => router.push(`/member/committee/${id}` as any)}
-          icon={<Ionicons name="person-circle-outline" size={20} color={COLORS.brandPrimary} />}
-        />
-        <Text className="text-slate-500 text-[10px] text-center mt-2 italic">
-          View your contributions, place bids, and track payments.
-        </Text>
-      </View>
-
-      {/* Committee Not Ready — Member-facing when DRAFT and not full */}
-      {!isOrganizer && committee.status === "DRAFT" && committee.filledSlots < committee.totalSlots && (
-        <View className="mb-6">
-          <Card style={{ marginBottom: 0 }} padding={0}>
-            <View className="p-5">
-              <View className="flex-row items-center mb-3">
-                <View className="w-10 h-10 rounded-full bg-amber-50 border border-amber-200/50 items-center justify-center mr-3">
-                  <Ionicons name="time-outline" size={20} color="#d97706" />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-slate-900 font-bold text-sm">Committee Not Ready Yet</Text>
-                  <Text className="text-slate-500 text-xs mt-0.5">
-                    Waiting for {committee.totalSlots - committee.filledSlots} more member(s) to join.
-                  </Text>
-                </View>
-              </View>
-              <Text className="text-slate-600 text-xs">
-                The organizer will start the committee once all slots are filled or adjusted.
-                You&apos;ll be notified when it&apos;s active.
-              </Text>
-            </View>
-          </Card>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {isOrganizer && (
+              <TouchableOpacity onPress={() => router.push(`/committees/${id}/manage`)} activeOpacity={0.7}
+                style={{ flexDirection: "row", alignItems: "center", borderRadius: BORDER_RADIUS.xl, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "rgba(99,102,241,0.08)", borderWidth: 1, borderColor: "rgba(99,102,241,0.2)", gap: 6 }}
+              >
+                <Ionicons name="settings-outline" size={16} color={COLORS.brand[500]} />
+                <Text style={{ color: COLORS.brand[700], fontSize: 12, fontWeight: "700" }}>Manage</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={() => router.push(`/committees/${id}/audit`)} activeOpacity={0.7}
+              style={{ flexDirection: "row", alignItems: "center", borderRadius: BORDER_RADIUS.xl, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "rgba(34,197,94,0.08)", borderWidth: 1, borderColor: "rgba(34,197,94,0.2)", gap: 6 }}
+            >
+              <Ionicons name="document-text-outline" size={16} color={COLORS.success.DEFAULT} />
+              <Text style={{ color: COLORS.success.dark, fontSize: 12, fontWeight: "700" }}>Audit Log</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push(`/member/committee/${id}` as any)} activeOpacity={0.7}
+              style={{ flexDirection: "row", alignItems: "center", borderRadius: BORDER_RADIUS.xl, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "rgba(99,102,241,0.08)", borderWidth: 1, borderColor: "rgba(99,102,241,0.2)", gap: 6 }}
+            >
+              <Ionicons name="person-circle-outline" size={16} color={COLORS.brand[500]} />
+              <Text style={{ color: COLORS.brand[700], fontSize: 12, fontWeight: "700" }}>My Dashboard</Text>
+            </TouchableOpacity>
+            {!isOrganizer && (() => {
+              const latestMonth = monthsData && monthsData.length > 0 ? monthsData[monthsData.length - 1] : null;
+              const isBiddingOpen = latestMonth?.status === "bidding_open";
+              const canMemberBid = isBiddingOpen && !userHasWon;
+              return canMemberBid ? (
+                <TouchableOpacity onPress={() => router.push(`/member/committee/${id}/bid` as any)} activeOpacity={0.7}
+                  style={{ flexDirection: "row", alignItems: "center", borderRadius: BORDER_RADIUS.xl, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "rgba(245,158,11,0.1)", borderWidth: 1, borderColor: "rgba(245,158,11,0.2)", gap: 6 }}
+                >
+                  <Ionicons name="hammer-outline" size={16} color={COLORS.gold[500]} />
+                  <Text style={{ color: COLORS.gold[700], fontSize: 12, fontWeight: "700" }}>Place Bid</Text>
+                </TouchableOpacity>
+              ) : null;
+            })()}
+          </View>
         </View>
-      )}
 
-      {/* Committee Months — Organizer Only */}
-      {isOrganizer && committee.status === "ACTIVE" && (
-        <View className="mb-6">
-          <Text className="text-slate-900 text-base font-bold mb-3">Committee Months</Text>
-
-          {monthsData && monthsData.length > 0 && (
-            <Card style={{ marginBottom: 0 }} padding={0}>
-              <View className="p-5">
-                <View className="flex-row border-b border-slate-100 pb-2 mb-3">
-                  <Text className="w-14 text-slate-500 font-bold text-xs">Month</Text>
-                  <Text className="flex-1 text-slate-500 font-bold text-xs">Date</Text>
-                  <Text className="w-20 text-right text-slate-500 font-bold text-xs">Pool</Text>
-                  <Text className="w-20 text-right text-slate-500 font-bold text-xs">Status</Text>
+        {/* Draft: Waiting / Invite / Start */}
+        {committee.status === "DRAFT" && isOrganizer && (
+          <View style={{ marginBottom: 24 }}>
+            {committee.filledSlots < committee.totalSlots ? (
+              <>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <View style={{ width: 4, height: 20, borderRadius: 2, backgroundColor: COLORS.warning.dark }} />
+                  <Text style={{ color: COLORS.text.primary, fontSize: 15, fontWeight: "700" }}>Waiting for Members</Text>
                 </View>
-                {monthsData.map((m: any) => (
-                  <TouchableOpacity
-                    key={m.id}
-                    onPress={() => router.push(`/committees/${id}/manage/month/${m.id}`)}
-                    className="flex-row py-2.5 border-b border-slate-100 items-center"
-                  >
-                    <Text className="w-14 text-slate-900 font-bold text-sm">#{m.monthNumber}</Text>
-                    <Text className="flex-1 text-slate-700 font-semibold text-sm">
-                      {new Date(m.monthDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                    </Text>
-                    <Text className="w-20 text-right text-gold-600 font-bold text-sm">
-                      {formatINR(Number(m.totalPool))}
-                    </Text>
-                    <View className="w-20 items-end">
-                      <View
-                        className={`px-2 py-0.5 rounded ${
-                          m.status === "completed"
-                            ? "bg-green-50"
-                            : m.status === "bidding_open"
-                            ? "bg-brand-50"
-                            : "bg-slate-100"
-                        }`}
-                      >
-                        <Text
-                          className={`text-[10px] font-bold ${
-                            m.status === "completed"
-                              ? "text-green-700"
-                              : m.status === "bidding_open"
-                              ? "text-brand-700"
-                              : "text-slate-600"
-                          }`}
-                        >
-                          {m.status === "bidding_open" ? "BIDDING" : m.status.toUpperCase()}
-                        </Text>
+                <Card accent="warning" padding={20}>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
+                    <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(245,158,11,0.1)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                      <Ionicons name="time-outline" size={20} color={COLORS.warning.dark} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: COLORS.text.primary, fontSize: 14, fontWeight: "700" }}>{committee.totalSlots - committee.filledSlots} more slot(s) to fill</Text>
+                      <Text style={{ color: COLORS.text.secondary, fontSize: 11, marginTop: 2 }}>Share the invite code below to add members</Text>
+                    </View>
+                  </View>
+                  <View style={{ height: 6, borderRadius: 3, backgroundColor: COLORS.surface.warm, overflow: "hidden", marginBottom: 12 }}>
+                    <View style={{ width: `${(committee.filledSlots / committee.totalSlots) * 100}%`, height: "100%", borderRadius: 3, backgroundColor: COLORS.gold[400] }} />
+                  </View>
+
+                  {committee.inviteCode && (
+                    <View style={{ backgroundColor: "rgba(245,158,11,0.06)", borderRadius: BORDER_RADIUS.xl, padding: 14, borderWidth: 1, borderColor: "rgba(245,158,11,0.15)", marginBottom: 12 }}>
+                      <Text style={{ color: COLORS.text.muted, fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Invite Code</Text>
+                      <Text style={{ color: COLORS.gold[600], fontSize: 20, fontWeight: "700", letterSpacing: 2, marginBottom: 10 }}>{committee.inviteCode}</Text>
+                      <View style={{ flexDirection: "row", gap: 8 }}>
+                        <TouchableOpacity onPress={handleCopyInviteCode} style={{ flex: 1, height: 38, borderRadius: BORDER_RADIUS.lg, backgroundColor: "rgba(99,102,241,0.08)", borderWidth: 1, borderColor: "rgba(99,102,241,0.2)", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                          <Ionicons name="copy-outline" size={14} color={COLORS.brand[500]} />
+                          <Text style={{ color: COLORS.brand[700], fontSize: 12, fontWeight: "700" }}>Copy</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={handleShareInviteCode} style={{ flex: 1, height: 38, borderRadius: BORDER_RADIUS.lg, backgroundColor: "rgba(245,158,11,0.08)", borderWidth: 1, borderColor: "rgba(245,158,11,0.2)", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                          <Ionicons name="share-outline" size={14} color={COLORS.gold[500]} />
+                          <Text style={{ color: COLORS.gold[700], fontSize: 12, fontWeight: "700" }}>Share</Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
-                  </TouchableOpacity>
-                ))}
+                  )}
+
+                  {!showAdjustSize ? (
+                    <TouchableOpacity onPress={() => { setAdjustSizeValue(String(committee.filledSlots)); setShowAdjustSize(true); }}
+                      style={{ height: 40, borderRadius: BORDER_RADIUS.lg, backgroundColor: "rgba(99,102,241,0.08)", borderWidth: 1, borderColor: "rgba(99,102,241,0.2)", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}
+                    >
+                      <Ionicons name="resize-outline" size={14} color={COLORS.brand[500]} />
+                      <Text style={{ color: COLORS.brand[700], fontSize: 12, fontWeight: "700" }}>Adjust Committee Size</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={{ backgroundColor: COLORS.surface.warm, borderRadius: BORDER_RADIUS.xl, padding: 14, borderWidth: 1, borderColor: COLORS.surface.border }}>
+                      <Text style={{ color: COLORS.text.secondary, fontSize: 11, fontWeight: "600", marginBottom: 8 }}>New Total Slots (min: {committee.filledSlots})</Text>
+                      <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
+                        <View style={{ flex: 1, backgroundColor: COLORS.surface.card, borderWidth: 1, borderColor: COLORS.surface.border, borderRadius: BORDER_RADIUS.xl, paddingHorizontal: 14, height: 44, justifyContent: "center" }}>
+                          <TextInput value={adjustSizeValue} onChangeText={setAdjustSizeValue} keyboardType="numeric" returnKeyType="done" blurOnSubmit onSubmitEditing={() => Keyboard.dismiss()} placeholder={`${committee.filledSlots}`} placeholderTextColor={COLORS.text.muted} style={{ color: COLORS.text.primary, fontWeight: "600", fontSize: 14 }} />
+                        </View>
+                        <TouchableOpacity onPress={() => { Keyboard.dismiss(); setAdjustSizeValue(String(committee.filledSlots)); }} style={{ backgroundColor: COLORS.surface.card, borderWidth: 1, borderColor: COLORS.surface.border, height: 44, paddingHorizontal: 12, borderRadius: BORDER_RADIUS.xl, alignItems: "center", justifyContent: "center" }}>
+                          <Text style={{ color: COLORS.text.secondary, fontWeight: "700", fontSize: 11 }}>Min</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => { Keyboard.dismiss(); setAdjustSizeValue(String(committee.totalSlots)); }} style={{ backgroundColor: COLORS.surface.card, borderWidth: 1, borderColor: COLORS.surface.border, height: 44, paddingHorizontal: 12, borderRadius: BORDER_RADIUS.xl, alignItems: "center", justifyContent: "center" }}>
+                          <Text style={{ color: COLORS.text.secondary, fontWeight: "700", fontSize: 11 }}>Max</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <View style={{ flexDirection: "row", gap: 8 }}>
+                        <TouchableOpacity onPress={() => { Keyboard.dismiss(); setShowAdjustSize(false); }} style={{ flex: 1, height: 38, borderRadius: BORDER_RADIUS.lg, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: COLORS.surface.border }}>
+                          <Text style={{ color: COLORS.text.secondary, fontWeight: "700", fontSize: 12 }}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => { Keyboard.dismiss(); setTimeout(() => handleAdjustSize(), 100); }} disabled={isAdjusting} activeOpacity={0.7} style={{ flex: 1, height: 38, borderRadius: BORDER_RADIUS.lg, alignItems: "center", justifyContent: "center", backgroundColor: COLORS.brand[500], opacity: isAdjusting ? 0.6 : 1 }}>
+                          {isAdjusting ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}>Confirm</Text>}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+                </Card>
+              </>
+            ) : (
+              <Button label="Start Chit Committee" variant="primary" onPress={handleStartCommittee} icon={<Ionicons name="play-circle-outline" size={20} color="#fff" />} />
+            )}
+          </View>
+        )}
+
+        {/* Draft Member: Not Ready */}
+        {!isOrganizer && committee.status === "DRAFT" && committee.filledSlots < committee.totalSlots && (
+          <View style={{ marginBottom: 24 }}>
+            <Card accent="warning" padding={20}>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(245,158,11,0.1)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                  <Ionicons name="time-outline" size={20} color={COLORS.warning.dark} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: COLORS.text.primary, fontSize: 14, fontWeight: "700" }}>Committee Not Ready Yet</Text>
+                  <Text style={{ color: COLORS.text.secondary, fontSize: 11, marginTop: 2 }}>Waiting for {committee.totalSlots - committee.filledSlots} more member(s)</Text>
+                </View>
               </View>
+              <Text style={{ color: COLORS.text.secondary, fontSize: 12, lineHeight: 18 }}>The organizer will start the committee once all slots are filled. You'll be notified when it's active.</Text>
             </Card>
-          )}
+          </View>
+        )}
 
-          {(!monthsData || monthsData.length === 0) && (
-            <View className="items-center py-6 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-              <Ionicons name="calendar-outline" size={28} color="#94a3b8" />
-              <Text className="text-slate-500 text-xs mt-2">No months created yet</Text>
-              <Text className="text-slate-600 text-[10px] mt-1">
-                Create the first month to start bidding.
-              </Text>
+        {/* Join Requests */}
+        {isOrganizer && committee.status === "DRAFT" && pendingJoinRequests.length > 0 && (
+          <View style={{ marginBottom: 24 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <View style={{ width: 4, height: 20, borderRadius: 2, backgroundColor: COLORS.info.DEFAULT }} />
+              <Text style={{ color: COLORS.text.primary, fontSize: 15, fontWeight: "700" }}>Join Requests ({pendingJoinRequests.length})</Text>
             </View>
-          )}
-        </View>
-      )}
-
-      {/* Invite Code — Organizer Only */}
-      {isOrganizer && committee.status === "DRAFT" && committee.inviteCode && (
-        <View className="mb-6">
-          <Text className="text-slate-900 text-base font-bold mb-3">Invite Members</Text>
-          <Card style={{ marginBottom: 0 }} padding={0}>
-            <View className="p-5">
-              <Text className="text-slate-500 text-xs font-semibold mb-3">
-                Share this code with people you want to add to this chit.
-              </Text>
-              <View className="flex-row items-center justify-between bg-slate-50 border border-slate-100 rounded-xl px-4 py-3.5 mb-4">
-                <Text className="text-gold-600 text-xl font-bold tracking-widest">
-                  {committee.inviteCode}
-                </Text>
-                <Text className="text-slate-500 text-xs">
-                  {committee.filledSlots}/{committee.totalSlots} filled
-                </Text>
-              </View>
-              <View className="flex-row gap-3">
-                <TouchableOpacity
-                  onPress={handleCopyInviteCode}
-                  className="flex-1 bg-brand-50 border border-brand-200/50 h-11 rounded-xl items-center justify-center flex-row"
-                >
-                  <Ionicons name="copy-outline" size={16} color={COLORS.brandPrimary} />
-                  <Text className="text-brand-700 font-bold text-sm ml-1.5">Copy Code</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleShareInviteCode}
-                  className="flex-1 bg-amber-50 border border-amber-200/50 h-11 rounded-xl items-center justify-center flex-row"
-                >
-                  <Ionicons name="share-outline" size={16} color={COLORS.goldPrimary} />
-                  <Text className="text-amber-700 font-bold text-sm ml-1.5">Share Code</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Card>
-        </View>
-      )}
-
-      {/* Waiting for Members — Organizer + DRAFT + Not Full */}
-      {isOrganizer && committee.status === "DRAFT" && committee.filledSlots < committee.totalSlots && (
-        <View className="mb-6">
-          <Card style={{ marginBottom: 0 }} padding={0}>
-            <View className="p-5">
-              <View className="flex-row items-center mb-3">
-                <View className="w-10 h-10 rounded-full bg-amber-50 border border-amber-200/50 items-center justify-center mr-3">
-                  <Ionicons name="time-outline" size={20} color="#d97706" />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-slate-900 font-bold text-sm">Waiting for Members</Text>
-                  <Text className="text-slate-500 text-xs mt-0.5">
-                    {committee.totalSlots - committee.filledSlots} more slot(s) to fill
-                  </Text>
-                </View>
-              </View>
-
-              {/* Progress bar */}
-              <View className="bg-slate-200 rounded-full h-2.5 mb-4">
-                <View
-                  className="bg-amber-500 h-2.5 rounded-full"
-                  style={{ width: `${(committee.filledSlots / committee.totalSlots) * 100}%` }}
-                />
-              </View>
-
-              <Text className="text-slate-600 text-xs mb-4">
-                No actions (starting, bidding, payouts) can be performed until all slots are filled.
-                Ask members to join using the invite code, or adjust the committee size below.
-              </Text>
-
-              {/* Adjust Size Section */}
-              {!showAdjustSize ? (
-                <TouchableOpacity
-                  onPress={() => {
-                    setAdjustSizeValue(String(committee.filledSlots));
-                    setShowAdjustSize(true);
-                  }}
-                  className="bg-brand-50 border border-brand-200/50 h-11 rounded-xl items-center justify-center flex-row"
-                >
-                  <Ionicons name="resize-outline" size={16} color={COLORS.brandPrimary} />
-                  <Text className="text-brand-700 font-bold text-sm ml-1.5">Adjust Committee Size</Text>
-                </TouchableOpacity>
-              ) : (
-                <View className="bg-slate-50 border border-slate-100 rounded-xl p-4">
-                  <Text className="text-slate-500 text-xs font-semibold mb-2">
-                    New Total Slots (min: {committee.filledSlots})
-                  </Text>
-                  <View className="flex-row gap-3 mb-3">
-                    <View className="flex-1 bg-white border border-slate-200 rounded-xl px-4 h-12 justify-center">
-                      <TextInput
-                        value={adjustSizeValue}
-                        onChangeText={setAdjustSizeValue}
-                        keyboardType="numeric"
-                        returnKeyType="done"
-                        blurOnSubmit={true}
-                        onSubmitEditing={() => Keyboard.dismiss()}
-                        placeholder={`${committee.filledSlots}`}
-                        placeholderTextColor="#94a3b8"
-                        className="text-slate-900 font-semibold text-sm"
-                      />
+            {pendingJoinRequests.map((request: any) => (
+              <Card key={request.id} accent="info" style={{ marginBottom: 8 }} padding={14}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                    <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(14,165,233,0.1)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                      <Ionicons name="person-outline" size={18} color={COLORS.info.DEFAULT} />
                     </View>
-                    <View className="flex-row gap-2">
-                      <TouchableOpacity
-                        onPress={() => { Keyboard.dismiss(); setAdjustSizeValue(String(committee.filledSlots)); }}
-                        className="bg-white border border-slate-200 h-12 px-3 rounded-xl items-center justify-center"
-                      >
-                        <Text className="text-slate-600 font-bold text-xs">Min</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => { Keyboard.dismiss(); setAdjustSizeValue(String(committee.totalSlots)); }}
-                        className="bg-white border border-slate-200 h-12 px-3 rounded-xl items-center justify-center"
-                      >
-                        <Text className="text-slate-600 font-bold text-xs">Max</Text>
-                      </TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: COLORS.text.primary, fontSize: 13, fontWeight: "700" }}>{request.user?.name || "Unknown"}</Text>
+                      <Text style={{ color: COLORS.text.muted, fontSize: 10, marginTop: 2 }}>{request.user?.phone} · {new Date(request.createdAt).toLocaleDateString()}</Text>
                     </View>
                   </View>
-                  <Text className="text-slate-500 text-[10px] mb-3">
-                    Set to {committee.filledSlots} to immediately unlock the committee.
-                  </Text>
-                  <View className="flex-row gap-3">
-                    <TouchableOpacity
-                      onPress={() => { Keyboard.dismiss(); setShowAdjustSize(false); }}
-                      className="flex-1 h-10 rounded-xl items-center justify-center border border-slate-200"
+                  <View style={{ flexDirection: "row", gap: 6 }}>
+                    <TouchableOpacity onPress={() => handleApproveRequest(request.id, request.user?.name || "Member")} disabled={processingId === request.id}
+                      style={{ width: 38, height: 38, borderRadius: BORDER_RADIUS.lg, backgroundColor: "rgba(34,197,94,0.15)", borderWidth: 1, borderColor: "rgba(34,197,94,0.2)", alignItems: "center", justifyContent: "center" }}
                     >
-                      <Text className="text-slate-500 font-bold text-sm">Cancel</Text>
+                      {processingId === request.id ? <ActivityIndicator size="small" color={COLORS.success.DEFAULT} /> : <Ionicons name="checkmark-outline" size={18} color={COLORS.success.DEFAULT} />}
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => {
-                        Keyboard.dismiss();
-                        setTimeout(() => handleAdjustSize(), 100);
-                      }}
-                      disabled={isAdjusting}
-                      activeOpacity={0.7}
-                      className="flex-1 bg-brand-500 h-10 rounded-xl items-center justify-center"
-                      style={{ opacity: isAdjusting ? 0.6 : 1 }}
+                    <TouchableOpacity onPress={() => handleRejectRequest(request.id, request.user?.name || "Member")} disabled={processingId === request.id}
+                      style={{ width: 38, height: 38, borderRadius: BORDER_RADIUS.lg, backgroundColor: "rgba(239,68,68,0.15)", borderWidth: 1, borderColor: "rgba(239,68,68,0.2)", alignItems: "center", justifyContent: "center" }}
                     >
-                      {isAdjusting ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <Text className="text-white font-bold text-sm">Confirm</Text>
-                      )}
+                      <Ionicons name="close-outline" size={18} color={COLORS.danger.DEFAULT} />
                     </TouchableOpacity>
                   </View>
                 </View>
-              )}
+              </Card>
+            ))}
+          </View>
+        )}
+
+        {/* Months — Organizer Active */}
+        {isOrganizer && committee.status === "ACTIVE" && (
+          <View style={{ marginBottom: 24 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <View style={{ width: 4, height: 20, borderRadius: 2, backgroundColor: COLORS.brand[500] }} />
+              <Text style={{ color: COLORS.text.primary, fontSize: 15, fontWeight: "700" }}>Committee Months</Text>
             </View>
-          </Card>
-        </View>
-      )}
+            {monthsData && monthsData.length > 0 ? (
+              <Card accent="brand" padding={0}>
+                <View style={{ padding: 16 }}>
+                  <View style={{ flexDirection: "row", borderBottomWidth: 1, borderBottomColor: COLORS.surface.border, paddingBottom: 8, marginBottom: 8 }}>
+                    <Text style={{ width: 50, color: COLORS.text.muted, fontWeight: "700", fontSize: 11 }}>Month</Text>
+                    <Text style={{ flex: 1, color: COLORS.text.muted, fontWeight: "700", fontSize: 11 }}>Date</Text>
+                    <Text style={{ width: 80, textAlign: "right", color: COLORS.text.muted, fontWeight: "700", fontSize: 11 }}>Pool</Text>
+                    <Text style={{ width: 80, textAlign: "right", color: COLORS.text.muted, fontWeight: "700", fontSize: 11 }}>Status</Text>
+                  </View>
+                  {monthsData.map((m: any) => (
+                    <TouchableOpacity key={m.id} onPress={() => router.push(`/committees/${id}/manage/month/${m.id}`)}
+                      style={{ flexDirection: "row", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: COLORS.surface.border, alignItems: "center" }}
+                    >
+                      <Text style={{ width: 50, color: COLORS.text.primary, fontWeight: "700", fontSize: 13 }}>#{m.monthNumber}</Text>
+                      <Text style={{ flex: 1, color: COLORS.text.secondary, fontWeight: "600", fontSize: 12 }}>{new Date(m.monthDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</Text>
+                      <Text style={{ width: 80, textAlign: "right", color: COLORS.gold[600], fontWeight: "700", fontSize: 12 }}>{formatINR(Number(m.totalPool))}</Text>
+                      <View style={{ width: 80, alignItems: "flex-end" }}>
+                        <Badge label={m.status === "bidding_open" ? "BIDDING" : m.status.toUpperCase()} variant={m.status === "completed" ? "success" : m.status === "bidding_open" ? "brand" : "neutral"} size="sm" />
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </Card>
+            ) : (
+              <View style={{ alignItems: "center", paddingVertical: 24, backgroundColor: COLORS.surface.card, borderRadius: BORDER_RADIUS["2xl"], borderWidth: 1, borderColor: COLORS.surface.border, borderStyle: "dashed" }}>
+                <Ionicons name="calendar-outline" size={28} color={COLORS.text.muted} />
+                <Text style={{ color: COLORS.text.secondary, fontSize: 12, marginTop: 8 }}>No months created yet</Text>
+                <Text style={{ color: COLORS.text.muted, fontSize: 10, marginTop: 2 }}>Create the first month to start bidding.</Text>
+              </View>
+            )}
+          </View>
+        )}
 
-      {/* Start Committee Button — Organizer Only (only when ALL slots filled) */}
-      {isOrganizer && committee.status === "DRAFT" && committee.filledSlots === committee.totalSlots && (
-        <View className="mb-6">
-          <Button
-            label="Start Chit Committee"
-            variant="primary"
-            onPress={handleStartCommittee}
-            icon={<Ionicons name="play-circle-outline" size={20} color="#fff" />}
-          />
-          <Text className="text-slate-500 text-[10px] text-center mt-2 italic">
-            All slots are filled. You can now activate this chit.
-          </Text>
-        </View>
-      )}
+        {/* Auction Panel */}
+        {committee.status === "ACTIVE" && (() => {
+          const latestMonth = monthsData && monthsData.length > 0 ? monthsData[monthsData.length - 1] : null;
+          const isMonthBiddingOpen = latestMonth?.status === "bidding_open";
+          return (
+            <View style={{ marginBottom: 24 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <View style={{ width: 4, height: 20, borderRadius: 2, backgroundColor: COLORS.gold[500] }} />
+                <Text style={{ color: COLORS.text.primary, fontSize: 15, fontWeight: "700" }}>Live Auction</Text>
+              </View>
+              <Card accent="gold" padding={0}>
+                <View style={{ padding: 16 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <Text style={{ color: COLORS.text.secondary, fontWeight: "600", fontSize: 12 }}>Leading Lowest Payout</Text>
+                    <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 15 }}>{leadingBid ? formatINR(leadingBid.bidAmountPaise) : "No bids yet"}</Text>
+                  </View>
+                  <View style={{ backgroundColor: COLORS.surface.warm, borderRadius: BORDER_RADIUS.xl, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: COLORS.surface.border }}>
+                    <Text style={{ color: COLORS.text.secondary, fontSize: 10, fontWeight: "700", marginBottom: 4 }}>BIDDING RULES</Text>
+                    <Text style={{ color: COLORS.text.muted, fontSize: 11 }}>Min: {formatINR(minPayoutAllowed)} · Max: {formatINR(maxPayoutAllowed)}</Text>
+                  </View>
 
-      {/* Pending Join Requests — Organizer Only */}
-      {isOrganizer && committee.status === "DRAFT" && pendingJoinRequests.length > 0 && (
-        <View className="mb-6">
-          <Text className="text-slate-900 text-base font-bold mb-3">
-            Join Requests ({pendingJoinRequests.length} pending)
-          </Text>
-          {pendingJoinRequests.map((request: any) => (
-              <View
-                key={request.id}
-                className="bg-surface-card border border-slate-100 rounded-xl p-4 mb-2.5"
-              >
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-center flex-1">
-                    <View className="w-10 h-10 rounded-full bg-amber-55 border border-amber-200/50 items-center justify-center mr-3">
-                      <Ionicons name="person-outline" size={18} color={COLORS.goldPrimary} />
+                  {!isOrganizer && isMonthBiddingOpen && myMembership && !userHasWon ? (
+                    <View>
+                      <View style={{ backgroundColor: "rgba(245,158,11,0.08)", borderRadius: BORDER_RADIUS.xl, padding: 12, borderWidth: 1, borderColor: "rgba(245,158,11,0.15)", marginBottom: 12 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                          <Ionicons name="hammer-outline" size={14} color={COLORS.gold[500]} />
+                          <Text style={{ color: COLORS.gold[700], fontWeight: "700", fontSize: 13 }}>Bidding is Open!</Text>
+                        </View>
+                        <Text style={{ color: COLORS.text.secondary, fontSize: 11 }}>Place your bid in the reverse auction. Lowest bidder wins the full pool.</Text>
+                      </View>
+                      <Button label="Place Your Bid Now" variant="gold" onPress={() => router.push(`/member/committee/${id}/bid` as any)} icon={<Ionicons name="hammer-outline" size={18} color={COLORS.black} />} />
                     </View>
-                    <View className="flex-1">
-                      <Text className="text-slate-900 font-bold text-sm">{request.user?.name || "Unknown"}</Text>
-                      <Text className="text-slate-500 text-[10px] mt-0.5">{request.user?.phone}</Text>
-                      <Text className="text-slate-600 text-[10px] mt-0.5">
-                        Requested {new Date(request.createdAt).toLocaleDateString()}
+                  ) : myMembership && !userHasWon ? (
+                    <View>
+                      <Text style={{ color: COLORS.text.muted, fontSize: 10, fontWeight: "700", textTransform: "uppercase", marginBottom: 6 }}>Place Your Bid (Payout Request)</Text>
+                      <View style={{ flexDirection: "row", gap: 8 }}>
+                        <View style={{ flex: 1, backgroundColor: COLORS.surface.warm, borderWidth: 1, borderColor: COLORS.surface.border, borderRadius: BORDER_RADIUS.xl, paddingHorizontal: 14, height: 44, justifyContent: "center" }}>
+                          <TextInput value={bidAmount} onChangeText={setBidAmount} keyboardType="numeric" placeholder={`e.g. ${maxPayoutAllowed / 100 - 500}`} placeholderTextColor={COLORS.text.muted} style={{ color: COLORS.text.primary, fontWeight: "600", fontSize: 14 }} />
+                        </View>
+                        <TouchableOpacity onPress={handlePlaceBid} disabled={isSubmitting} style={{ paddingHorizontal: 20, borderRadius: BORDER_RADIUS.xl, backgroundColor: COLORS.brand[500], alignItems: "center", justifyContent: "center" }}>
+                          {isSubmitting ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Bid</Text>}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={{ backgroundColor: "rgba(239,68,68,0.06)", borderRadius: BORDER_RADIUS.xl, padding: 12, borderWidth: 1, borderColor: "rgba(239,68,68,0.12)" }}>
+                      <Text style={{ color: COLORS.danger.dark, fontSize: 11, fontWeight: "600", textAlign: "center" }}>
+                        {userHasWon ? "You have already received a payout, so you are ineligible to bid." : "Only chit members can place bids."}
                       </Text>
                     </View>
-                  </View>
-
-                  <View className="flex-row gap-2">
-                    <TouchableOpacity
-                      onPress={() => handleApproveRequest(request.id, request.user?.name || "Member")}
-                      disabled={processingId === request.id}
-                      className="w-10 h-10 rounded-full bg-green-500/15 border border-green-500/20 items-center justify-center"
-                    >
-                      {processingId === request.id ? (
-                        <ActivityIndicator size="small" color="#4ade80" />
-                      ) : (
-                        <Ionicons name="checkmark-outline" size={18} color="#4ade80" />
-                      )}
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => handleRejectRequest(request.id, request.user?.name || "Member")}
-                      disabled={processingId === request.id}
-                      className="w-10 h-10 rounded-full bg-red-500/15 border border-red-500/20 items-center justify-center"
-                    >
-                      <Ionicons name="close-outline" size={18} color="#f87171" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            ))}
-        </View>
-      )}
-
-      {/* Auction Bidding Panel */}
-      {committee.status === "ACTIVE" && (() => {
-        const latestMonth = monthsData && monthsData.length > 0 ? monthsData[monthsData.length - 1] : null;
-        const isMonthBiddingOpen = latestMonth?.status === "bidding_open";
-        return (
-        <View className="mb-6">
-          <Text className="text-slate-900 text-base font-bold mb-3">Live Auction</Text>
-          <Card style={{ marginBottom: 16 }} padding={0}>
-            <View className="p-5">
-              <View className="flex-row justify-between mb-4">
-                <Text className="text-slate-500 font-semibold text-sm">Leading Lowest Payout</Text>
-                <Text className="text-slate-900 font-bold text-sm">
-                  {leadingBid ? formatINR(leadingBid.bidAmountPaise) : "No bids yet"}
-                </Text>
-              </View>
-
-              <View className="bg-slate-50 border border-slate-100 p-3.5 rounded-xl mb-4">
-                <Text className="text-slate-600 text-xs font-semibold">Bidding Rules (Reverse Auction):</Text>
-                <Text className="text-slate-600 text-xs mt-1">
-                  • Min Allowed Payout: {formatINR(minPayoutAllowed)} (max {maxDiscRate}% discount)
-                </Text>
-                <Text className="text-slate-600 text-xs mt-0.5">
-                  • Max Allowed Payout: {formatINR(maxPayoutAllowed)} (full pool)
-                </Text>
-              </View>
-
-              {!isOrganizer && isMonthBiddingOpen && myMembership && !userHasWon ? (
-                <View>
-                  <View className="bg-amber-50 border border-amber-200/50 rounded-xl p-4 mb-3">
-                    <View className="flex-row items-center mb-2">
-                      <Ionicons name="hammer-outline" size={16} color={COLORS.goldPrimary} />
-                      <Text className="text-amber-700 font-bold text-sm ml-2">Bidding is Open!</Text>
-                    </View>
-                    <Text className="text-slate-700 text-xs">
-                      Place your bid in the reverse auction. Lowest bidder wins the full pool.
-                    </Text>
-                  </View>
-                  <Button
-                    label="Place Your Bid Now"
-                    variant="gold"
-                    onPress={() => router.push(`/member/committee/${id}/bid` as any)}
-                    icon={<Ionicons name="hammer-outline" size={18} color="#fff" />}
-                  />
-                </View>
-              ) : myMembership && !userHasWon ? (
-                <View>
-                  <Text className="text-slate-500 text-xs font-semibold mb-2">PLACE YOUR BID (Payout Request)</Text>
-                  <View className="flex-row gap-3">
-                    <View className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 justify-center h-12">
-                      <TextInput
-                        value={bidAmount}
-                        onChangeText={setBidAmount}
-                        keyboardType="numeric"
-                        placeholder={`e.g. ${maxPayoutAllowed / 100 - 500}`}
-                        placeholderTextColor="#94a3b8"
-                        className="text-slate-900 font-semibold text-sm"
-                      />
-                    </View>
-                    <TouchableOpacity
-                      onPress={handlePlaceBid}
-                      disabled={isSubmitting}
-                      className="bg-brand-500 hover:bg-brand-600 px-5 rounded-xl items-center justify-center"
-                    >
-                      {isSubmitting ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <Text className="text-white font-bold text-sm">Bid</Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                <View className="bg-red-50 border border-red-150 p-3.5 rounded-xl">
-                  <Text className="text-red-700 text-xs font-semibold text-center">
-                    {userHasWon
-                      ? "You have already received a payout, so you are ineligible to bid."
-                      : "Only chit members can place bids."}
-                  </Text>
-                </View>
-              )}
-
-              {isOrganizer && monthsData && monthsData.some((m: any) => m.status !== "completed") && (
-                <TouchableOpacity
-                  onPress={handleResolveMonth}
-                  disabled={loading}
-                  className={`h-11 rounded-xl items-center justify-center flex-row mt-4 ${loading ? "bg-gold-500/50" : "bg-gold-500/80 hover:bg-gold-500"}`}
-                >
-                  {loading ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Ionicons name="flash-outline" size={16} color="#fff" />
                   )}
-                  <Text className="text-white font-bold ml-1.5 text-sm">
-                    {loading ? "Resolving..." : "Resolve Cycle & Distribute Payout"}
-                  </Text>
+
+                  {isOrganizer && monthsData && monthsData.some((m: any) => m.status !== "completed") && (
+                    <TouchableOpacity onPress={handleResolveMonth} disabled={loading}
+                      style={{ marginTop: 12, height: 44, borderRadius: BORDER_RADIUS.xl, backgroundColor: loading ? "rgba(245,158,11,0.5)" : COLORS.gold[500], flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}
+                    >
+                      {loading ? <ActivityIndicator size="small" color={COLORS.black} /> : <Ionicons name="flash-outline" size={16} color={COLORS.black} />}
+                      <Text style={{ color: COLORS.black, fontWeight: "700", fontSize: 13 }}>{loading ? "Resolving..." : "Resolve & Distribute Payout"}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </Card>
+
+              <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 14, marginBottom: 8, marginTop: 8 }}>Active Bids (Cycle #{committee.currentCycleNo})</Text>
+              {activeBids.map((bid: any, idx: number) => (
+                <TouchableOpacity key={bid.id} activeOpacity={0.7}
+                  style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: COLORS.surface.card, borderRadius: BORDER_RADIUS["2xl"], padding: 14, marginBottom: 8, borderWidth: 1, borderColor: COLORS.surface.border, ...SHADOWS.cardSm }}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(99,102,241,0.08)", borderWidth: 1, borderColor: "rgba(99,102,241,0.15)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                      <Text style={{ color: COLORS.brand[700], fontWeight: "700", fontSize: 11 }}>#{idx + 1}</Text>
+                    </View>
+                    <View>
+                      <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 13 }}>{bid.user?.name || "Anonymous"}</Text>
+                      <Text style={{ color: COLORS.text.muted, fontSize: 10 }}>Requested payout</Text>
+                    </View>
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 13 }}>{formatINR(bid.bidAmountPaise)}</Text>
+                    <Text style={{ color: COLORS.text.muted, fontSize: 10 }}>Discount: {formatINR(totalPot - Number(bid.bidAmountPaise))}</Text>
+                  </View>
                 </TouchableOpacity>
+              ))}
+              {activeBids.length === 0 && (
+                <View style={{ alignItems: "center", paddingVertical: 20, backgroundColor: COLORS.surface.card, borderRadius: BORDER_RADIUS["2xl"], borderWidth: 1, borderColor: COLORS.surface.border, borderStyle: "dashed" }}>
+                  <Text style={{ color: COLORS.text.muted, fontSize: 12 }}>No bids placed yet for this cycle</Text>
+                </View>
               )}
             </View>
-          </Card>
+          );
+        })()}
 
-          <Text className="text-slate-900 text-sm font-bold mb-2">Active Bids (Cycle #{committee.currentCycleNo})</Text>
-          {activeBids.map((bid: any, idx: number) => (
-            <View
-              key={bid.id}
-              className="flex-row items-center justify-between bg-surface-card border border-slate-100 rounded-xl p-3.5 mb-2.5"
-            >
-              <View className="flex-row items-center">
-                <View className="w-8 h-8 rounded-full bg-brand-50 items-center justify-center border border-brand-200/60 mr-3">
-                  <Text className="text-brand-700 font-bold text-xs">#{idx + 1}</Text>
-                </View>
-                <View>
-                  <Text className="text-slate-900 font-bold text-sm">{bid.user?.name || "Anonymous"}</Text>
-                  <Text className="text-slate-500 text-[10px] mt-0.5">Requested payout</Text>
-                </View>
-              </View>
-
-              <View className="items-end">
-                <Text className="text-slate-900 font-bold text-sm">{formatINR(bid.bidAmountPaise)}</Text>
-                <Text className="text-slate-500 text-[10px] mt-0.5">
-                  Discount: {formatINR(totalPot - Number(bid.bidAmountPaise))}
-                </Text>
-              </View>
+        {/* Payout History */}
+        {committee.status === "ACTIVE" && (
+          <View style={{ marginBottom: 24 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <View style={{ width: 4, height: 20, borderRadius: 2, backgroundColor: COLORS.success.DEFAULT }} />
+              <Text style={{ color: COLORS.text.primary, fontSize: 15, fontWeight: "700" }}>Payout History</Text>
             </View>
-          ))}
-
-          {activeBids.length === 0 && (
-            <View className="items-center py-6 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-              <Text className="text-slate-500 text-xs">No bids placed yet for this cycle</Text>
-            </View>
-          )}
-        </View>
-        );
-      })()}
-
-      {/* Payout Cycle History */}
-      <Text className="text-slate-900 text-base font-bold mb-3">Payout & Dividend History</Text>
-      <Card style={{ marginBottom: 20 }} padding={0}>
-        <View className="p-5">
-          <View className="flex-row border-b border-slate-100 pb-2 mb-3">
-            <Text className="w-14 text-slate-500 font-bold text-xs">Cycle</Text>
-            <Text className="flex-1 text-slate-500 font-bold text-xs">Winner</Text>
-            <Text className="w-24 text-right text-slate-500 font-bold text-xs">Payout</Text>
+            <Card accent="success" padding={16}>
+              {(committee.payoutCycles || []).length > 0 ? (
+                <>
+                  <View style={{ flexDirection: "row", borderBottomWidth: 1, borderBottomColor: COLORS.surface.border, paddingBottom: 8, marginBottom: 8 }}>
+                    <Text style={{ width: 50, color: COLORS.text.muted, fontWeight: "700", fontSize: 11 }}>Cycle</Text>
+                    <Text style={{ flex: 1, color: COLORS.text.muted, fontWeight: "700", fontSize: 11 }}>Winner</Text>
+                    <Text style={{ width: 90, textAlign: "right", color: COLORS.text.muted, fontWeight: "700", fontSize: 11 }}>Payout</Text>
+                  </View>
+                  {(committee.payoutCycles || [])
+                    .sort((a: any, b: any) => a.cycleNo - b.cycleNo)
+                    .map((item: any) => {
+                      const winnerName = committee.members?.find((m: any) => m.userId === item.winnerId)?.user?.name || "Winner";
+                      return (
+                        <View key={item.id} style={{ flexDirection: "row", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.surface.border, alignItems: "center" }}>
+                          <Text style={{ width: 50, color: COLORS.text.primary, fontWeight: "700", fontSize: 13 }}>#{item.cycleNo}</Text>
+                          <Text style={{ flex: 1, color: COLORS.text.secondary, fontWeight: "600", fontSize: 12 }}>{winnerName}</Text>
+                          <Text style={{ width: 90, textAlign: "right", color: COLORS.gold[600], fontWeight: "700", fontSize: 12 }}>{formatINR(item.payoutAmtPaise)}</Text>
+                        </View>
+                      );
+                    })}
+                </>
+              ) : (
+                <Text style={{ color: COLORS.text.muted, fontSize: 12, textAlign: "center", paddingVertical: 12 }}>No payout cycles resolved yet</Text>
+              )}
+            </Card>
           </View>
+        )}
 
-          {(committee.payoutCycles || [])
-            .sort((a: any, b: any) => a.cycleNo - b.cycleNo)
-            .map((item: any) => {
-              const winnerName = committee.members?.find((m: any) => m.userId === item.winnerId)?.user?.name || "Winner";
-              return (
-                <View key={item.id} className="flex-row py-2.5 border-b border-slate-100 items-center">
-                  <Text className="w-14 text-slate-900 font-bold text-sm">#{item.cycleNo}</Text>
-                  <Text className="flex-1 text-slate-700 font-semibold text-sm">{winnerName}</Text>
-                  <Text className="w-24 text-right text-gold-600 font-bold text-sm">
-                    {formatINR(item.payoutAmtPaise)}
-                  </Text>
-                </View>
-              );
-            })}
-
-          {(!committee.payoutCycles || committee.payoutCycles.length === 0) && (
-            <Text className="text-center text-slate-500 py-3 text-xs">No payout cycles resolved yet</Text>
-          )}
-        </View>
-      </Card>
-
-      {/* Monthly Schedule */}
-      {schedule && schedule.length > 0 && (
-        <>
-          <Text className="text-slate-900 text-base font-bold mb-3">Monthly Schedule</Text>
-          <Card style={{ marginBottom: 20 }} padding={0}>
-            <View className="p-5">
-              <View className="flex-row border-b border-slate-100 pb-2 mb-3">
-                <Text className="w-14 text-slate-500 font-bold text-xs">Cycle</Text>
-                <Text className="flex-1 text-slate-500 font-bold text-xs">Due Date</Text>
-                <Text className="w-16 text-right text-slate-500 font-bold text-xs">Amount</Text>
-                <Text className="w-24 text-right text-slate-500 font-bold text-xs">Status</Text>
+        {/* Monthly Schedule */}
+        {schedule && schedule.length > 0 && (
+          <View style={{ marginBottom: 24 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <View style={{ width: 4, height: 20, borderRadius: 2, backgroundColor: COLORS.info.DEFAULT }} />
+              <Text style={{ color: COLORS.text.primary, fontSize: 15, fontWeight: "700" }}>Payment Schedule</Text>
+            </View>
+            <Card accent="info" padding={16}>
+              <View style={{ flexDirection: "row", borderBottomWidth: 1, borderBottomColor: COLORS.surface.border, paddingBottom: 8, marginBottom: 8 }}>
+                <Text style={{ width: 50, color: COLORS.text.muted, fontWeight: "700", fontSize: 11 }}>Cycle</Text>
+                <Text style={{ flex: 1, color: COLORS.text.muted, fontWeight: "700", fontSize: 11 }}>Due Date</Text>
+                <Text style={{ width: 80, textAlign: "right", color: COLORS.text.muted, fontWeight: "700", fontSize: 11 }}>Amount</Text>
+                <Text style={{ width: 80, textAlign: "right", color: COLORS.text.muted, fontWeight: "700", fontSize: 11 }}>Status</Text>
               </View>
-
               {schedule.map((item: any) => {
                 const isCurrentCycle = item.cycleNo === committee.currentCycleNo;
                 const allPaid = item.paid === item.total;
@@ -1041,81 +870,47 @@ export default function CommitteeDetail() {
                 const isPaid = displayStatus === "PAID" || displayStatus === "COMPLETED";
                 const isOverdue = displayStatus === "OVERDUE";
                 return (
-                  <View
-                    key={item.cycleNo}
-                    className={`flex-row py-2.5 border-b border-slate-100 items-center ${
-                      isCurrentCycle ? "bg-brand-50/50" : ""
-                    }`}
-                  >
-                    <Text className={`w-14 font-bold text-sm ${isCurrentCycle ? "text-brand-700" : "text-slate-900"}`}>
-                      #{item.cycleNo}
+                  <View key={item.cycleNo} style={{ flexDirection: "row", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.surface.border, alignItems: "center", backgroundColor: isCurrentCycle ? "rgba(99,102,241,0.04)" : "transparent" }}>
+                    <Text style={{ width: 50, color: isCurrentCycle ? COLORS.brand[700] : COLORS.text.primary, fontWeight: "700", fontSize: 13 }}>#{item.cycleNo}</Text>
+                    <Text style={{ flex: 1, color: COLORS.text.secondary, fontWeight: "600", fontSize: 12 }}>
+                      {new Date(item.dueDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                     </Text>
-                    <Text className="flex-1 text-slate-700 font-semibold text-sm">
-                      {new Date(item.dueDate).toLocaleDateString("en-IN", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </Text>
-                    <Text className="w-16 text-right text-gold-600 font-bold text-sm">
-                      {formatINR(item.amountDuePaise)}
-                    </Text>
-                    <View className="w-24 items-end">
-                      <View
-                        className={`px-2 py-0.5 rounded ${
-                          isPaid
-                            ? "bg-green-50"
-                            : isOverdue
-                            ? "bg-red-50"
-                            : "bg-slate-100"
-                        }`}
-                      >
-                        <Text
-                          className={`text-[10px] font-bold ${
-                            isPaid
-                              ? "text-green-700"
-                              : isOverdue
-                              ? "text-red-700"
-                              : "text-slate-600"
-                          }`}
-                        >
-                          {isPaid ? "Paid" : isOverdue ? "Overdue" : `${item.paid}/${item.total} paid`}
-                        </Text>
-                      </View>
+                    <Text style={{ width: 80, textAlign: "right", color: COLORS.gold[600], fontWeight: "700", fontSize: 12 }}>{formatINR(item.amountDuePaise)}</Text>
+                    <View style={{ width: 80, alignItems: "flex-end" }}>
+                      {isPaid ? <Badge label="Paid" variant="success" size="sm" dot />
+                        : isOverdue ? <Badge label="Overdue" variant="danger" size="sm" dot />
+                        : <Badge label={`${item.paid}/${item.total}`} variant="warning" size="sm" />}
                     </View>
                   </View>
                 );
               })}
-            </View>
-          </Card>
-        </>
-      )}
-
-      {/* Members List */}
-      <Text className="text-slate-900 text-base font-bold mb-3">Chit Members</Text>
-      {committee.members?.map((member: any) => (
-        <View
-          key={member.id}
-          className="flex-row items-center justify-between bg-surface-card border border-slate-100 rounded-xl p-3.5 mb-2.5"
-        >
-          <View className="flex-row items-center">
-            <View className="w-7 h-7 rounded-full bg-brand-50 border border-brand-200/50 items-center justify-center mr-3">
-              <Text className="text-brand-700 font-bold text-xs">{member.slotNumber}</Text>
-            </View>
-            <View>
-              <Text className="text-slate-900 font-bold text-sm">
-                {member.user?.name} {member.userId === currentUser?.id && "(You)"}
-              </Text>
-              <Text className="text-slate-500 text-[10px] mt-0.5">{member.user?.phone}</Text>
-            </View>
+            </Card>
           </View>
+        )}
 
-          <Badge
-            label={member.hasReceivedPayout ? "Payout Received" : "Eligible to Bid"}
-            variant={member.hasReceivedPayout ? "success" : "info"}
-          />
+        {/* Members */}
+        <View style={{ marginBottom: 24 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <View style={{ width: 4, height: 20, borderRadius: 2, backgroundColor: COLORS.brand[500] }} />
+            <Text style={{ color: COLORS.text.primary, fontSize: 15, fontWeight: "700" }}>Chit Members ({committee.members?.length || 0})</Text>
+          </View>
+          {committee.members?.map((member: any) => (
+            <View key={member.id} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: COLORS.surface.card, borderRadius: BORDER_RADIUS["2xl"], padding: 14, marginBottom: 6, borderWidth: 1, borderColor: COLORS.surface.border, ...SHADOWS.cardSm }}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: "rgba(99,102,241,0.08)", borderWidth: 1, borderColor: "rgba(99,102,241,0.15)", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                  <Text style={{ color: COLORS.brand[700], fontWeight: "700", fontSize: 11 }}>{member.slotNumber}</Text>
+                </View>
+                <View>
+                  <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 13 }}>{member.user?.name}{member.userId === currentUser?.id ? " (You)" : ""}</Text>
+                  <Text style={{ color: COLORS.text.muted, fontSize: 10, marginTop: 1 }}>{member.user?.phone}</Text>
+                </View>
+              </View>
+              <Badge label={member.hasReceivedPayout ? "Payout Received" : "Eligible to Bid"} variant={member.hasReceivedPayout ? "success" : "info"} size="sm" dot />
+            </View>
+          ))}
         </View>
-      ))}
+
+      </View>
       <AlertComponent />
     </ScrollView>
   );

@@ -1,10 +1,8 @@
-// src/app/(app)/dashboard/index.tsx
-// Kometi Member & Organizer Premium Dashboard Home.
-
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl, StyleSheet } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
-
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../../../stores/auth.store";
 import { useWalletStore } from "../../../stores/wallet.store";
@@ -15,13 +13,26 @@ import { authApi } from "../../../services/auth.api";
 import { tokenStorage } from "../../../utils/storage";
 import { formatINR } from "../../../utils/currency";
 import { canViewMembers } from "../../../utils/rbac";
-import { COLORS } from "../../../constants/theme";
+import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from "../../../constants/theme";
 import Card from "../../../components/ui/Card";
 import Avatar from "../../../components/ui/Avatar";
+import KKMark, { KKMarkWatermark, KKDot } from "../../../components/brand/KKMark";
 import { useAlertModal } from "../../../components/ui/AlertModal";
+
+
+
+const QUICK_ACTIONS = [
+  { key: "committees", icon: "people-circle", label: "My Chits", color: COLORS.brand[500], bg: "rgba(99,102,241,0.1)" },
+  { key: "installments", icon: "calendar-clear", label: "Chit Dues", color: COLORS.gold[500], bg: "rgba(245,158,11,0.1)" },
+  { key: "members", icon: "person-add", label: "Members", color: COLORS.success.DEFAULT, bg: "rgba(34,197,94,0.1)" },
+  { key: "create", icon: "add-circle", label: "Create Chit", color: COLORS.brand[500], bg: "rgba(99,102,241,0.1)" },
+  { key: "join", icon: "enter-outline", label: "Join Chit", color: COLORS.gold[500], bg: "rgba(245,158,11,0.1)" },
+];
 
 export default function Dashboard() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const [refreshing, setRefreshing] = useState(false);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
@@ -44,10 +55,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Socket-triggered refresh (wallet updates, contributions, committee changes)
   const walletUpdatedVersion = useWalletStore((s) => s.walletUpdatedVersion);
   const contributionVersion = useCommitteeStore((s) => s.contributionUpdatedVersion);
   const resolvedVersion = useCommitteeStore((s) => s.monthResolvedVersion);
@@ -82,10 +91,21 @@ export default function Dashboard() {
 
   const canOpenMembers = canViewMembers();
 
+  const handleAction = (key: string) => {
+    switch (key) {
+      case "committees": router.push("/committees"); break;
+      case "installments": router.push("/installments"); break;
+      case "members": if (canOpenMembers) router.push("/members"); break;
+      case "create": router.push("/committees/create"); break;
+      case "join": router.push("/(auth)/join-committee" as any); break;
+    }
+  };
+
   return (
     <ScrollView
-      className="flex-1 bg-surface-100 px-4"
-      contentContainerStyle={{ paddingTop: 64, paddingBottom: 110 }}
+      className="flex-1"
+      style={{ backgroundColor: COLORS.surface.bg }}
+      contentContainerStyle={{ paddingBottom: 120 }}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -94,224 +114,254 @@ export default function Dashboard() {
         />
       }
     >
-      {/* Header section */}
-      <View className="flex-row items-center justify-between mb-8">
-        <View className="flex-row items-center">
-          <Avatar
-            name={user?.name || "Kometi"}
-            imageUrl={user?.profileImageUrl || undefined}
-            size={48}
-            showOnline
-          />
-          <View className="ml-3.5">
-            <Text className="text-slate-400 text-xs font-semibold">Namaste,</Text>
-            <Text className="text-slate-900 text-lg font-bold">{user?.name || "Kometi User"}</Text>
+      {/* Hero Header */}
+      <LinearGradient
+        colors={["#1e1b4b", "#312e81", "#3730a3"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
+          paddingTop: insets.top + SPACING[4],
+          paddingHorizontal: SPACING[5],
+          paddingBottom: SPACING[12],
+          borderBottomLeftRadius: BORDER_RADIUS["4xl"],
+          borderBottomRightRadius: BORDER_RADIUS["4xl"],
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <KKMarkWatermark size={200} color={COLORS.white} opacity={0.05} />
+
+        {/* Header Row */}
+        <View className="flex-row items-center justify-between mb-8">
+          <View className="flex-row items-center">
+            <Avatar
+              name={user?.name || "Monio"}
+              imageUrl={user?.profileImageUrl || undefined}
+              size={48}
+              showOnline
+            />
+            <View className="ml-3">
+              <Text className="text-white/60 text-xs font-semibold">Namaste,</Text>
+              <Text className="text-white text-lg font-bold">{user?.name || "Monio User"}</Text>
+            </View>
+          </View>
+
+          <View className="flex-row gap-2.5">
+            <TouchableOpacity
+              onPress={() => router.push("/notifications")}
+              className="w-10 h-10 rounded-full items-center justify-center relative"
+              style={{ backgroundColor: "rgba(255,255,255,0.1)" }}
+            >
+              <Ionicons name="notifications-outline" size={20} color={COLORS.white} />
+              {unreadCount > 0 && (
+                <View className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full items-center justify-center">
+                  <Text className="text-white text-[10px] font-bold">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleLogout}
+              className="w-10 h-10 rounded-full items-center justify-center"
+              style={{ backgroundColor: "rgba(255,255,255,0.1)" }}
+            >
+              <Ionicons name="log-out-outline" size={20} color={COLORS.white} />
+            </TouchableOpacity>
           </View>
         </View>
 
-        <View className="flex-row gap-2.5">
-          <TouchableOpacity
-            onPress={() => router.push("/notifications")}
-            className="w-10 h-10 bg-brand-50 rounded-full items-center justify-center border border-brand-100 relative"
-          >
-            <Ionicons name="notifications-outline" size={20} color={COLORS.brandPrimary} />
-            {unreadCount > 0 && (
-              <View className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full items-center justify-center">
-                <Text className="text-white text-[10px] font-bold">
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => router.push("/settings/change-password")}
-            className="w-10 h-10 bg-brand-50 rounded-full items-center justify-center border border-brand-100"
-          >
-            <Ionicons name="settings-outline" size={20} color={COLORS.brandPrimary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={handleLogout}
-            className="w-10 h-10 bg-danger-500/10 border border-danger-500/25 rounded-full items-center justify-center"
-          >
-            <Ionicons name="log-out-outline" size={20} color={COLORS.danger.DEFAULT} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Wallet Balance Hero Card — keeps premium dark indigo gradient */}
-      <Card gradient style={{ marginBottom: 24 }}>
-        <View className="p-6">
-          <Text className="text-white/60 text-xs font-semibold tracking-wider uppercase mb-1">
-            Wallet Balance
-          </Text>
-          <Text className="text-white text-3xl font-bold mb-5">
+        {/* Balance Card */}
+        <View className="rounded-2xl p-5"
+          style={{
+            backgroundColor: "rgba(255,255,255,0.08)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.1)",
+          }}
+        >
+          <View className="flex-row items-center gap-2 mb-2">
+            <KKDot size={6} color={COLORS.gold[400]} />
+            <Text className="text-white/60 text-xs font-semibold tracking-wider uppercase">
+              Wallet Balance
+            </Text>
+          </View>
+          <Text className="text-white text-4xl font-bold mb-4" style={{ letterSpacing: -1 }}>
             {formatINR(balancePaise)}
           </Text>
 
-          <View className="flex-row justify-between gap-3">
+          <View className="flex-row gap-3">
             <TouchableOpacity
               onPress={() => router.push("/wallet")}
-              className="flex-1 bg-white/10 h-11 rounded-lg items-center justify-center flex-row"
+              className="flex-1 h-11 rounded-xl items-center justify-center flex-row"
+              style={{ backgroundColor: "rgba(245,158,11,0.2)" }}
             >
-              <Ionicons name="add-circle-outline" size={18} color="#fff" />
-              <Text className="text-white font-bold ml-1.5 text-sm">Add Money</Text>
+              <Ionicons name="add-circle-outline" size={18} color={COLORS.gold[300]} />
+              <Text className="text-gold-300 font-bold ml-1.5 text-sm">Add Money</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => router.push("/wallet")}
-              className="flex-1 bg-amber-500 h-11 rounded-lg items-center justify-center flex-row"
+              onPress={() => router.push("/wallet/withdraw" as any)}
+              className="flex-1 h-11 rounded-xl items-center justify-center flex-row"
+              style={{ backgroundColor: "rgba(255,255,255,0.1)" }}
             >
-              <Ionicons name="send-outline" size={16} color="#fff" />
-              <Text className="text-white font-bold ml-1.5 text-sm">Transfer</Text>
+              <Ionicons name="arrow-up-outline" size={18} color={COLORS.white} />
+              <Text className="text-white font-bold ml-1.5 text-sm">Send</Text>
             </TouchableOpacity>
           </View>
         </View>
-      </Card>
+      </LinearGradient>
 
-      {/* Dues Quick Info Bar */}
-      {upcomingDues.length > 0 ? (
-        <TouchableOpacity
-          onPress={() => router.push("/installments")}
-          className="mb-6 flex-row items-center justify-between bg-red-50 border border-red-200 p-4 rounded-xl"
-        >
-          <View className="flex-row items-center flex-1 pr-4">
-            <Ionicons name="alert-circle" size={20} color={COLORS.danger.DEFAULT} />
-            <View className="ml-3">
-              <Text className="text-red-700 font-bold text-sm">Upcoming chit dues</Text>
-              <Text className="text-red-500 text-xs mt-0.5">
-                You have {upcomingDues.length} pending installment(s) due soon.
-              </Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={COLORS.danger.DEFAULT} />
-        </TouchableOpacity>
-      ) : null}
-
-      {/* Main Grid Shortcuts */}
-      <Text className="text-slate-800 text-base font-bold mb-4">Quick Actions</Text>
-      <View className="flex-row flex-wrap gap-4 mb-8">
-        <TouchableOpacity
-          onPress={() => router.push("/committees")}
-          style={styles.gridBtn}
-          className="bg-white border border-slate-100 items-center justify-center"
-        >
-          <View className="w-12 h-12 rounded-full bg-indigo-50 items-center justify-center mb-2 border border-indigo-100">
-            <Ionicons name="people-circle" size={26} color={COLORS.brandPrimary} />
-          </View>
-          <Text className="text-slate-700 font-semibold text-xs">My Chits</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => router.push("/installments")}
-          style={styles.gridBtn}
-          className="bg-white border border-slate-100 items-center justify-center"
-        >
-          <View className="w-12 h-12 rounded-full bg-amber-50 items-center justify-center mb-2 border border-amber-100">
-            <Ionicons name="calendar-clear" size={24} color={COLORS.goldPrimary} />
-          </View>
-          <Text className="text-slate-700 font-semibold text-xs">Chit Dues</Text>
-        </TouchableOpacity>
-
-        {canOpenMembers && (
+      {/* Content below hero */}
+      <View style={{ paddingHorizontal: SPACING[5], marginTop: SPACING[3] }}>
+        {/* Dues Alert */}
+        {upcomingDues.length > 0 && (
           <TouchableOpacity
-            onPress={() => router.push("/members")}
-            style={styles.gridBtn}
-            className="bg-white border border-slate-100 items-center justify-center"
+            onPress={() => router.push("/installments")}
+            className="mb-5 flex-row items-center justify-between rounded-2xl p-4"
+            style={{
+              backgroundColor: "rgba(239,68,68,0.08)",
+              borderWidth: 1,
+              borderColor: "rgba(239,68,68,0.15)",
+            }}
           >
-            <View className="w-12 h-12 rounded-full bg-emerald-50 items-center justify-center mb-2 border border-emerald-100">
-              <Ionicons name="person-add" size={24} color={COLORS.success.DEFAULT} />
+            <View className="flex-row items-center flex-1 pr-4">
+              <View className="w-10 h-10 rounded-xl items-center justify-center"
+                style={{ backgroundColor: "rgba(239,68,68,0.15)" }}
+              >
+                <Ionicons name="alert-circle" size={20} color={COLORS.danger.DEFAULT} />
+              </View>
+              <View className="ml-3">
+                <Text className="text-red-700 font-bold text-sm">Upcoming chit dues</Text>
+                <Text className="text-red-500 text-xs mt-0.5">
+                  You have {upcomingDues.length} pending installment(s) due soon.
+                </Text>
+              </View>
             </View>
-            <Text className="text-slate-700 font-semibold text-xs">Members</Text>
+            <Ionicons name="chevron-forward" size={18} color={COLORS.danger.DEFAULT} />
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity
-          onPress={() => router.push("/committees/create")}
-          style={styles.gridBtn}
-          className="bg-white border border-slate-100 items-center justify-center"
-        >
-          <View className="w-12 h-12 rounded-full bg-indigo-50 items-center justify-center mb-2 border border-indigo-100">
-            <Ionicons name="add-circle" size={26} color={COLORS.brandPrimary} />
+        {/* Quick Actions */}
+        <View className="mb-6">
+          <View className="flex-row items-center gap-2 mb-4">
+            <View className="w-1 h-5 rounded-full" style={{ backgroundColor: COLORS.brand[500] }} />
+            <Text className="text-slate-800 text-base font-bold">Quick Actions</Text>
           </View>
-          <Text className="text-slate-700 font-semibold text-xs">Create Chit</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => router.push("/(auth)/join-committee" as any)}
-          style={styles.gridBtn}
-          className="bg-white border border-slate-100 items-center justify-center"
-        >
-          <View className="w-12 h-12 rounded-full bg-amber-50 items-center justify-center mb-2 border border-amber-100">
-            <Ionicons name="enter-outline" size={24} color={COLORS.goldPrimary} />
+          <View className="flex-row flex-wrap gap-3">
+            {QUICK_ACTIONS.map((action) => {
+              if (action.key === "members" && !canOpenMembers) return null;
+              return (
+                <TouchableOpacity
+                  key={action.key}
+                  onPress={() => handleAction(action.key)}
+                  activeOpacity={0.7}
+                  className="items-center justify-center bg-white rounded-2xl"
+                  style={{
+                    width: (width - SPACING[5] * 2 - 12 * 2) / 3,
+                    aspectRatio: 1,
+                    borderWidth: 1,
+                    borderColor: COLORS.surface.border,
+                    ...SHADOWS.card,
+                  }}
+                >
+                  <View
+                    className="w-12 h-12 rounded-2xl items-center justify-center mb-2"
+                    style={{ backgroundColor: action.bg }}
+                  >
+                    <Ionicons name={action.icon as any} size={24} color={action.color} />
+                  </View>
+                  <Text className="text-slate-700 font-semibold text-xs">{action.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-          <Text className="text-slate-700 font-semibold text-xs">Join Chit</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Recent Activities */}
-      <View className="flex-row items-center justify-between mb-4">
-        <Text className="text-slate-800 text-base font-bold">Recent Transactions</Text>
-        <TouchableOpacity onPress={() => router.push("/wallet")}>
-          <Text className="text-brand-500 text-xs font-semibold">View All</Text>
-        </TouchableOpacity>
-      </View>
-
-      {transactions.slice(0, 3).map((tx) => (
-        <View
-          key={tx.id}
-          className="flex-row items-center justify-between bg-white border border-slate-100 rounded-xl p-4 mb-3"
-        >
-          <View className="flex-row items-center">
-            <View
-              className={`w-10 h-10 rounded-full items-center justify-center ${
-                tx.type === "CREDIT" ? "bg-emerald-50" : "bg-red-50"
-              }`}
-            >
-              <Ionicons
-                name={tx.type === "CREDIT" ? "arrow-down" : "arrow-up"}
-                size={18}
-                color={tx.type === "CREDIT" ? COLORS.success.DEFAULT : COLORS.danger.DEFAULT}
-              />
-            </View>
-            <View className="ml-3">
-              <Text className="text-slate-800 font-bold text-sm">{tx.description}</Text>
-              <Text className="text-slate-400 text-xs mt-0.5">
-                {new Date(tx.createdAt).toLocaleDateString("en-IN", {
-                  day: "numeric",
-                  month: "short",
-                })}
-              </Text>
-            </View>
-          </View>
-
-          <Text
-            className={`font-bold text-sm ${
-              tx.type === "CREDIT" ? "text-emerald-600" : "text-slate-700"
-            }`}
-          >
-            {tx.type === "CREDIT" ? "+" : "-"}
-            {formatINR(tx.amountPaise)}
-          </Text>
         </View>
-      ))}
 
-      {transactions.length === 0 && (
-        <View className="items-center py-6 bg-white rounded-xl border border-dashed border-slate-200">
-          <Text className="text-slate-400 text-xs">No recent transactions</Text>
+        {/* Recent Transactions */}
+        <View className="mb-4">
+          <View className="flex-row items-center justify-between mb-4">
+            <View className="flex-row items-center gap-2">
+              <View className="w-1 h-5 rounded-full" style={{ backgroundColor: COLORS.brand[500] }} />
+              <Text className="text-slate-800 text-base font-bold">Recent Transactions</Text>
+            </View>
+            <TouchableOpacity onPress={() => router.push("/wallet")}>
+              <Text className="text-brand-500 text-xs font-semibold">View All</Text>
+            </TouchableOpacity>
+          </View>
+
+          {transactions.length > 0 && (
+            <View className="bg-white rounded-2xl overflow-hidden" style={{ borderWidth: 1, borderColor: COLORS.surface.border, ...SHADOWS.cardSm }}>
+              {transactions.slice(0, 5).map((tx, i) => {
+                const isLast = i < Math.min(transactions.length, 5) - 1;
+                return (
+                  <TouchableOpacity
+                    key={tx.id}
+                    activeOpacity={0.7}
+                    className="flex-row items-center px-4 py-3.5"
+                    style={{ borderBottomWidth: isLast ? 1 : 0, borderColor: COLORS.surface.border }}
+                  >
+                    <View
+                      className="w-9 h-9 rounded-xl items-center justify-center"
+                      style={{
+                        backgroundColor: tx.type === "CREDIT" ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
+                      }}
+                    >
+                      <Ionicons
+                        name={tx.type === "CREDIT" ? "arrow-down" : "arrow-up"}
+                        size={16}
+                        color={tx.type === "CREDIT" ? COLORS.success.DEFAULT : COLORS.danger.DEFAULT}
+                      />
+                    </View>
+                    <View className="ml-3 flex-1 min-w-0">
+                      <Text className="text-slate-800 text-sm font-semibold" numberOfLines={1}>{tx.description || "Transaction"}</Text>
+                      <View className="flex-row items-center mt-0.5 gap-2">
+                        <Text className="text-slate-400 text-[10px]">
+                          {new Date(tx.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                        </Text>
+                        {tx.status && (
+                          <View
+                            className="px-1.5 py-0.5 rounded-md"
+                            style={{ backgroundColor: tx.status === "COMPLETED" ? "rgba(34,197,94,0.08)" : "rgba(245,158,11,0.08)" }}
+                          >
+                            <Text
+                              className="text-[9px] font-semibold"
+                              style={{ color: tx.status === "COMPLETED" ? COLORS.success.dark : COLORS.gold[600] }}
+                            >
+                              {tx.status === "COMPLETED" ? "Done" : "Pending"}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+
+                    <View className="items-end ml-3">
+                      <Text
+                        className="font-bold text-sm"
+                        style={{ color: tx.type === "CREDIT" ? COLORS.success.dark : COLORS.text.primary }}
+                      >
+                        {tx.type === "CREDIT" ? "+" : "-"}{formatINR(tx.amountPaise)}
+                      </Text>
+                      <Text className="text-slate-400 text-[9px] mt-0.5 uppercase tracking-wider">
+                        {tx.type === "CREDIT" ? "Credit" : "Debit"}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
+          {transactions.length === 0 && (
+            <View className="items-center py-8 bg-white rounded-2xl border border-dashed border-slate-200">
+              <KKMark size={32} color={COLORS.brand[200]} opacity={0.5} />
+              <Text className="text-slate-400 text-xs mt-3">No recent transactions</Text>
+            </View>
+          )}
         </View>
-      )}
+      </View>
 
       <AlertComponent />
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  gridBtn: {
-    width: "30%",
-    aspectRatio: 1.1,
-    borderRadius: 16,
-  },
-});

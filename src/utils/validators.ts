@@ -1,5 +1,5 @@
 // src/utils/validators.ts
-// All input validation rules for Kometi fintech fields
+// All input validation rules for Monio fintech fields
 
 /** Indian mobile number: starts with 6-9, 10 digits */
 export function isValidPhone(phone: string): boolean {

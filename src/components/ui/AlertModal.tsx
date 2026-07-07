@@ -1,7 +1,4 @@
-// src/components/ui/AlertModal.tsx
-// Custom mobile alert modal — replaces native Alert.alert with a styled popup.
-
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import {
   Modal,
   View,
@@ -9,7 +6,6 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   StyleSheet,
-  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS, BORDER_RADIUS, SPACING, FONT_SIZE } from "../../constants/theme";
@@ -32,7 +28,7 @@ interface AlertConfig {
 const ICON_MAP: Record<AlertType, { name: keyof typeof Ionicons.glyphMap; color: string; bg: string }> = {
   info:    { name: "information-circle",   color: COLORS.info.dark,    bg: "rgba(14,165,233,0.10)" },
   success: { name: "checkmark-circle",     color: COLORS.success.dark, bg: "rgba(34,197,94,0.10)" },
-  warning: { name: "warning",              color: COLORS.warning.dark, bg: "rgba(234,179,8,0.10)" },
+  warning: { name: "warning",              color: COLORS.warning.dark, bg: "rgba(245,158,11,0.10)" },
   error:   { name: "close-circle",         color: COLORS.danger.dark,  bg: "rgba(239,68,68,0.10)" },
 };
 
@@ -98,8 +94,6 @@ export function AlertModal({ config, onClose }: { config: AlertConfig; onClose: 
     </Modal>
   );
 }
-
-// ─── Promise-based hook for imperative usage ──────────────────────────────────
 
 let globalId = 0;
 
@@ -175,8 +169,6 @@ export function useAlertModal() {
   return { alert, confirm, AlertComponent };
 }
 
-// ─── Static styles ───────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -189,7 +181,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 340,
     backgroundColor: COLORS.surface.card,
-    borderRadius: BORDER_RADIUS["2xl"],
+    borderRadius: BORDER_RADIUS["3xl"],
     borderWidth: 1,
     borderColor: COLORS.surface.border,
     padding: SPACING[6],

@@ -13,14 +13,16 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { committeesApi } from "../../../../../services/committees.api";
+import BrandedLoader from "../../../../../components/brand/BrandedLoader";
 import { installmentsApi } from "../../../../../services/installments.api";
 import { useAuthStore } from "../../../../../stores/auth.store";
 import { useCommitteeStore } from "../../../../../stores/committee.store";
 import { formatINR } from "../../../../../utils/currency";
-import { COLORS, GRADIENTS } from "../../../../../constants/theme";
+import { COLORS, GRADIENTS, SHADOWS, BORDER_RADIUS, SPACING } from "../../../../../constants/theme";
 import Card from "../../../../../components/ui/Card";
 import Badge from "../../../../../components/ui/Badge";
 import Button from "../../../../../components/ui/Button";
+import GradientHero from "../../../../../components/brand/GradientHero";
 import PayNowButton from "../../../../../components/payments/PayNowButton";
 import PayNetButton from "../../../../../components/payments/PayNetButton";
 
@@ -146,32 +148,27 @@ export default function MemberCommitteeOverview() {
 
   if (!isValidId) {
     return (
-      <View className="flex-1 bg-surface-50 items-center justify-center px-6">
+      <View style={{ flex: 1, backgroundColor: COLORS.surface.bg, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
         <Ionicons name="alert-circle-outline" size={40} color={COLORS.danger.light} />
-        <Text className="text-slate-900 font-bold text-lg mt-4">Invalid Committee</Text>
-        <TouchableOpacity onPress={() => router.back()} className="mt-4">
-          <Text className="text-brand-600 text-sm font-medium">Go Back</Text>
+        <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 18, marginTop: 16 }}>Invalid Committee</Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 16 }}>
+          <Text style={{ color: COLORS.brand[600], fontSize: 13, fontWeight: "500" }}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   if (loading && !refreshing) {
-    return (
-      <View className="flex-1 bg-surface-50 items-center justify-center">
-        <ActivityIndicator size="large" color={COLORS.brandPrimary} />
-        <Text className="text-slate-500 text-sm mt-4">Loading committee...</Text>
-      </View>
-    );
+    return <BrandedLoader message="Loading committee..." />;
   }
 
   if (error && !committee) {
     return (
-      <View className="flex-1 bg-surface-50 items-center justify-center px-6">
+      <View style={{ flex: 1, backgroundColor: COLORS.surface.bg, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }}>
         <Ionicons name="cloud-offline-outline" size={40} color={COLORS.warning.light} />
-        <Text className="text-slate-900 font-bold text-lg mt-4">{error}</Text>
-        <TouchableOpacity onPress={loadData} className="mt-4 bg-brand-500 px-5 py-2.5 rounded-xl">
-          <Text className="text-slate-900 font-bold text-sm">Retry</Text>
+        <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 18, marginTop: 16 }}>{error}</Text>
+        <TouchableOpacity onPress={loadData} style={{ backgroundColor: COLORS.brand[500], paddingHorizontal: 20, paddingVertical: 10, borderRadius: BORDER_RADIUS.xl, marginTop: 16 }}>
+          <Text style={{ color: COLORS.white, fontWeight: "700", fontSize: 13 }}>Retry</Text>
         </TouchableOpacity>
       </View>
     );
@@ -260,34 +257,46 @@ export default function MemberCommitteeOverview() {
   return (
     <ScrollView
       className="flex-1 bg-surface-50"
-      contentContainerStyle={{ paddingTop: 64, paddingBottom: 120 }}
+      contentContainerStyle={{ paddingTop: 0, paddingBottom: 120 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.brandPrimary} />}
     >
-      {/* Header */}
-      <View className="px-4 flex-row items-center mb-5">
-        <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 bg-surface-card rounded-full items-center justify-center border border-brand-primary/10 mr-4">
-          <Ionicons name="arrow-back" size={20} color="#1a1a2e" />
-        </TouchableOpacity>
-        <View className="flex-1">
-          <Text className="text-slate-900 text-xl font-bold" numberOfLines={1}>{committee.name}</Text>
-          <Text className="text-slate-400 text-xs">Member Dashboard</Text>
+      {/* Hero Header */}
+      <GradientHero
+        gradient={["#1e1b4b", "#312e81", "#3730a3"]}
+        borderRadius={BORDER_RADIUS["4xl"]}
+      >
+        <View className="flex-row items-center justify-between mb-6">
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={{
+              width: 38, height: 38, borderRadius: BORDER_RADIUS.lg,
+              backgroundColor: "rgba(255,255,255,0.1)",
+              alignItems: "center", justifyContent: "center",
+            }}
+          >
+            <Ionicons name="arrow-back" size={20} color={COLORS.white} />
+          </TouchableOpacity>
+          {slotNumber && (
+            <View style={{ backgroundColor: "rgba(255,255,255,0.1)", borderRadius: BORDER_RADIUS.full, paddingHorizontal: 12, paddingVertical: 6 }}>
+              <Text style={{ color: COLORS.gold[300], fontSize: 11, fontWeight: "700" }}>Slot #{slotNumber}</Text>
+            </View>
+          )}
         </View>
-        {slotNumber && (
-          <View className="bg-brand-500/15 px-3 py-1.5 rounded-full">
-            <Text className="text-brand-600 text-xs font-bold">Slot #{slotNumber}</Text>
-          </View>
-        )}
-      </View>
 
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* Committee Info Card                                               */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      <View className="px-4 mb-5">
-        <Card gradient>
+        <View className="mb-2">
+          <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 11, fontWeight: "700", letterSpacing: 1, marginBottom: 4, textTransform: "uppercase" }}>
+            Member Dashboard
+          </Text>
+          <Text style={{ color: COLORS.white, fontSize: 22, fontWeight: "700" }} numberOfLines={1}>
+            {committee.name}
+          </Text>
+        </View>
+
+        <View style={{ marginTop: 16, borderRadius: BORDER_RADIUS["2xl"], padding: 16, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" }}>
           <View className="flex-row items-center justify-between mb-3">
             <View>
-              <Text className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Month Progress</Text>
-              <Text className="text-slate-900 font-bold text-lg mt-0.5">
+              <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" }}>Month Progress</Text>
+              <Text style={{ color: COLORS.white, fontSize: 16, fontWeight: "700", marginTop: 2 }}>
                 Month {months.length} of {totalMembers}
               </Text>
             </View>
@@ -295,53 +304,51 @@ export default function MemberCommitteeOverview() {
               label={committee.status}
               variant={committee.status === "ACTIVE" ? "success" : committee.status === "COMPLETED" ? "brand" : "neutral"}
               size="md"
+              dot
             />
           </View>
-
-          <View className="flex-row flex-wrap gap-3">
-            <View className="flex-1 min-w-[100px] bg-surface-50 rounded-lg p-2.5">
-              <Text className="text-slate-500 text-[9px] uppercase font-bold">Total Pool</Text>
-              <Text className="text-brand-600 font-bold text-sm mt-0.5">{F(totalPool)}</Text>
+          <View className="flex-row gap-3">
+            <View style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: BORDER_RADIUS.lg, padding: 10 }}>
+              <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>Total Pool</Text>
+              <Text style={{ color: COLORS.gold[300], fontWeight: "700", fontSize: 15, marginTop: 2 }}>{F(totalPool)}</Text>
             </View>
-            <View className="flex-1 min-w-[100px] bg-surface-50 rounded-lg p-2.5">
-              <Text className="text-slate-500 text-[9px] uppercase font-bold">My Contribution</Text>
-              <Text className="text-slate-900 font-bold text-sm mt-0.5">{F(installment)}</Text>
+            <View style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: BORDER_RADIUS.lg, padding: 10 }}>
+              <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 9, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 }}>My Contribution</Text>
+              <Text style={{ color: COLORS.white, fontWeight: "700", fontSize: 15, marginTop: 2 }}>{F(installment)}</Text>
             </View>
           </View>
-        </Card>
-      </View>
+        </View>
+      </GradientHero>
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* My Stats                                                          */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <View className="px-4 mb-5">
-        <View className="flex-row items-center mb-3">
-          <View className="w-7 h-7 rounded-lg bg-brand-500/15 items-center justify-center mr-2">
-            <Ionicons name="stats-chart-outline" size={14} color={COLORS.brandPrimary} />
-          </View>
-          <Text className="text-slate-900 font-bold text-sm">My Stats</Text>
+      <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[5] }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <View style={{ width: 4, height: 20, borderRadius: 999, backgroundColor: COLORS.brand[500] }} />
+          <Text style={{ color: COLORS.text.primary, fontSize: 14, fontWeight: "700" }}>My Stats</Text>
         </View>
 
         <View className="flex-row gap-3">
-          <Card padding={0} style={{ flex: 1 }}>
+          <Card padding={0} style={{ flex: 1 }} accent="brand">
             <View className="p-3 items-center">
               <Ionicons name="arrow-up-circle-outline" size={20} color={COLORS.danger.light} />
-              <Text className="text-slate-500 text-[9px] uppercase font-bold mt-1">Contributed</Text>
-              <Text className="text-danger-600 font-bold text-sm mt-0.5">{F(myTotalPaid)}</Text>
+              <Text style={{ color: COLORS.text.secondary, fontSize: 9, fontWeight: "700", textTransform: "uppercase", marginTop: 4 }}>Contributed</Text>
+              <Text style={{ color: COLORS.danger.dark, fontWeight: "700", fontSize: 13, marginTop: 2 }}>{F(myTotalPaid)}</Text>
             </View>
           </Card>
-          <Card padding={0} style={{ flex: 1 }}>
+          <Card padding={0} style={{ flex: 1 }} accent="success">
             <View className="p-3 items-center">
               <Ionicons name="arrow-down-circle-outline" size={20} color={COLORS.success.light} />
-              <Text className="text-slate-500 text-[9px] uppercase font-bold mt-1">Received</Text>
-              <Text className="text-success-600 font-bold text-sm mt-0.5">{F(myTotalReceived)}</Text>
+              <Text style={{ color: COLORS.text.secondary, fontSize: 9, fontWeight: "700", textTransform: "uppercase", marginTop: 4 }}>Received</Text>
+              <Text style={{ color: COLORS.success.dark, fontWeight: "700", fontSize: 13, marginTop: 2 }}>{F(myTotalReceived)}</Text>
             </View>
           </Card>
           <Card padding={0} style={{ flex: 1 }}>
             <View className="p-3 items-center">
               <Ionicons name="trending-up-outline" size={20} color={myNetPosition >= 0 ? COLORS.success.light : COLORS.danger.light} />
-              <Text className="text-slate-500 text-[9px] uppercase font-bold mt-1">Net</Text>
-              <Text className={`font-bold text-sm mt-0.5 ${myNetPosition >= 0 ? "text-success-600" : "text-danger-600"}`}>
+              <Text style={{ color: COLORS.text.secondary, fontSize: 9, fontWeight: "700", textTransform: "uppercase", marginTop: 4 }}>Net</Text>
+              <Text style={{ color: myNetPosition >= 0 ? COLORS.success.dark : COLORS.danger.dark, fontWeight: "700", fontSize: 13, marginTop: 2 }}>
                 {myNetPosition >= 0 ? "+" : ""}{F(myNetPosition)}
               </Text>
             </View>
@@ -353,80 +360,78 @@ export default function MemberCommitteeOverview() {
       {/* Blocked Status Card                                               */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {memberIsBlocked && (
-        <View className="px-4 mb-4">
-          <View className="bg-danger-500/10 border border-danger-500/20 rounded-xl p-4">
+        <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[4] }}>
+          <Card accent="danger" padding={16} style={SHADOWS.cardSm}>
             <View className="flex-row items-center mb-2">
-              <Ionicons name="lock-closed" size={20} color="#ef4444" />
-              <Text className="text-danger-600 font-bold text-sm ml-2">Account Blocked</Text>
+              <Ionicons name="lock-closed" size={20} color={COLORS.danger.light} />
+              <Text style={{ color: COLORS.danger.dark, fontWeight: "700", fontSize: 13, marginLeft: 8 }}>Account Blocked</Text>
             </View>
-            <Text className="text-slate-500 text-xs">
+            <Text style={{ color: COLORS.text.secondary, fontSize: 11 }}>
               {memberBlockedReason || "Your account is blocked due to overdue payment."}
             </Text>
-            <Text className="text-slate-500 text-xs mt-2">
+            <Text style={{ color: COLORS.text.secondary, fontSize: 11, marginTop: 8 }}>
               Please pay the organiser to unblock your account.
             </Text>
-          </View>
+          </Card>
         </View>
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* Current Month Status                                              */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <View className="px-4 mb-5">
-        <View className="flex-row items-center mb-3">
-          <View className="w-7 h-7 rounded-lg bg-gold-500/15 items-center justify-center mr-2">
-            <Ionicons name="flash-outline" size={14} color={COLORS.goldPrimary} />
-          </View>
-          <Text className="text-slate-900 font-bold text-sm">Current Month</Text>
+      <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[5] }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <View style={{ width: 4, height: 20, borderRadius: 999, backgroundColor: COLORS.gold[500] }} />
+          <Text style={{ color: COLORS.text.primary, fontSize: 14, fontWeight: "700" }}>Current Month</Text>
           {currentMonth && (
-            <Text className="text-slate-500 text-xs ml-2">#{currentMonth.monthNumber || months.length}</Text>
+            <Text style={{ color: COLORS.text.muted, fontSize: 11, marginLeft: 4 }}>#{currentMonth.monthNumber || months.length}</Text>
           )}
         </View>
 
-        <Card>
+        <Card accent="info" style={SHADOWS.cardSm}>
           {!currentMonth ? (
             <View className="items-center py-4">
               <Ionicons name="hourglass-outline" size={28} color={COLORS.text.muted} />
-              <Text className="text-slate-500 text-xs mt-2">No months created yet</Text>
+              <Text style={{ color: COLORS.text.secondary, fontSize: 11, marginTop: 8 }}>No months created yet</Text>
             </View>
           ) : latestMonthStatus === "pending" ? (
             <View>
               <View className="flex-row items-center justify-between mb-3">
                 <Badge label="Contribution Due" variant="warning" size="md" />
-                <Text className="text-slate-500 text-[10px]">Month #{currentMonth.monthNumber || months.length}</Text>
+                <Text style={{ color: COLORS.text.secondary, fontSize: 10 }}>Month #{currentMonth.monthNumber || months.length}</Text>
               </View>
 
               {/* Projected Pool & Distribution */}
-              <View className="bg-surface-50 rounded-xl p-3 mb-2">
+              <View style={{ backgroundColor: COLORS.surface.warm, borderRadius: BORDER_RADIUS.xl, padding: 12, marginBottom: 8 }}>
                 <View className="flex-row justify-between items-center mb-2">
-                  <Text className="text-slate-400 text-[10px] uppercase font-bold">Total Pool</Text>
-                  <Text className="text-slate-900 font-bold text-sm">{F(currentMonth.totalPool)}</Text>
+                  <Text style={{ color: COLORS.text.muted, fontSize: 10, fontWeight: "700", textTransform: "uppercase" }}>Total Pool</Text>
+                  <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 13 }}>{F(currentMonth.totalPool)}</Text>
                 </View>
                 <View className="flex-row justify-between items-center mb-2">
-                  <Text className="text-slate-400 text-[10px] uppercase font-bold">Your Contribution</Text>
-                  <Text className="text-slate-900 font-bold text-sm">{F(installment)}</Text>
+                  <Text style={{ color: COLORS.text.muted, fontSize: 10, fontWeight: "700", textTransform: "uppercase" }}>Your Contribution</Text>
+                  <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 13 }}>{F(installment)}</Text>
                 </View>
                 <View className="flex-row justify-between items-center">
-                  <Text className="text-slate-400 text-[10px] uppercase font-bold">Est. Distribution/Member</Text>
-                  <Text className="text-success-600 font-bold text-sm">+{F(currentMonth.perMemberDistribution)}</Text>
+                  <Text style={{ color: COLORS.text.muted, fontSize: 10, fontWeight: "700", textTransform: "uppercase" }}>Est. Distribution/Member</Text>
+                  <Text style={{ color: COLORS.success.dark, fontWeight: "700", fontSize: 13 }}>+{F(currentMonth.perMemberDistribution)}</Text>
                 </View>
               </View>
 
               {currentMonth.monthNumber === 1 || currentMonth.resolutionType === "organiser_commission" ? (
                 hasWon ? (
-                  <View className="bg-success-500/10 rounded-xl p-3 mt-1">
+                  <View style={{ backgroundColor: "rgba(22,163,74,0.10)", borderRadius: BORDER_RADIUS.xl, padding: 12, marginTop: 4 }}>
                     <View className="flex-row items-center">
                       <Ionicons name="checkmark-circle" size={16} color={COLORS.success.light} />
-                      <Text className="text-success-600 text-xs font-bold ml-1.5">You already received a payout</Text>
+                      <Text style={{ color: COLORS.success.dark, fontSize: 11, fontWeight: "700", marginLeft: 6 }}>You already received a payout</Text>
                     </View>
                   </View>
                 ) : (
                   <View>
-                    <View className="bg-teal-50 rounded-xl p-3 mb-2">
-                      <Text className="text-teal-700 text-xs text-center font-bold">
+                    <View style={{ backgroundColor: "#f0fdfa", borderRadius: BORDER_RADIUS.xl, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: "rgba(20,184,166,0.20)" }}>
+                      <Text style={{ color: "#0f766e", fontSize: 11, fontWeight: "700", textAlign: "center" }}>
                         Organiser Commission Month
                       </Text>
-                      <Text className="text-slate-500 text-[10px] text-center mt-1">
+                      <Text style={{ color: COLORS.text.secondary, fontSize: 10, textAlign: "center", marginTop: 4 }}>
                         Pay your contribution directly. No bidding needed.
                       </Text>
                     </View>
@@ -444,7 +449,7 @@ export default function MemberCommitteeOverview() {
                   </View>
                 )
               ) : (
-                <Text className="text-slate-500 text-[10px] text-center mt-1">
+                <Text style={{ color: COLORS.text.secondary, fontSize: 10, textAlign: "center", marginTop: 4 }}>
                   Waiting for organizer to open bidding
                 </Text>
               )}
@@ -452,45 +457,45 @@ export default function MemberCommitteeOverview() {
           ) : latestMonthStatus === "bidding_open" ? (
             <View>
               <View className="flex-row items-center justify-between mb-3">
-                <Badge label="Bidding Open" variant="success" size="md" />
-                {hasWon && <Badge label="Already Won" variant="warning" size="sm" />}
+                <Badge label="Bidding Open" variant="success" size="md" dot />
+                {hasWon && <Badge label="Already Won" variant="warning" size="sm" dot />}
               </View>
 
               {/* My bid status */}
               {myCurrentBid ? (
-                <View className="bg-brand-500/10 rounded-xl p-3 mb-3">
+                <View style={{ backgroundColor: "rgba(79,70,229,0.08)", borderRadius: BORDER_RADIUS.xl, padding: 12, marginBottom: 12 }}>
                   <View className="flex-row items-center justify-between">
                     <View>
-                      <Text className="text-slate-400 text-[10px] uppercase font-bold mb-1">Your Current Bid</Text>
-                      <Text className="text-brand-600 font-bold text-lg">{F(myCurrentBid.bidAmount)}</Text>
+                      <Text style={{ color: COLORS.text.muted, fontSize: 10, fontWeight: "700", textTransform: "uppercase", marginBottom: 4 }}>Your Current Bid</Text>
+                      <Text style={{ color: COLORS.brand[600], fontWeight: "700", fontSize: 18 }}>{F(myCurrentBid.bidAmount)}</Text>
                     </View>
                     {myBidRank > 0 && (
                       <View className="items-end">
-                        <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">Your Rank</Text>
-                        <Text className={`font-bold text-lg ${myBidRank === 1 ? "text-gold-600" : "text-slate-400"}`}>
+                        <Text style={{ color: COLORS.text.secondary, fontSize: 10, fontWeight: "700", textTransform: "uppercase", marginBottom: 4 }}>Your Rank</Text>
+                        <Text style={{ color: myBidRank === 1 ? COLORS.gold[600] : COLORS.text.muted, fontWeight: "700", fontSize: 18 }}>
                           #{myBidRank}
                         </Text>
                       </View>
                     )}
                   </View>
-                  <Text className="text-slate-500 text-[10px] mt-1">You can edit or cancel until bidding closes</Text>
+                  <Text style={{ color: COLORS.text.secondary, fontSize: 10, marginTop: 4 }}>You can edit or cancel until bidding closes</Text>
                 </View>
               ) : null}
 
               {/* Lowest bid info */}
               {lowestBid && (
-                <View className="bg-gold-500/10 rounded-xl p-3 mb-3">
+                <View style={{ backgroundColor: "rgba(245,158,11,0.08)", borderRadius: BORDER_RADIUS.xl, padding: 12, marginBottom: 12 }}>
                   <View className="flex-row items-center justify-between">
                     <View>
-                      <Text className="text-slate-400 text-[10px] uppercase font-bold mb-1">Lowest Bid</Text>
-                      <Text className="text-gold-600 font-bold text-lg">{F(lowestBid.bidAmount)}</Text>
+                      <Text style={{ color: COLORS.text.muted, fontSize: 10, fontWeight: "700", textTransform: "uppercase", marginBottom: 4 }}>Lowest Bid</Text>
+                      <Text style={{ color: COLORS.gold[600], fontWeight: "700", fontSize: 18 }}>{F(lowestBid.bidAmount)}</Text>
                     </View>
                     <View className="items-end">
-                      <Text className="text-slate-400 text-[10px] uppercase font-bold mb-1">Bids Placed</Text>
-                      <Text className="text-slate-900 font-bold text-lg">{allBids.length}</Text>
+                      <Text style={{ color: COLORS.text.muted, fontSize: 10, fontWeight: "700", textTransform: "uppercase", marginBottom: 4 }}>Bids Placed</Text>
+                      <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 18 }}>{allBids.length}</Text>
                     </View>
                   </View>
-                  <Text className="text-slate-500 text-[10px] mt-1">Lowest bidder wins the pool</Text>
+                  <Text style={{ color: COLORS.text.secondary, fontSize: 10, marginTop: 4 }}>Lowest bidder wins the pool</Text>
                 </View>
               )}
 
@@ -502,29 +507,29 @@ export default function MemberCommitteeOverview() {
                   icon={<Ionicons name="hammer-outline" size={18} color="#fff" />}
                 />
               ) : hasWon ? (
-                <View className="bg-warning-500/10 rounded-xl p-3">
-                  <Text className="text-warning-600 text-xs font-bold text-center">
+                <View style={{ backgroundColor: "rgba(217,119,6,0.10)", borderRadius: BORDER_RADIUS.xl, padding: 12 }}>
+                  <Text style={{ color: COLORS.warning.dark, fontSize: 11, fontWeight: "700", textAlign: "center" }}>
                     You have already won a payout. You cannot bid again.
                   </Text>
                 </View>
               ) : (
-                <Text className="text-slate-500 text-xs text-center py-2">You are not eligible to bid this month</Text>
+                <Text style={{ color: COLORS.text.secondary, fontSize: 11, textAlign: "center", paddingVertical: 8 }}>You are not eligible to bid this month</Text>
               )}
             </View>
           ) : latestMonthStatus === "completed" ? (
             <View>
               <View className="flex-row items-center justify-between mb-2">
-                <Badge label="Resolved" variant="brand" size="md" />
-                <Text className="text-slate-500 text-[10px]">{currentMonth.resolutionType?.replace("_", " ")}</Text>
+                <Badge label="Resolved" variant="brand" size="md" dot />
+                <Text style={{ color: COLORS.text.secondary, fontSize: 10 }}>{currentMonth.resolutionType?.replace("_", " ")}</Text>
               </View>
 
               {currentMonth.winnerMemberId && (
-                <View className="bg-surface-50 rounded-xl p-3 mb-2">
-                  <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">Winner</Text>
-                  <Text className="text-slate-900 font-bold text-sm">
+                <View style={{ backgroundColor: COLORS.surface.warm, borderRadius: BORDER_RADIUS.xl, padding: 12, marginBottom: 8 }}>
+                  <Text style={{ color: COLORS.text.secondary, fontSize: 10, fontWeight: "700", textTransform: "uppercase", marginBottom: 4 }}>Winner</Text>
+                  <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 13 }}>
                     {members.find((m: any) => m.id === currentMonth.winnerMemberId)?.user?.name || "Unknown"}
                   </Text>
-                  <Text className="text-gold-600 text-xs mt-0.5">
+                  <Text style={{ color: COLORS.gold[600], fontSize: 11, marginTop: 2 }}>
                     Winning bid: {F(currentMonth.winningBidAmount)}
                   </Text>
                 </View>
@@ -532,12 +537,12 @@ export default function MemberCommitteeOverview() {
 
               {/* Net payment obligation for current member */}
               {isWinnerOfCurrentMonth ? (
-                <View className="bg-success-500/10 rounded-xl p-3 mt-2">
+                <View style={{ backgroundColor: "rgba(22,163,74,0.10)", borderRadius: BORDER_RADIUS.xl, padding: 12, marginTop: 8 }}>
                   <View className="flex-row items-center mb-1">
                     <Ionicons name="checkmark-circle" size={16} color={COLORS.success.light} />
-                    <Text className="text-success-600 text-xs font-bold ml-1.5">Winner — Contribution Netted</Text>
+                    <Text style={{ color: COLORS.success.dark, fontSize: 11, fontWeight: "700", marginLeft: 6 }}>Winner — Contribution Netted</Text>
                   </View>
-                  <Text className="text-slate-400 text-[10px] leading-5">
+                  <Text style={{ color: COLORS.text.muted, fontSize: 10, lineHeight: 16 }}>
                     You won this month. Your {F(installment)} contribution has been adjusted against your payout of {F(currentMonth.winningBidAmount)}. No payment needed.
                   </Text>
                 </View>
@@ -549,7 +554,7 @@ export default function MemberCommitteeOverview() {
 
                 if (myObligation.direction === "pay" && (myObligation.status === "pending" || myObligation.status === "overdue")) {
                   return (
-                    <View className="mt-2">
+                    <View style={{ marginTop: 8 }}>
                       <PayNetButton
                         committeeId={committeeId}
                         monthId={currentMonth.id}
@@ -568,10 +573,10 @@ export default function MemberCommitteeOverview() {
 
                 if (myObligation.direction === "receive" && myObligation.status === "pending") {
                   return (
-                    <View className="bg-success-500/10 rounded-xl p-3 mt-2">
-                      <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">Your Payout — Expected</Text>
-                      <Text className="text-success-600 font-bold text-lg">+{F(Math.abs(myObligation.netAmount))}</Text>
-                      <Text className="text-slate-500 text-[10px] mt-1">
+                    <View style={{ backgroundColor: "rgba(22,163,74,0.10)", borderRadius: BORDER_RADIUS.xl, padding: 12, marginTop: 8 }}>
+                      <Text style={{ color: COLORS.text.secondary, fontSize: 10, fontWeight: "700", textTransform: "uppercase", marginBottom: 4 }}>Your Payout — Expected</Text>
+                      <Text style={{ color: COLORS.success.dark, fontWeight: "700", fontSize: 18 }}>+{F(Math.abs(myObligation.netAmount))}</Text>
+                      <Text style={{ color: COLORS.text.secondary, fontSize: 10, marginTop: 4 }}>
                         Credited to wallet after all members pay
                       </Text>
                     </View>
@@ -580,10 +585,10 @@ export default function MemberCommitteeOverview() {
 
                 if (myObligation.status === "paid") {
                   return (
-                    <View className="bg-success-500/10 rounded-xl p-3 mt-2">
+                    <View style={{ backgroundColor: "rgba(22,163,74,0.10)", borderRadius: BORDER_RADIUS.xl, padding: 12, marginTop: 8 }}>
                       <View className="flex-row items-center">
                         <Ionicons name="checkmark-circle" size={16} color={COLORS.success.light} />
-                        <Text className="text-success-600 text-xs font-bold ml-1.5">Payment Completed</Text>
+                        <Text style={{ color: COLORS.success.dark, fontSize: 11, fontWeight: "700", marginLeft: 6 }}>Payment Completed</Text>
                       </View>
                     </View>
                   );
@@ -591,16 +596,16 @@ export default function MemberCommitteeOverview() {
 
                 if (myObligation.status === "organiser_advanced") {
                   return (
-                    <View className="bg-warning-500/10 rounded-xl p-3 mt-2">
+                    <View style={{ backgroundColor: "rgba(217,119,6,0.10)", borderRadius: BORDER_RADIUS.xl, padding: 12, marginTop: 8 }}>
                       <View className="flex-row items-center">
                         <Ionicons name="person-outline" size={16} color={COLORS.warning.light} />
-                        <Text className="text-warning-600 text-xs font-bold ml-1.5">Paid by Organizer</Text>
+                        <Text style={{ color: COLORS.warning.dark, fontSize: 11, fontWeight: "700", marginLeft: 6 }}>Paid by Organizer</Text>
                       </View>
-                      <Text className="text-slate-500 text-[10px] mt-1">
+                      <Text style={{ color: COLORS.text.secondary, fontSize: 10, marginTop: 4 }}>
                         Organizer advanced {F(Math.abs(myObligation.netAmount))} on your behalf
                       </Text>
                       {memberIsBlocked && (
-                        <Text className="text-danger-600 text-[10px] mt-1">
+                        <Text style={{ color: COLORS.danger.dark, fontSize: 10, marginTop: 4 }}>
                           Pay this amount to the organiser to unblock your account.
                         </Text>
                       )}
@@ -612,16 +617,16 @@ export default function MemberCommitteeOverview() {
               })()}
 
               {myCurrentDistribution > 0 && (
-                <View className="bg-success-500/10 rounded-xl p-3 mt-2">
-                  <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">Your Distribution</Text>
-                  <Text className="text-success-600 font-bold text-lg">+{F(myCurrentDistribution)}</Text>
+                <View style={{ backgroundColor: "rgba(22,163,74,0.10)", borderRadius: BORDER_RADIUS.xl, padding: 12, marginTop: 8 }}>
+                  <Text style={{ color: COLORS.text.secondary, fontSize: 10, fontWeight: "700", textTransform: "uppercase", marginBottom: 4 }}>Your Distribution</Text>
+                  <Text style={{ color: COLORS.success.dark, fontWeight: "700", fontSize: 18 }}>+{F(myCurrentDistribution)}</Text>
                 </View>
               )}
 
               {currentMonth.perMemberDistribution > 0 && !myCurrentDistribution && (
-                <View className="bg-success-500/10 rounded-xl p-3 mt-2">
-                  <Text className="text-slate-500 text-[10px] uppercase font-bold mb-1">Per-Member Distribution</Text>
-                  <Text className="text-success-600 font-bold text-lg">+{F(currentMonth.perMemberDistribution)}</Text>
+                <View style={{ backgroundColor: "rgba(22,163,74,0.10)", borderRadius: BORDER_RADIUS.xl, padding: 12, marginTop: 8 }}>
+                  <Text style={{ color: COLORS.text.secondary, fontSize: 10, fontWeight: "700", textTransform: "uppercase", marginBottom: 4 }}>Per-Member Distribution</Text>
+                  <Text style={{ color: COLORS.success.dark, fontWeight: "700", fontSize: 18 }}>+{F(currentMonth.perMemberDistribution)}</Text>
                 </View>
               )}
             </View>
@@ -632,21 +637,25 @@ export default function MemberCommitteeOverview() {
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* Eligibility Status                                                */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <View className="px-4 mb-5">
-        <Card>
+      <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[5] }}>
+        <Card accent={hasWon ? "success" : "brand"} style={SHADOWS.cardSm}>
           <View className="flex-row items-center">
-            <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${hasWon ? "bg-success-500/15" : "bg-brand-500/15"}`}>
+            <View style={{
+              width: 40, height: 40, borderRadius: 999,
+              backgroundColor: hasWon ? "rgba(22,163,74,0.10)" : "rgba(79,70,229,0.10)",
+              alignItems: "center", justifyContent: "center", marginRight: 12,
+            }}>
               <Ionicons
                 name={hasWon ? "checkmark-circle-outline" : "person-outline"}
                 size={20}
                 color={hasWon ? COLORS.success.light : COLORS.brandPrimary}
               />
             </View>
-            <View className="flex-1">
-              <Text className="text-slate-900 font-bold text-sm">
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: COLORS.text.primary, fontWeight: "700", fontSize: 13 }}>
                 {hasWon ? "Payout Received" : "Eligible to Bid"}
               </Text>
-              <Text className="text-slate-500 text-xs mt-0.5">
+              <Text style={{ color: COLORS.text.secondary, fontSize: 11, marginTop: 2 }}>
                 {hasWon
                   ? "You have already received your committee payout. Thank you for participating!"
                   : "You have not won yet. Keep participating to receive your payout."}
@@ -660,22 +669,20 @@ export default function MemberCommitteeOverview() {
       {/* Patience Meter / Progress Bar                                     */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {!hasWon && (
-        <View className="px-4 mb-5">
-          <View className="flex-row items-center mb-3">
-            <View className="w-7 h-7 rounded-lg bg-success-500/15 items-center justify-center mr-2">
-              <Ionicons name="pie-chart-outline" size={14} color={COLORS.success.light} />
-            </View>
-            <Text className="text-slate-900 font-bold text-sm">Your Progress</Text>
+        <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[5] }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <View style={{ width: 4, height: 20, borderRadius: 999, backgroundColor: COLORS.success.dark }} />
+            <Text style={{ color: COLORS.text.primary, fontSize: 14, fontWeight: "700" }}>Your Progress</Text>
           </View>
 
-          <Card>
-            <View className="mb-3">
+          <Card accent="success" style={SHADOWS.cardSm}>
+            <View>
               <View className="flex-row justify-between mb-1.5">
-                <Text className="text-slate-400 text-xs">Distributions received</Text>
-                <Text className="text-success-600 text-xs font-bold">{F(myTotalReceived)} / {F(totalExpectedPayout)}</Text>
+                <Text style={{ color: COLORS.text.muted, fontSize: 11 }}>Distributions received</Text>
+                <Text style={{ color: COLORS.success.dark, fontSize: 11, fontWeight: "700" }}>{F(myTotalReceived)} / {F(totalExpectedPayout)}</Text>
               </View>
               {/* Progress bar */}
-              <View className="h-3 bg-surface-50 rounded-full overflow-hidden">
+              <View style={{ height: 10, backgroundColor: COLORS.surface.warm, borderRadius: 999, overflow: "hidden" }}>
                 <LinearGradient
                   colors={GRADIENTS.successGreen}
                   start={{ x: 0, y: 0 }}
@@ -683,7 +690,7 @@ export default function MemberCommitteeOverview() {
                   style={{ width: `${progressPercent}%`, height: "100%", borderRadius: 9999 }}
                 />
               </View>
-              <Text className="text-slate-500 text-[10px] mt-1.5 text-right">
+              <Text style={{ color: COLORS.text.secondary, fontSize: 10, marginTop: 6, textAlign: "right" }}>
                 {progressPercent.toFixed(1)}% of expected total ({F(totalExpectedPayout)})
               </Text>
             </View>
@@ -698,20 +705,18 @@ export default function MemberCommitteeOverview() {
         // Show winner message for resolved month where user won
         if (isWinnerOfCurrentMonth) {
           return (
-            <View className="px-4 mb-5">
-              <View className="flex-row items-center mb-3">
-                <View className="w-7 h-7 rounded-lg bg-success-500/15 items-center justify-center mr-2">
-                  <Ionicons name="checkmark-circle-outline" size={14} color={COLORS.success.light} />
-                </View>
-                <Text className="text-slate-900 font-bold text-sm">Payment Status</Text>
+            <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[5] }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <View style={{ width: 4, height: 20, borderRadius: 999, backgroundColor: COLORS.success.dark }} />
+                <Text style={{ color: COLORS.text.primary, fontSize: 14, fontWeight: "700" }}>Payment Status</Text>
               </View>
-              <Card>
-                <View className="bg-success-500/10 rounded-xl p-4">
+              <Card accent="success" style={SHADOWS.cardSm}>
+                <View style={{ backgroundColor: "rgba(22,163,74,0.08)", borderRadius: BORDER_RADIUS.xl, padding: 16 }}>
                   <View className="flex-row items-center mb-2">
                     <Ionicons name="checkmark-circle" size={20} color={COLORS.success.light} />
-                    <Text className="text-success-600 font-bold text-sm ml-2">Winner — No Payment Needed</Text>
+                    <Text style={{ color: COLORS.success.dark, fontWeight: "700", fontSize: 13, marginLeft: 8 }}>Winner — No Payment Needed</Text>
                   </View>
-                  <Text className="text-slate-400 text-xs leading-5">
+                  <Text style={{ color: COLORS.text.muted, fontSize: 11, lineHeight: 18 }}>
                     You are the winner of Month #{currentMonth.monthNumber}. Your contribution of {F(installment)} has been netted from your payout. No physical payment is required.
                   </Text>
                 </View>
@@ -740,15 +745,13 @@ export default function MemberCommitteeOverview() {
         if (totalDue <= 0) return null;
 
         return (
-          <View className="px-4 mb-5">
-            <View className="flex-row items-center mb-3">
-              <View className="w-7 h-7 rounded-lg bg-gold-500/15 items-center justify-center mr-2">
-                <Ionicons name="card-outline" size={14} color={COLORS.goldPrimary} />
-              </View>
-              <Text className="text-slate-900 font-bold text-sm">Pay Contribution</Text>
+          <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[5] }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <View style={{ width: 4, height: 20, borderRadius: 999, backgroundColor: COLORS.gold[500] }} />
+              <Text style={{ color: COLORS.text.primary, fontSize: 14, fontWeight: "700" }}>Pay Contribution</Text>
             </View>
 
-            <Card>
+            <Card accent="gold" style={SHADOWS.cardSm}>
               <PayNowButton
                 committeeId={committeeId}
                 monthId={currentMonth.id}
@@ -767,7 +770,7 @@ export default function MemberCommitteeOverview() {
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/* Quick Actions                                                     */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <View className="px-4 mb-5">
+      <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[5] }}>
         <View className="flex-row gap-3">
           <View style={{ flex: 1 }}>
             <Button
@@ -790,18 +793,16 @@ export default function MemberCommitteeOverview() {
 
       {/* Pending Dues */}
       {myPendingCount > 0 && (
-        <View className="px-4 mb-5">
-          <View className="flex-row items-center justify-between mb-3">
-            <View className="flex-row items-center">
-              <View className="w-7 h-7 rounded-lg bg-danger-500/15 items-center justify-center mr-2">
-                <Ionicons name="alert-circle-outline" size={14} color={COLORS.danger.light} />
-              </View>
-              <Text className="text-slate-900 font-bold text-sm">Pending Dues</Text>
+        <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[5] }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <View style={{ width: 4, height: 20, borderRadius: 999, backgroundColor: COLORS.danger.light }} />
+              <Text style={{ color: COLORS.text.primary, fontSize: 14, fontWeight: "700" }}>Pending Dues</Text>
             </View>
-            <Badge label={`${myPendingCount} pending`} variant="danger" size="sm" />
+            <Badge label={`${myPendingCount} pending`} variant="danger" size="sm" dot />
           </View>
 
-          <Card padding={0}>
+          <Card padding={0} accent="danger" style={SHADOWS.cardSm}>
             {installments
               .filter((i: any) => {
                 if (i.userId !== currentUser?.id) return false;
@@ -814,18 +815,18 @@ export default function MemberCommitteeOverview() {
               })
               .slice(0, 5)
               .map((inst: any) => (
-                <View key={inst.id} className="flex-row items-center px-3.5 py-2.5 border-b border-brand-primary/5">
-                  <View className="w-8 h-8 rounded-full bg-danger-500/10 items-center justify-center mr-2.5">
+                <View key={inst.id} style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: COLORS.surface.border }}>
+                  <View style={{ width: 32, height: 32, borderRadius: 999, backgroundColor: "rgba(220,38,38,0.10)", alignItems: "center", justifyContent: "center", marginRight: 10 }}>
                     <Ionicons name="time-outline" size={14} color={COLORS.danger.light} />
                   </View>
-                  <View className="flex-1">
-                    <Text className="text-slate-900 text-xs font-semibold">Cycle #{inst.cycleNo}</Text>
-                    <Text className="text-slate-500 text-[10px]">Due: {fmtDate(inst.dueDate)}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: COLORS.text.primary, fontSize: 11, fontWeight: "600" }}>Cycle #{inst.cycleNo}</Text>
+                    <Text style={{ color: COLORS.text.secondary, fontSize: 10 }}>Due: {fmtDate(inst.dueDate)}</Text>
                   </View>
-                  <View className="items-end">
-                    <Text className="text-danger-600 text-xs font-bold">{F(inst.amountDuePaise)}</Text>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={{ color: COLORS.danger.dark, fontSize: 11, fontWeight: "700" }}>{F(inst.amountDuePaise)}</Text>
                     {inst.penaltyPaise > 0 && (
-                      <Text className="text-warning-600 text-[9px]">+{F(inst.penaltyPaise)} late fee</Text>
+                      <Text style={{ color: COLORS.warning.dark, fontSize: 9 }}>+{F(inst.penaltyPaise)} late fee</Text>
                     )}
                   </View>
                 </View>

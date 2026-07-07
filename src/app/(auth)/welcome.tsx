@@ -1,12 +1,14 @@
-// src/app/(auth)/welcome.tsx
-// Kometi Welcome / Onboarding screen
-
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, Dimensions } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import Button from "../../components/ui/Button";
+import KKMark, { KKSeparator } from "../../components/brand/KKMark";
 import { COLORS, FONT_SIZE, SPACING, BORDER_RADIUS } from "../../constants/theme";
+
+const { width } = Dimensions.get("window");
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -14,128 +16,141 @@ export default function WelcomeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.surface.bg }}>
-      {/* Logo area */}
-      <View style={[styles.logoContainer, { paddingTop: insets.top + SPACING[10] }]}>
-        <View style={styles.logoCircle}>
-          <Text style={styles.logoText}>₹</Text>
+      {/* Hero Section */}
+      <LinearGradient
+        colors={["#1e1b4b", "#312e81", "#3730a3"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
+          paddingTop: insets.top + SPACING[12],
+          paddingBottom: SPACING[16],
+          paddingHorizontal: SPACING[6],
+          borderBottomLeftRadius: BORDER_RADIUS["4xl"],
+          borderBottomRightRadius: BORDER_RADIUS["4xl"],
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        {/* K-Mark Watermark */}
+        <View style={{
+          position: "absolute",
+          right: -60,
+          top: -20,
+          opacity: 0.06,
+        }}>
+          <KKMark size={260} color={COLORS.white} />
         </View>
-        <Text style={styles.appName}>Kometi</Text>
-        <Text style={styles.tagline}>Committee Management</Text>
-      </View>
 
-      {/* Feature pills */}
-      <View style={styles.featuresRow}>
-        {["Secure", "Instant", "Transparent"].map((f) => (
-          <View key={f} style={styles.featurePill}>
-            <Text style={styles.featurePillText}>{f}</Text>
+        <View style={{ alignItems: "center" }}>
+          <View style={{
+            width: 80,
+            height: 80,
+            borderRadius: 24,
+            backgroundColor: "rgba(255,255,255,0.1)",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: SPACING[4],
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.15)",
+          }}>
+            <KKMark size={44} color={COLORS.white} />
           </View>
-        ))}
-      </View>
+          <Text style={{
+            fontSize: FONT_SIZE["4xl"],
+            fontWeight: "800",
+            color: COLORS.white,
+            letterSpacing: -1,
+          }}>
+            Monio
+          </Text>
+          <KKSeparator color="rgba(255,255,255,0.3)" width={60} thickness={2} />
+          <Text style={{
+            fontSize: FONT_SIZE.base,
+            color: COLORS.brand[200],
+            marginTop: SPACING[2],
+            textAlign: "center",
+            lineHeight: 24,
+          }}>
+            Committee Management
+          </Text>
+        </View>
+      </LinearGradient>
 
-      {/* Main content */}
-      <View style={styles.contentBlock}>
-        <Text style={styles.headline}>Run your committee{"\n"}the modern way</Text>
-        <Text style={styles.subtext}>
-          Manage members, track installments, and disburse payouts — all in one app built for Indian chit funds.
-        </Text>
+      {/* Content */}
+      <View style={{
+        flex: 1,
+        paddingHorizontal: SPACING[6],
+        paddingTop: SPACING[8],
+        gap: SPACING[6],
+      }}>
+        {/* Feature Highlights */}
+        <View style={{
+          backgroundColor: COLORS.surface.card,
+          borderRadius: BORDER_RADIUS["2xl"],
+          padding: SPACING[6],
+          borderWidth: 1,
+          borderColor: COLORS.surface.border,
+          shadowColor: COLORS.brand[500],
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.05,
+          shadowRadius: 12,
+          elevation: 3,
+          gap: SPACING[5],
+        }}>
+          {[
+            { icon: "shield-checkmark", title: "Secure & Transparent", desc: "Every transaction is recorded and verifiable" },
+            { icon: "flash", title: "Instant Payments", desc: "Pay installments and receive payouts instantly" },
+            { icon: "people", title: "Manage Committees", desc: "Create, join, and manage chit funds seamlessly" },
+          ].map((item, i) => (
+            <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: SPACING[4] }}>
+              <View style={{
+                width: 44,
+                height: 44,
+                borderRadius: 14,
+                backgroundColor: "rgba(79, 70, 229, 0.08)",
+                alignItems: "center",
+                justifyContent: "center",
+              }}>
+                <Ionicons name={item.icon as any} size={22} color={COLORS.brand[500]} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: FONT_SIZE.base, fontWeight: "600", color: COLORS.text.primary }}>
+                  {item.title}
+                </Text>
+                <Text style={{ fontSize: FONT_SIZE.sm, color: COLORS.text.secondary, marginTop: 1 }}>
+                  {item.desc}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
       </View>
 
       {/* CTA */}
-      <View style={[styles.ctaContainer, { paddingBottom: insets.bottom + SPACING[6] }]}>
+      <View style={{
+        paddingHorizontal: SPACING[6],
+        paddingBottom: insets.bottom + SPACING[6],
+        gap: SPACING[3],
+      }}>
         <Button
           label="Get Started"
           variant="primary"
           size="lg"
+          gradient
           onPress={() => router.push("/(auth)/login")}
         />
-        <Text style={styles.termsText}>
+        <Text style={{
+          fontSize: FONT_SIZE.xs,
+          color: COLORS.text.muted,
+          textAlign: "center",
+          lineHeight: 18,
+        }}>
           By continuing, you agree to our{" "}
-          <Text style={{ color: COLORS.brand[400] }}>Terms of Service</Text>
+          <Text style={{ color: COLORS.brand[400], fontWeight: "600" }}>Terms</Text>
           {" "}and{" "}
-          <Text style={{ color: COLORS.brand[400] }}>Privacy Policy</Text>
+          <Text style={{ color: COLORS.brand[400], fontWeight: "600" }}>Privacy Policy</Text>
         </Text>
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  logoContainer: {
-    alignItems: "center",
-    gap:        SPACING[2],
-    flex:       1,
-    justifyContent: "center",
-  },
-  logoCircle: {
-    width:         80,
-    height:        80,
-    borderRadius:  20,
-    alignItems:    "center",
-    justifyContent:"center",
-    marginBottom:  SPACING[2],
-    backgroundColor: COLORS.brand[500],
-  },
-  logoText: {
-    fontSize:   36,
-    fontWeight: "700",
-    color:      COLORS.white,
-  },
-  appName: {
-    fontSize:   FONT_SIZE["3xl"],
-    fontWeight: "700",
-    color:      COLORS.text.primary,
-    letterSpacing: -0.5,
-  },
-  tagline: {
-    fontSize: FONT_SIZE.sm,
-    color:    COLORS.text.secondary,
-    letterSpacing: 1,
-    fontWeight: "500",
-  },
-  featuresRow: {
-    flexDirection:  "row",
-    gap:            SPACING[2],
-    justifyContent: "center",
-    paddingHorizontal: SPACING[6],
-    marginBottom:   SPACING[8],
-  },
-  featurePill: {
-    paddingHorizontal: SPACING[3],
-    paddingVertical:   SPACING[1.5],
-    borderRadius:      BORDER_RADIUS.full,
-    backgroundColor:   COLORS.surface.card,
-    borderWidth:       1,
-    borderColor:       COLORS.surface.border,
-  },
-  featurePillText: {
-    fontSize:   FONT_SIZE.xs,
-    fontWeight: "500",
-    color:      COLORS.text.secondary,
-  },
-  contentBlock: {
-    paddingHorizontal: SPACING[6],
-    gap:               SPACING[3],
-    marginBottom:      SPACING[8],
-  },
-  headline: {
-    fontSize:   FONT_SIZE["3xl"],
-    fontWeight: "700",
-    color:      COLORS.text.primary,
-    lineHeight: 38,
-  },
-  subtext: {
-    fontSize:   FONT_SIZE.base,
-    color:      COLORS.text.secondary,
-    lineHeight: 24,
-  },
-  ctaContainer: {
-    paddingHorizontal: SPACING[6],
-    gap:               SPACING[4],
-  },
-  termsText: {
-    fontSize:  FONT_SIZE.xs,
-    color:     COLORS.text.muted,
-    textAlign: "center",
-    lineHeight: 18,
-  },
-});
