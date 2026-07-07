@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, RefreshControl } from "react-na
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useWalletStore } from "../../../stores/wallet.store";
+import { useFlatListScrollToTop } from "../../../hooks/useScrollToTop";
 import { useAuthStore } from "../../../stores/auth.store";
 import { formatINR } from "../../../utils/currency";
 import { COLORS, BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from "../../../constants/theme";
@@ -21,6 +22,7 @@ import { useAlertModal } from "../../../components/ui/AlertModal";
 export default function Wallet() {
   const router = useRouter();
   const { balancePaise, transactions, withdrawals, isLoading, fetchWalletData, fetchWithdrawals, topupWallet, verifyTopupPayment } = useWalletStore();
+  const listRef = useFlatListScrollToTop();
   const currentUser = useAuthStore((s: any) => s.user);
   const [refreshing, setRefreshing] = useState(false);
   const [topupAmount, setTopupAmount] = useState<bigint>(0n);
@@ -108,6 +110,7 @@ export default function Wallet() {
       <ScreenHeader title="Wallet" subtitle="Manage your chit payments and balance" transparent />
 
       <FlatList
+        ref={listRef}
         data={transactions}
         keyExtractor={(item) => item.id}
         refreshControl={

@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, RefreshControl } from "react-na
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+import { useFlatListScrollToTop } from "../../../hooks/useScrollToTop";
 import { useCommitteeStore } from "../../../stores/committee.store";
 import { formatINR } from "../../../utils/currency";
 import { COLORS, BORDER_RADIUS, SPACING, SHADOWS } from "../../../constants/theme";
@@ -15,6 +16,7 @@ export default function Committees() {
   const router = useRouter();
   const { committees, isLoading, fetchCommittees } = useCommitteeStore();
   const [refreshing, setRefreshing] = useState(false);
+  const listRef = useFlatListScrollToTop();
 
   const loadData = async () => {
     setRefreshing(true);
@@ -139,6 +141,7 @@ export default function Committees() {
       />
 
       <FlatList
+        ref={listRef}
         data={committees}
         keyExtractor={(item) => item.id}
         refreshControl={

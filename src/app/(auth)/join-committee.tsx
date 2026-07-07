@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import {
-  View, Text, ScrollView, TextInput, KeyboardAvoidingView, Platform,
+  View, Text, ScrollView, TextInput, KeyboardAvoidingView, Platform, useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,7 +15,10 @@ const CODE_LENGTH = 8;
 export default function JoinCommitteeScreen() {
   const router   = useRouter();
   const insets   = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const inputsRef = useRef<(TextInput | null)[]>([]);
+  const gap = screenWidth < 380 ? 4 : screenWidth < 420 ? 5 : 6;
+  const boxSize = Math.min(40, Math.floor((screenWidth - SPACING[6] * 2 - gap * (CODE_LENGTH - 1)) / CODE_LENGTH));
 
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -122,7 +125,7 @@ export default function JoinCommitteeScreen() {
 
         {/* Code Input */}
         <View style={{ alignItems: "center" }}>
-          <View style={{ flexDirection: "row", gap: 6, justifyContent: "center" }}>
+          <View style={{ flexDirection: "row", gap, justifyContent: "center" }}>
             {Array.from({ length: CODE_LENGTH }).map((_, i) => {
               const filled = !!digits[i] && digits[i] !== " ";
               const borderColor = error
@@ -144,14 +147,14 @@ export default function JoinCommitteeScreen() {
                   selectTextOnFocus
                   autoFocus={i === 0}
                   style={{
-                    width: 40,
-                    height: 54,
+                    width: boxSize,
+                    height: boxSize * 1.35,
                     borderRadius: BORDER_RADIUS.lg,
                     borderWidth: 2,
                     borderColor,
                     backgroundColor: COLORS.surface.card,
                     textAlign: "center",
-                    fontSize: FONT_SIZE.xl,
+                    fontSize: boxSize > 34 ? FONT_SIZE.xl : FONT_SIZE.lg,
                     fontWeight: "700",
                     color: COLORS.brand[600],
                     shadowColor: filled ? COLORS.brand[500] : "transparent",

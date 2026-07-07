@@ -18,7 +18,7 @@ export default function KKMark({
   return (
     <View style={[{ width: size, height: size, alignItems: "center", justifyContent: "center" }, style]}>
       <Image
-        source={require("../../../assets/images/icon.png")}
+        source={require("../../../assets/images/watermarklogo.png")}
         style={{
           width: size,
           height: size,

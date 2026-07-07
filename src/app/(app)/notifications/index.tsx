@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNotificationsStore } from "../../../stores/notifications.store";
 import { COLORS, SPACING, SHADOWS } from "../../../constants/theme";
+import { useFlatListScrollToTop } from "../../../hooks/useScrollToTop";
 import EmptyState from "../../../components/ui/EmptyState";
 import ScreenHeader from "../../../components/shared/ScreenHeader";
 import { useAlertModal } from "../../../components/ui/AlertModal";
@@ -20,6 +21,7 @@ const NOTIF_ICONS: Record<string, { name: keyof typeof Ionicons.glyphMap; color:
 export default function Notifications() {
   const { notifications, unreadCount, fetchNotifications, markAsRead, markAllAsRead } = useNotificationsStore();
   const { AlertComponent } = useAlertModal();
+  const listRef = useFlatListScrollToTop();
 
   useEffect(() => {
     fetchNotifications();
@@ -34,6 +36,7 @@ export default function Notifications() {
       <ScreenHeader title="Notifications" transparent />
 
       <FlatList
+        ref={listRef}
         data={notifications}
         keyExtractor={(item: any) => item.id}
         contentContainerStyle={{ paddingBottom: 100, flexGrow: 1 }}

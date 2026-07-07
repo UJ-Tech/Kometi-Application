@@ -10,6 +10,7 @@ import { useWalletStore } from "../stores/wallet.store";
 import { useInstallmentStore } from "../stores/installment.store";
 import { useCommitteeStore } from "../stores/committee.store";
 import { useNotificationsStore } from "../stores/notifications.store";
+import * as Notifications from "expo-notifications";
 
 export function useSocket(): Socket | null {
   const socketRef      = useRef<Socket | null>(null);
@@ -136,6 +137,17 @@ export function useSocket(): Socket | null {
         title: data.title,
         body: data.body,
       });
+
+      Notifications.scheduleNotificationAsync({
+        identifier: `push_${Date.now()}`,
+        content: {
+          title: data.title,
+          body: data.body,
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: null,
+      }).catch(() => {});
     });
 
     return () => {

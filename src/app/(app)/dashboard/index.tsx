@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text, ScrollView, TouchableOpacity, RefreshControl, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
+import { useScrollToTop } from "../../../hooks/useScrollToTop";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,11 +23,11 @@ import { useAlertModal } from "../../../components/ui/AlertModal";
 
 
 const QUICK_ACTIONS = [
-  { key: "committees", icon: "people-circle", label: "My Chits", color: COLORS.brand[500], bg: "rgba(99,102,241,0.1)" },
-  { key: "installments", icon: "calendar-clear", label: "Chit Dues", color: COLORS.gold[500], bg: "rgba(245,158,11,0.1)" },
-  { key: "members", icon: "person-add", label: "Members", color: COLORS.success.DEFAULT, bg: "rgba(34,197,94,0.1)" },
-  { key: "create", icon: "add-circle", label: "Create Chit", color: COLORS.brand[500], bg: "rgba(99,102,241,0.1)" },
-  { key: "join", icon: "enter-outline", label: "Join Chit", color: COLORS.gold[500], bg: "rgba(245,158,11,0.1)" },
+  { key: "committees", icon: "people-circle", label: "My Chits", desc: "View your committees", color: COLORS.brand[500], bg: "rgba(99,102,241,0.08)", gradient: ["rgba(99,102,241,0.06)", "rgba(99,102,241,0.01)"] },
+  { key: "installments", icon: "calendar-clear", label: "Chit Dues", desc: "Upcoming payments", color: COLORS.gold[500], bg: "rgba(245,158,11,0.08)", gradient: ["rgba(245,158,11,0.06)", "rgba(245,158,11,0.01)"] },
+  { key: "members", icon: "person-add", label: "Members", desc: "Committee members", color: "#059669", bg: "rgba(5,150,105,0.08)", gradient: ["rgba(5,150,105,0.06)", "rgba(5,150,105,0.01)"] },
+  { key: "create", icon: "add-circle", label: "Create Chit", desc: "Start a new committee", color: COLORS.brand[500], bg: "rgba(99,102,241,0.08)", gradient: ["rgba(99,102,241,0.06)", "rgba(99,102,241,0.01)"] },
+  { key: "join", icon: "enter-outline", label: "Join Chit", desc: "Use invite code", color: COLORS.gold[500], bg: "rgba(245,158,11,0.08)", gradient: ["rgba(245,158,11,0.06)", "rgba(245,158,11,0.01)"] },
 ];
 
 export default function Dashboard() {
@@ -101,8 +102,11 @@ export default function Dashboard() {
     }
   };
 
+  const scrollRef = useScrollToTop();
+
   return (
     <ScrollView
+      ref={scrollRef}
       className="flex-1"
       style={{ backgroundColor: COLORS.surface.bg }}
       contentContainerStyle={{ paddingBottom: 120 }}
@@ -244,34 +248,50 @@ export default function Dashboard() {
 
         {/* Quick Actions */}
         <View className="mb-6">
-          <View className="flex-row items-center gap-2 mb-4">
-            <View className="w-1 h-5 rounded-full" style={{ backgroundColor: COLORS.brand[500] }} />
-            <Text className="text-slate-800 text-base font-bold">Quick Actions</Text>
+          <View className="flex-row items-center justify-between mb-4 px-1">
+            <View className="flex-row items-center gap-2">
+              <View className="w-1 h-5 rounded-full" style={{ backgroundColor: COLORS.brand[500] }} />
+              <Text className="text-slate-800 text-base font-bold">Quick Actions</Text>
+            </View>
+            <Text className="text-slate-400 text-[10px] font-medium">{QUICK_ACTIONS.filter(a => a.key !== "members" || canOpenMembers).length} shortcuts</Text>
           </View>
-          <View className="flex-row flex-wrap gap-3">
+          <View className="flex-row flex-wrap" style={{ marginHorizontal: -4 }}>
             {QUICK_ACTIONS.map((action) => {
               if (action.key === "members" && !canOpenMembers) return null;
+              const cardWidth = (width - SPACING[5] * 2 - 8) / 2;
               return (
                 <TouchableOpacity
                   key={action.key}
                   onPress={() => handleAction(action.key)}
                   activeOpacity={0.7}
-                  className="items-center justify-center bg-white rounded-2xl"
                   style={{
-                    width: (width - SPACING[5] * 2 - 12 * 2) / 3,
-                    aspectRatio: 1,
+                    width: cardWidth,
+                    margin: 4,
+                    borderRadius: 16,
+                    backgroundColor: COLORS.surface.card,
                     borderWidth: 1,
                     borderColor: COLORS.surface.border,
-                    ...SHADOWS.card,
+                    ...SHADOWS.cardSm,
                   }}
                 >
-                  <View
-                    className="w-12 h-12 rounded-2xl items-center justify-center mb-2"
-                    style={{ backgroundColor: action.bg }}
-                  >
-                    <Ionicons name={action.icon as any} size={24} color={action.color} />
+                  <View style={{ padding: 14, gap: 10 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                      <View
+                        style={{
+                          width: 36, height: 36, borderRadius: 12,
+                          backgroundColor: action.bg,
+                          alignItems: "center", justifyContent: "center",
+                        }}
+                      >
+                        <Ionicons name={action.icon as any} size={18} color={action.color} />
+                      </View>
+                      <Text className="text-slate-800 font-bold text-sm flex-1">{action.label}</Text>
+                      <Ionicons name="chevron-forward" size={14} color={COLORS.text.muted} />
+                    </View>
+                    <Text className="text-slate-400 text-[10px] leading-4" style={{ paddingLeft: 46 }}>
+                      {action.desc}
+                    </Text>
                   </View>
-                  <Text className="text-slate-700 font-semibold text-xs">{action.label}</Text>
                 </TouchableOpacity>
               );
             })}
