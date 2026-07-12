@@ -38,8 +38,10 @@ export class WalletService {
       .eq("status", "confirmed");
 
     const committeeBalance = (ledgerEntries || []).reduce((sum: number, entry: any) => {
-      // contribution_made is a record of payment into the pool, not spendable money
-      if (entry.entry_type === "contribution_made") return sum;
+      // contribution_made credits record payment into the pool (not spendable),
+      // but contribution_made debits represent spending committee credits — they
+      // should reduce the available balance.
+      if (entry.entry_type === "contribution_made" && entry.direction === "credit") return sum;
       return sum + (entry.direction === "credit" ? Number(entry.amount) : -Number(entry.amount));
     }, 0);
 

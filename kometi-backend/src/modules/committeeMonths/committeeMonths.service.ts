@@ -386,7 +386,7 @@ export class CommitteeMonthsService {
 
       const { error: instErr, data: updatedInst } = await supabase
         .from("installments")
-        .update({ status: "PAID", paidAt: new Date().toISOString() })
+        .update({ status: "PAID", amountPaidPaise: contributionPerPerson, paidAt: new Date().toISOString() })
         .eq("committeeId", committeeId)
         .eq("userId", winnerUser.userId)
         .eq("cycleNo", month.month_number)
@@ -1207,7 +1207,7 @@ export class CommitteeMonthsService {
       .eq("status", "confirmed");
 
     const committeeBalance = (ledgerEntries || []).reduce((sum: number, entry: any) => {
-      if (entry.entry_type === "contribution_made") return sum;
+      if (entry.entry_type === "contribution_made" && entry.direction === "credit") return sum;
       return sum + (entry.direction === "credit" ? Number(entry.amount) : -Number(entry.amount));
     }, 0);
 
@@ -1257,12 +1257,26 @@ export class CommitteeMonthsService {
 
     if (updateOblErr) throw updateOblErr;
 
-    // 6. Update monthly_contributions → paid (backward compat)
+    // 6. Get full contribution amount so installment shows fully paid
+    //    (non-winner pays net amount = contribution - distribution, but the
+    //     installment obligation is the full contribution — distribution covers
+    //     the gap, so mark the installment as fully satisfied.)
+    const { data: installmentRecord } = await supabase
+      .from("installments")
+      .select("amountDuePaise")
+      .eq("committeeId", committeeId)
+      .eq("userId", userId)
+      .eq("cycleNo", cycleNo)
+      .single();
+
+    const fullContributionPaise = installmentRecord ? Number(installmentRecord.amountDuePaise) : netAmountPaise;
+
+    // 7. Update monthly_contributions → paid (backward compat)
     await supabase
       .from("monthly_contributions")
       .update({
         status: "paid",
-        amount_paid: netAmountPaise,
+        amount_paid: fullContributionPaise,
         paid_at: new Date().toISOString(),
         payment_transaction_id: tx.id,
       })
@@ -1270,12 +1284,12 @@ export class CommitteeMonthsService {
       .eq("month_id", monthId)
       .eq("member_id", memberId);
 
-    // 7. Update installments → PAID (backward compat)
+    // 8. Update installments → PAID (backward compat)
     await supabase
       .from("installments")
       .update({
         status: "PAID",
-        amountPaidPaise: netAmountPaise,
+        amountPaidPaise: fullContributionPaise,
         paidAt: new Date().toISOString(),
         paymentMethod: "WALLET",
         paymentReference: tx.id,
@@ -1284,7 +1298,7 @@ export class CommitteeMonthsService {
       .eq("userId", userId)
       .eq("cycleNo", cycleNo);
 
-    // 8. Credit wallet ledger — net contribution made
+    // 9. Credit wallet ledger — net contribution made
     try {
       await WalletLedgerService.creditWallet({
         memberId: userId,
@@ -1301,12 +1315,12 @@ export class CommitteeMonthsService {
       console.error("[payNetAmount] Wallet ledger credit failed:", err);
     }
 
-    // 9. DEBIT WALLET (LAST — all DB updates above succeeded)
+    // 10. DEBIT WALLET (LAST — all DB updates above succeeded)
     //    Debit from raw wallet first, then from committee ledger if needed.
     const rawDebit = Math.min(rawBalance, netAmountPaise);
     const ledgerDebit = netAmountPaise - rawDebit;
 
-    // 9a. Debit raw wallet
+    // 10a. Debit raw wallet
     if (rawDebit > 0) {
       const rawBalanceAfter = rawBalance - rawDebit;
       const { error: debitError } = await supabase
@@ -1317,7 +1331,7 @@ export class CommitteeMonthsService {
       if (debitError) throw new Error("Failed to debit wallet");
     }
 
-    // 9b. If remainder, debit from committee ledger (already validated combined balance is sufficient)
+    // 10b. If remainder, debit from committee ledger (already validated combined balance is sufficient)
     if (ledgerDebit > 0) {
       try {
         // Create a direct debit entry in the ledger for the remainder
@@ -1358,7 +1372,7 @@ export class CommitteeMonthsService {
       }
     }
 
-    // 10. Record legacy transaction (non-critical)
+    // 11. Record legacy transaction (non-critical)
     try {
       await supabase
         .from("transactions")
@@ -1456,7 +1470,7 @@ export class CommitteeMonthsService {
       .eq("status", "confirmed");
 
     const orgCommitteeBalance = (orgLedgerEntries || []).reduce((sum: number, entry: any) => {
-      if (entry.entry_type === "contribution_made") return sum;
+      if (entry.entry_type === "contribution_made" && entry.direction === "credit") return sum;
       return sum + (entry.direction === "credit" ? Number(entry.amount) : -Number(entry.amount));
     }, 0);
 

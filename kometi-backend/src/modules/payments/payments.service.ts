@@ -719,7 +719,7 @@ export class PaymentsService {
       .eq("status", "confirmed");
 
     const committeeBalance = (ledgerEntries || []).reduce((sum: number, entry: any) => {
-      if (entry.entry_type === "contribution_made") return sum;
+      if (entry.entry_type === "contribution_made" && entry.direction === "credit") return sum;
       return sum + (entry.direction === "credit" ? Number(entry.amount) : -Number(entry.amount));
     }, 0);
 
