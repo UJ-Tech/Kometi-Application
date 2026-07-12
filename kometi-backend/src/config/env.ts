@@ -25,12 +25,15 @@ const envSchema = z.object({
   // Expo Push Notifications
   EXPO_ACCESS_TOKEN: z.string().optional(),
 
-  // SMTP (for email OTP) — optional when not configured
+  // Email (Resend — preferred, HTTPS, never blocked)
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().optional(),
+
+  // SMTP (fallback — Render blocks SMTP ports)
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.string().optional(),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
-  EMAIL_FROM: z.string().optional(),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

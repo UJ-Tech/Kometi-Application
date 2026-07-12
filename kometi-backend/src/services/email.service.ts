@@ -1,27 +1,13 @@
 // src/services/email.service.ts
-// Nodemailer-based email sender with a branded HTML OTP template.
+// Sends emails via Resend Web API (HTTPS — never blocked by cloud hosts).
 
 import env from "../config/env";
 
-const smtpConfigured = !!(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS && env.EMAIL_FROM);
-
-let transporter: import("nodemailer").Transporter | null = null;
-
-if (smtpConfigured) {
-  const nodemailer = require("nodemailer");
-  transporter = nodemailer.createTransport({
-    host: env.SMTP_HOST,
-    port: env.SMTP_PORT ? parseInt(env.SMTP_PORT, 10) : 587,
-    secure: env.SMTP_PORT === "465",
-    auth: {
-      user: env.SMTP_USER,
-      pass: env.SMTP_PASS,
-    },
-    connectionTimeout: 5_000,
-    greetingTimeout: 5_000,
-    socketTimeout: 10_000,
-  });
-}
+const resendClient = (() => {
+  if (!env.RESEND_API_KEY) return null;
+  const { Resend } = require("resend");
+  return new Resend(env.RESEND_API_KEY);
+})();
 
 function buildOTPEmail(otp: string, userName: string, appName = "Monio"): string {
   return `
@@ -82,33 +68,27 @@ export async function sendEmailOTP(
   userName: string,
   otp: string,
 ): Promise<void> {
-  if (!smtpConfigured || !transporter) {
-    console.log(`[Email OTP] SMTP not configured. Would send to ${to}: ${otp}`);
+  if (!resendClient) {
+    console.log(`[Email OTP] Resend not configured. Would send to ${to}: ${otp}`);
     return;
   }
 
   const html = buildOTPEmail(otp, userName);
 
-  try {
-    await transporter.sendMail({
-      from: env.EMAIL_FROM,
-      to,
-      subject: "Your OTP for Email Verification - Monio",
-      html,
-    });
-  } catch (err: any) {
-    console.error(`[Email OTP] Failed to send to ${to}:`, err?.message ?? err);
+  console.log(`[Email OTP] Sending to ${to} via Resend...`);
+
+  const { data, error } = await resendClient.emails.send({
+    from: env.EMAIL_FROM,
+    to,
+    subject: "Your OTP for Email Verification - Monio",
+    html,
+  });
+
+  if (error) {
+    console.error(`[Email OTP] Resend error:`, error);
     console.log(`[Email OTP] OTP for ${to}: ${otp}`);
-    const detail = err?.message ?? "";
-    if (detail.includes("EAUTH")) {
-      throw new Error("SMTP authentication failed. Check your SMTP_USER and SMTP_PASS (use an App Password for Gmail).");
-    }
-    if (detail.includes("ENOTFOUND")) {
-      throw new Error(`SMTP host not found. Check your SMTP_HOST (current: ${env.SMTP_HOST}).`);
-    }
-    if (detail.includes("ETIMEDOUT") || detail.includes("ESOCKET")) {
-      throw new Error(`SMTP connection timed out. Check your SMTP_HOST and SMTP_PORT (current: ${env.SMTP_HOST}:${env.SMTP_PORT ?? "587"}). Render may block outbound SMTP — try port 465 (SSL) instead of 587.`);
-    }
-    throw new Error(`Failed to send email: ${detail.slice(0, 120)}`);
+    throw new Error(`Failed to send email: ${error.message}`);
   }
+
+  console.log(`[Email OTP] Sent, id=${data?.id}`);
 }
