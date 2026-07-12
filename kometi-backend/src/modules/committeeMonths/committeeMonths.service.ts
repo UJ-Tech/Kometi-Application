@@ -384,7 +384,7 @@ export class CommitteeMonthsService {
 
       const { error: instErr, data: updatedInst } = await supabase
         .from("installments")
-        .update({ status: "PAID", paidAt: new Date().toISOString(), paymentMethod: "NETTED_PAYOUT" })
+        .update({ status: "PAID", paidAt: new Date().toISOString() })
         .eq("committeeId", committeeId)
         .eq("userId", winnerUser.userId)
         .eq("cycleNo", month.month_number)

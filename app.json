@@ -22,7 +22,10 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/watermarklogo.png"
+      "favicon": "./assets/images/watermarklogo.png",
+      "notification": {
+        "vapidPublicKey": "BBVGEr2wY4AQ8xj29fxvEw2UMUmWzjkEeJ4x/cNVPEHtattZWNt9uDoA9S6hGfA/0YB/sQbbLWN2ZeQkAbsF8xw="
+      }
     },
     "plugins": [
       "expo-router",

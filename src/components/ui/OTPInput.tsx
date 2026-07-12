@@ -51,52 +51,55 @@ export default function OTPInput({
     }
   };
 
+  const boxes: React.ReactNode[] = [];
+  for (let i = 0; i < length; i++) {
+    const filled = !!digits[i] && digits[i] !== " ";
+    const hasError = !!error;
+    const borderColor = hasError
+      ? COLORS.danger.DEFAULT
+      : filled
+        ? COLORS.brand[500]
+        : COLORS.surface.border;
+
+    boxes.push(
+      <TextInput
+        key={i}
+        ref={(r) => { inputsRef.current[i] = r; }}
+        value={digits[i] === " " ? "" : digits[i]}
+        onChangeText={(t) => handleChange(t, i)}
+        onKeyPress={(e) => handleKeyPress(e, i)}
+        keyboardType="number-pad"
+        maxLength={6}
+        selectTextOnFocus
+        autoFocus={autoFocus && i === 0}
+        style={{
+          width: 48,
+          height: 58,
+          borderRadius: BORDER_RADIUS.lg,
+          borderWidth: 2,
+          borderColor,
+          backgroundColor: COLORS.surface.card,
+          textAlign: "center",
+          fontSize: FONT_SIZE.xl,
+          fontWeight: "700",
+          color: COLORS.text.primary,
+          shadowColor: filled ? COLORS.brand[500] : "transparent",
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.3,
+          shadowRadius: 6,
+          elevation: filled ? 3 : 0,
+          outlineStyle: "none",
+        } as any}
+      />
+    );
+  }
+
   return (
     <View>
       <View style={{ flexDirection: "row", gap: SPACING[2], justifyContent: "center" }}>
-        {Array.from({ length }).map((_, i) => {
-          const filled = !!digits[i] && digits[i] !== " ";
-          const hasError = !!error;
-          const borderColor = hasError
-            ? COLORS.danger.DEFAULT
-            : filled
-            ? COLORS.brand[500]
-            : COLORS.surface.border;
-
-          return (
-            <TextInput
-              key={i}
-              ref={(r) => { inputsRef.current[i] = r; }}
-              value={digits[i] === " " ? "" : digits[i]}
-              onChangeText={(t) => handleChange(t, i)}
-              onKeyPress={(e) => handleKeyPress(e, i)}
-              keyboardType="number-pad"
-              maxLength={6}
-              selectTextOnFocus
-              autoFocus={autoFocus && i === 0}
-              style={{
-                width: 48,
-                height: 58,
-                borderRadius: BORDER_RADIUS.lg,
-                borderWidth: 2,
-                borderColor,
-                backgroundColor: COLORS.surface.card,
-                textAlign: "center",
-                fontSize: FONT_SIZE.xl,
-                fontWeight: "700",
-                color: COLORS.text.primary,
-                shadowColor: filled ? COLORS.brand[500] : "transparent",
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.3,
-                shadowRadius: 6,
-                elevation: filled ? 3 : 0,
-                outlineStyle: "none",
-              } as any}
-            />
-          );
-        })}
+        {boxes}
       </View>
-      {error && (
+      {!!error && (
         <Text style={{
           textAlign: "center",
           fontSize: FONT_SIZE.sm,
