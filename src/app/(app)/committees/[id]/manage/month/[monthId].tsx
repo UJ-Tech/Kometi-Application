@@ -138,11 +138,10 @@ export default function OrganiserMonthDetail() {
     try {
       setIsResolving(true);
       await committeesApi.resolveMonth(id, monthId);
-      await confirmAction("Success", "Month resolved successfully!", "OK");
       loadData();
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || "Failed to resolve month";
-      await confirmAction("Error", msg, "OK");
+      await alert("Error", msg);
     } finally {
       setIsResolving(false);
     }

@@ -292,8 +292,9 @@ export class CommitteeMonthsService {
         winnerMemberId = this.runLottery(eligibleMembers);
         const remainingNonWinners = Math.max(totalMembers - (month.month_number - 1), 1);
         const interestAmount = calculateMonthlyInterest(remainingNonWinners, contributionPerPerson, 2);
-        winningBidAmount = calculateMaxBid(totalPool, interestAmount);
-        resolutionType = "lottery";
+        const isLastMonth = month.month_number === totalMembers;
+        winningBidAmount = isLastMonth ? totalPool : calculateMaxBid(totalPool, interestAmount);
+        resolutionType = isLastMonth ? "bid_single" : "lottery";
 
       } else if (bids.length === 1) {
         winnerMemberId = bids[0].member_id;
@@ -332,8 +333,9 @@ export class CommitteeMonthsService {
           winnerMemberId = this.runLottery(eligibleMembers);
           const remainingNonWinners = Math.max(totalMembers - (month.month_number - 1), 1);
           const interestAmount = calculateMonthlyInterest(remainingNonWinners, contributionPerPerson, 2);
-          winningBidAmount = calculateMaxBid(totalPool, interestAmount);
-          resolutionType = "lottery";
+          const isLastMonth = month.month_number === totalMembers;
+          winningBidAmount = isLastMonth ? totalPool : calculateMaxBid(totalPool, interestAmount);
+          resolutionType = isLastMonth ? "bid_single" : "lottery";
         } else if (tiedBids.length > 1) {
           // Only the lowest bids are tied (but higher bids exist) → tie-breaker lottery among tied
           const tiedMemberIds = tiedBids.map(b => b.member_id);

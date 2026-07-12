@@ -623,29 +623,6 @@ export default function OrganiserManageTimeline() {
         )}
       </View>
 
-      {/* Delete Month Button (local only — not wired to DB yet) */}
-      {months.length > 0 && (
-        <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[4] }}>
-          <TouchableOpacity
-            onPress={async () => {
-              const confirmed = await confirmAction(
-                "Delete Month (Local)",
-                `Remove Month ${months[months.length - 1]?.monthNumber} from view? This is local only — the DB record still exists.`,
-                "Delete"
-              );
-              if (!confirmed) return;
-              const updatedMonths = months.slice(0, -1);
-              setMonthsData({ ...monthsData, months: updatedMonths });
-              await notify("Done", "Month removed from view. Recreate it from the app.");
-            }}
-            style={{ backgroundColor: "#fef2f2", borderWidth: 1, borderColor: "#fecaca", paddingHorizontal: 16, paddingVertical: 12, borderRadius: BORDER_RADIUS.xl, flexDirection: "row", alignItems: "center", justifyContent: "center" }}
-          >
-            <Ionicons name="trash-outline" size={16} color="#ef4444" />
-            <Text style={{ color: COLORS.danger.dark, fontWeight: "700", fontSize: 13, marginLeft: 8 }}>Delete Last Month (Local Only)</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
       {/* Create Month Button */}
       <View style={{ paddingHorizontal: SPACING[5], marginBottom: SPACING[4] }}>
         {committee && committee.status !== "ACTIVE" ? (
