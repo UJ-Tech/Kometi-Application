@@ -372,26 +372,52 @@ export class CommitteeMonthsService {
     // ─── Winner never physically pays — their contribution is netted from winnings ──
     // Mark winner's installment + monthly_contribution as PAID for EVERY resolved month.
     {
-      const { data: winnerUser } = await supabase
+      const { data: winnerUser, error: winnerUserErr } = await supabase
         .from("committee_members")
         .select("userId")
         .eq("id", winnerMemberId)
         .single();
 
-      if (winnerUser) {
-        await supabase
-          .from("installments")
-          .update({ status: "PAID", paidAt: new Date().toISOString(), paymentMethod: "NETTED_PAYOUT" })
-          .eq("committeeId", committeeId)
-          .eq("userId", winnerUser.userId)
-          .eq("cycleNo", month.month_number);
+      if (winnerUserErr || !winnerUser) {
+        throw new Error(`Failed to lookup winner committee member: ${winnerUserErr?.message || "not found"}`);
+      }
 
-        await supabase
-          .from("monthly_contributions")
-          .update({ status: "paid", amount_paid: contributionPerPerson, paid_at: new Date().toISOString() })
-          .eq("committee_id", committeeId)
-          .eq("month_id", monthId)
-          .eq("member_id", winnerMemberId);
+      const { error: instErr, data: updatedInst } = await supabase
+        .from("installments")
+        .update({ status: "PAID", paidAt: new Date().toISOString(), paymentMethod: "NETTED_PAYOUT" })
+        .eq("committeeId", committeeId)
+        .eq("userId", winnerUser.userId)
+        .eq("cycleNo", month.month_number)
+        .select("id");
+
+      if (instErr) {
+        throw new Error(`Failed to mark winner's installment as PAID: ${instErr.message}`);
+      }
+      if (!updatedInst || updatedInst.length === 0) {
+        throw new Error(
+          `No installment found to mark PAID for user ${winnerUser.userId}, committee ${committeeId}, cycle ${month.month_number}`
+        );
+      }
+
+      const { error: mcErr } = await supabase
+        .from("monthly_contributions")
+        .update({ status: "paid", amount_paid: contributionPerPerson, paid_at: new Date().toISOString() })
+        .eq("committee_id", committeeId)
+        .eq("month_id", monthId)
+        .eq("member_id", winnerMemberId);
+
+      if (mcErr) {
+        throw new Error(`Failed to mark winner's monthly contribution as paid: ${mcErr.message}`);
+      }
+
+      // Prevent winner from participating in future months — set immediately on resolution
+      const { error: payoutFlagErr } = await supabase
+        .from("committee_members")
+        .update({ hasReceivedPayout: true })
+        .eq("id", winnerMemberId);
+
+      if (payoutFlagErr) {
+        throw new Error(`Failed to mark winner as hasReceivedPayout: ${payoutFlagErr.message}`);
       }
     }
 
