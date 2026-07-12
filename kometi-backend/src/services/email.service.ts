@@ -86,15 +86,24 @@ export async function sendEmailOTP(
 
   const html = buildOTPEmail(otp, userName);
 
-  await Promise.race([
-    transporter.sendMail({
-      from: env.EMAIL_FROM,
-      to,
-      subject: "Your OTP for Email Verification - Monio",
-      html,
-    }),
-    new Promise<void>((_, reject) =>
-      setTimeout(() => reject(new Error("Email send timed out")), 10_000),
-    ),
-  ]);
+  try {
+    await Promise.race([
+      transporter.sendMail({
+        from: env.EMAIL_FROM,
+        to,
+        subject: "Your OTP for Email Verification - Monio",
+        html,
+      }),
+      new Promise<void>((_, reject) =>
+        setTimeout(() => reject(new Error("Email send timed out")), 10_000),
+      ),
+    ]);
+  } catch (err) {
+    console.error(`[Email OTP] Failed to send to ${to}:`, err);
+    console.log(`[Email OTP] OTP for ${to}: ${otp}`);
+    throw new Error(
+      "Failed to send verification email. Check that your SMTP credentials are correct " +
+      "(for Gmail with 2FA, use an App Password).",
+    );
+  }
 }
