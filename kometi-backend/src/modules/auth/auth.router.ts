@@ -14,6 +14,7 @@ import {
   changePasswordSchema,
   sendEmailOtpSchema,
   verifyEmailOtpSchema,
+  checkAvailabilitySchema,
 } from "./auth.validator";
 
 const router = Router();
@@ -24,6 +25,8 @@ router.post("/login", validate(loginSchema), AuthController.login);
 router.post("/register", validate(registerSchema), AuthController.register);
 router.post("/refresh", validate(refreshTokenSchema), AuthController.refresh);
 router.post("/logout", AuthController.logout);
+router.post("/check-availability", validate(checkAvailabilitySchema), AuthController.checkAvailability);
+router.post("/cancel-registration", protect as any, AuthController.cancelRegistration as any);
 
 // Protected routes
 router.post("/set-mpin", protect as any, validate(setMpinSchema), AuthController.setMpin as any);

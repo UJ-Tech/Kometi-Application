@@ -68,3 +68,10 @@ export const changePasswordSchema = z.object({
     newPassword: z.string().min(8, "New password must be at least 8 characters"),
   }),
 });
+
+export const checkAvailabilitySchema = z.object({
+  body: z.object({
+    phone: z.string().regex(/^[6-9]\d{9}$/, "Must be a valid 10-digit Indian phone number"),
+    email: z.string().email("Invalid email format"),
+  }),
+});

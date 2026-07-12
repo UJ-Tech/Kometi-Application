@@ -35,6 +35,28 @@ export class AuthController {
     }
   }
 
+  static async checkAvailability(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { phone, email } = req.body;
+      const result = await AuthService.checkAvailability(phone, email);
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async cancelRegistration(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) throw new Error("Unauthorized");
+
+      await AuthService.cancelRegistration(userId);
+      res.status(200).json({ success: true, data: null, message: "Registration cancelled" });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   static async register(req: Request, res: Response, next: NextFunction) {
     try {
       const { phone, name, email, password } = req.body;

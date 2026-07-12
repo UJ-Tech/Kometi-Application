@@ -214,6 +214,38 @@ export class AuthService {
     }
   }
 
+  // ─── PRE-REGISTRATION CHECKS ──────────────────────────────────────────────
+  static async checkAvailability(phone: string, email: string) {
+    const { data: existing } = await supabase
+      .from("users")
+      .select("id, phone, emailVerified")
+      .or(`phone.eq.${phone},email.eq.${email}`)
+      .maybeSingle();
+
+    if (existing) {
+      const field = existing.phone === phone ? "phone" : "email";
+      const exists = existing.emailVerified ? "registered" : "pending";
+      return { available: false, exists, field };
+    }
+
+    return { available: true, exists: null, field: null };
+  }
+
+  // ─── CANCEL PARTIAL REGISTRATION ───────────────────────────────────────────
+  static async cancelRegistration(userId: string) {
+    const { data: user } = await supabase
+      .from("users")
+      .select("emailVerified")
+      .eq("id", userId)
+      .single();
+
+    if (!user) throw new Error("User not found");
+    if (user.emailVerified) throw new Error("Cannot cancel: email already verified");
+
+    await supabase.from("wallets").delete().eq("userId", userId);
+    await supabase.from("users").delete().eq("id", userId);
+  }
+
   static async registerUser(phone: string, name: string, email: string, password: string) {
     let passwordHash: string | undefined;
     try {

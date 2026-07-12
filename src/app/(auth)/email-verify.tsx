@@ -14,6 +14,7 @@ import { authApi } from "../../services/auth.api";
 import { useAuthStore } from "../../stores/auth.store";
 import { isValidEmail } from "../../utils/validators";
 import { COLORS, FONT_SIZE, SPACING, BORDER_RADIUS } from "../../constants/theme";
+import { tokenStorage } from "../../utils/storage";
 import { APP_CONFIG } from "../../constants/config";
 
 const OTP_EXPIRY = APP_CONFIG.OTP_EXPIRY_SECONDS;
@@ -34,6 +35,18 @@ export default function EmailVerifyScreen() {
   const [step,          setStep]          = useState<"email" | "otp">("email");
   const [countdown,     setCountdown]     = useState<number>(0);
   const [canResend,     setCanResend]     = useState(false);
+  const [isDeleting,    setIsDeleting]    = useState(false);
+
+  const handleCancelAndGoBack = async () => {
+    if (!isFromRegistration) { router.back(); return; }
+    setIsDeleting(true);
+    try {
+      await authApi.cancelRegistration();
+      await tokenStorage.clearAll();
+      useAuthStore.getState().logout();
+    } catch {} // best effort
+    router.replace("/(auth)/register");
+  };
 
   useEffect(() => {
     if (countdown <= 0) { setCanResend(true); return; }
@@ -92,7 +105,7 @@ export default function EmailVerifyScreen() {
       style={{ flex: 1, backgroundColor: COLORS.surface.bg }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScreenHeader title="Verify Email" showBack={!isFromRegistration} />
+      <ScreenHeader title="Verify Email" showBack onBack={isFromRegistration ? handleCancelAndGoBack : undefined} />
 
       <View style={[{ flex: 1, paddingHorizontal: SPACING[6], gap: SPACING[8], paddingTop: SPACING[4] }, { paddingBottom: insets.bottom + SPACING[6] }]}>
         <View style={{ alignItems: "center", gap: SPACING[3] }}>

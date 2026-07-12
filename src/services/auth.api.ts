@@ -24,6 +24,14 @@ export interface AuthTokens {
   user:         User;
 }
 
+export interface CheckAvailabilityPayload { phone: string; email: string }
+
+export interface CheckAvailabilityResponse {
+  available: boolean;
+  exists: "registered" | "pending" | null;
+  field: "phone" | "email" | null;
+}
+
 export const authApi = {
   sendOTP: (payload: SendOTPPayload) =>
     apiClient.post<ApiResponse<{ expiresIn: number }>>("/auth/send-otp", payload),
@@ -60,4 +68,10 @@ export const authApi = {
 
   verifyEmailOTP: (payload: VerifyEmailOTPPayload) =>
     apiClient.post<ApiResponse<{ verified: boolean }>>("/auth/verify-email-otp", payload),
+
+  checkAvailability: (payload: CheckAvailabilityPayload) =>
+    apiClient.post<ApiResponse<CheckAvailabilityResponse>>("/auth/check-availability", payload),
+
+  cancelRegistration: () =>
+    apiClient.post<ApiResponse<null>>("/auth/cancel-registration"),
 };

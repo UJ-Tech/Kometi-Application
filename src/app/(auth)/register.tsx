@@ -53,6 +53,17 @@ export default function RegisterScreen() {
     if (!validate()) return;
     setIsLoading(true);
     try {
+      const av = await authApi.checkAvailability({
+        phone: phone.trim().replace(/\s/g, ""),
+        email: email.trim().toLowerCase(),
+      });
+      if (!av.data.data.available) {
+        const fieldName = av.data.data.field === "phone" ? "Mobile Number" : "Email";
+        setErrors({ form: `${fieldName} is already ${av.data.data.exists === "pending" ? "registered (pending verification)" : "registered"}` });
+        setIsLoading(false);
+        return;
+      }
+
       const res = await authApi.register({
         phone: phone.trim().replace(/\s/g, ""),
         name:  name.trim(),
