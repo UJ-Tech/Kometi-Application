@@ -25,12 +25,12 @@ const envSchema = z.object({
   // Expo Push Notifications
   EXPO_ACCESS_TOKEN: z.string().optional(),
 
-  // SMTP (for email OTP)
-  SMTP_HOST: z.string().min(1, "SMTP_HOST is required"),
-  SMTP_PORT: z.string().transform((v) => parseInt(v, 10)).default("587"),
-  SMTP_USER: z.string().min(1, "SMTP_USER is required"),
-  SMTP_PASS: z.string().min(1, "SMTP_PASS is required"),
-  EMAIL_FROM: z.string().min(1, "EMAIL_FROM is required"),
+  // SMTP (for email OTP) — optional when not configured
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.string().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  EMAIL_FROM: z.string().optional(),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
