@@ -25,9 +25,10 @@ const envSchema = z.object({
   // Expo Push Notifications
   EXPO_ACCESS_TOKEN: z.string().optional(),
 
-  // Email (Resend — preferred, HTTPS, never blocked)
-  RESEND_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().optional(),
+  // Email (Brevo / Sendinblue — HTTPS, 300/day free, no domain needed)
+  BREVO_API_KEY: z.string().optional(),
+  BREVO_SENDER_NAME: z.string().optional().default("Monio"),
+  BREVO_SENDER_EMAIL: z.string().optional(),
 
   // SMTP (fallback — Render blocks SMTP ports)
   SMTP_HOST: z.string().optional(),

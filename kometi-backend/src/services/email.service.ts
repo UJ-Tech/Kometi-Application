@@ -1,13 +1,10 @@
 // src/services/email.service.ts
-// Sends emails via Resend Web API (HTTPS — never blocked by cloud hosts).
+// Sends emails via Brevo (Sendinblue) REST API — HTTPS, never blocked by cloud hosts.
 
+import https from "https";
 import env from "../config/env";
 
-const resendClient = (() => {
-  if (!env.RESEND_API_KEY) return null;
-  const { Resend } = require("resend");
-  return new Resend(env.RESEND_API_KEY);
-})();
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
 function buildOTPEmail(otp: string, userName: string, appName = "Monio"): string {
   return `
@@ -63,32 +60,73 @@ function buildOTPEmail(otp: string, userName: string, appName = "Monio"): string
 </html>`;
 }
 
+function postToBrevo(payload: object): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify(payload);
+    const url = new URL(BREVO_API_URL);
+    const req = https.request(
+      url,
+      {
+        method: "POST",
+        headers: {
+          "api-key": env.BREVO_API_KEY!,
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(data),
+        },
+      },
+      (res) => {
+        let body = "";
+        res.on("data", (chunk: string) => (body += chunk));
+        res.on("end", () => {
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            resolve();
+          } else {
+            const message =
+              (() => {
+                try {
+                  return JSON.parse(body).message;
+                } catch {
+                  return body;
+                }
+              })() || res.statusMessage || `HTTP ${res.statusCode}`;
+            reject(new Error(message));
+          }
+        });
+      },
+    );
+    req.on("error", reject);
+    req.write(data);
+    req.end();
+  });
+}
+
 export async function sendEmailOTP(
   to: string,
   userName: string,
   otp: string,
 ): Promise<void> {
-  if (!resendClient) {
-    console.log(`[Email OTP] Resend not configured. Would send to ${to}: ${otp}`);
+  if (!env.BREVO_API_KEY || !env.BREVO_SENDER_EMAIL) {
+    console.log(`[Email OTP] Brevo not configured. OTP for ${to}: ${otp}`);
     return;
   }
 
-  const html = buildOTPEmail(otp, userName);
+  console.log(`[Email OTP] Sending to ${to} via Brevo...`);
 
-  console.log(`[Email OTP] Sending to ${to} via Resend...`);
-
-  const { data, error } = await resendClient.emails.send({
-    from: env.EMAIL_FROM,
-    to,
-    subject: "Your OTP for Email Verification - Monio",
-    html,
-  });
-
-  if (error) {
-    console.error(`[Email OTP] Resend error:`, error);
+  try {
+    await postToBrevo({
+      sender: {
+        name: env.BREVO_SENDER_NAME || "Monio",
+        email: env.BREVO_SENDER_EMAIL,
+      },
+      to: [{ email: to, name: userName }],
+      subject: "Your OTP for Email Verification - Monio",
+      htmlContent: buildOTPEmail(otp, userName),
+    });
+    console.log(`[Email OTP] Sent successfully to ${to}`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[Email OTP] Brevo error: ${message}`);
     console.log(`[Email OTP] OTP for ${to}: ${otp}`);
-    throw new Error(`Failed to send email: ${error.message}`);
+    throw new Error(`Failed to send email: ${message}`);
   }
-
-  console.log(`[Email OTP] Sent, id=${data?.id}`);
 }
