@@ -81,9 +81,14 @@ model User {
   email           String?   @unique
   passwordHash    String?
   pin             String? // 6-digit hashed MPIN
+  pinAttempts     Int       @default(0) // failed MPIN attempts
+  lockedUntil     DateTime? // MPIN lockout expiry
   role            UserRole  @default(MEMBER)
-  isActive        Boolean   @default(true)
-  kycStatus       KYCStatus @default(PENDING)
+  isActive              Boolean   @default(true)
+  kycStatus             KYCStatus @default(PENDING)
+  emailVerified         Boolean   @default(false)
+  emailVerificationCode String?   // current email verification code (plain-text for simplicity)
+  emailVerificationExpiresAt DateTime?
   profileImageUrl String?
   deviceTokens    String[] // FCM tokens for push
   lastLoginAt     DateTime?
@@ -348,7 +353,8 @@ model AuditLog {
 
 model OTPVerification {
   id        String   @id @default(cuid())
-  phone     String
+  phone     String?
+  email     String?
   otp       String // bcrypt hashed
   expiresAt DateTime
   attempts  Int      @default(0)
@@ -356,6 +362,7 @@ model OTPVerification {
   createdAt DateTime @default(now())
 
   @@index([phone])
+  @@index([email])
   @@map("otp_verifications")
 }
 

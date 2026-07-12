@@ -49,6 +49,19 @@ export const verifyMpinSchema = z.object({
   }),
 });
 
+export const sendEmailOtpSchema = z.object({
+  body: z.object({
+    email: z.string().email("Invalid email format"),
+  }),
+});
+
+export const verifyEmailOtpSchema = z.object({
+  body: z.object({
+    email: z.string().email("Invalid email format"),
+    otp: z.string().length(6, "OTP must be exactly 6 characters"),
+  }),
+});
+
 export const changePasswordSchema = z.object({
   body: z.object({
     currentPassword: z.string().min(8, "Current password must be at least 8 characters"),

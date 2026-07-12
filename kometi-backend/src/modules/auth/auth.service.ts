@@ -1,12 +1,13 @@
 // src/modules/auth/auth.service.ts
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { randomUUID } from "crypto";
+import { randomUUID, randomInt } from "crypto";
 import fs from "fs/promises";
 import path from "path";
 import supabase from "../../config/supabase";
 import env from "../../config/env";
 import { isDatabaseUnavailable } from "../../utils/db-utils";
+import { sendEmailOTP } from "../../services/email.service";
 
 type LocalUser = {
   id: string;
@@ -15,6 +16,11 @@ type LocalUser = {
   email: string;
   passwordHash: string;
   pin: string | null;
+  pinAttempts: number;
+  lockedUntil: string | null;
+  emailVerified: boolean;
+  emailVerificationCode: string | null;
+  emailVerificationExpiresAt: string | null;
   isActive: boolean;
   kycStatus: "PENDING" | "SUBMITTED" | "VERIFIED" | "REJECTED";
   profileImageUrl: string | null;
@@ -30,9 +36,21 @@ type LocalRefreshToken = {
   isRevoked: boolean;
 };
 
+type LocalOTPRecord = {
+  id: string;
+  phone: string | null;
+  email: string | null;
+  otp: string;
+  expiresAt: string;
+  attempts: number;
+  verified: boolean;
+  createdAt: string;
+};
+
 type LocalAuthStore = {
   users: LocalUser[];
   refreshTokens: LocalRefreshToken[];
+  otpVerifications: LocalOTPRecord[];
 };
 
 const localStorePath = path.resolve(process.cwd(), "data", "auth-store.json");
@@ -42,7 +60,7 @@ async function readLocalStore(): Promise<LocalAuthStore> {
     const raw = await fs.readFile(localStorePath, "utf8");
     return JSON.parse(raw) as LocalAuthStore;
   } catch {
-    return { users: [], refreshTokens: [] };
+    return { users: [], refreshTokens: [], otpVerifications: [] };
   }
 }
 
@@ -252,6 +270,11 @@ export class AuthService {
         email,
         passwordHash,
         pin: null,
+        pinAttempts: 0,
+        lockedUntil: null,
+        emailVerified: false,
+        emailVerificationCode: null,
+        emailVerificationExpiresAt: null,
         isActive: true,
         kycStatus: "PENDING",
         profileImageUrl: null,
@@ -348,11 +371,14 @@ export class AuthService {
     }
   }
 
-  static async verifyMpin(userId: string, mpin: string): Promise<boolean> {
+  static async verifyMpin(userId: string, mpin: string): Promise<{ verified: boolean; remainingAttempts: number }> {
+    const MAX_ATTEMPTS = 5;
+    const LOCKOUT_MINUTES = 10;
+
     try {
       const { data: user, error } = await supabase
         .from("users")
-        .select("pin")
+        .select("pin, pinAttempts, lockedUntil")
         .eq("id", userId)
         .single();
 
@@ -360,7 +386,34 @@ export class AuthService {
         throw new Error("MPIN not set up for this user");
       }
 
-      return bcrypt.compare(mpin, user.pin);
+      const now = new Date();
+
+      if (user.lockedUntil && new Date(user.lockedUntil) > now) {
+        throw new Error("ACCOUNT_LOCKED");
+      }
+
+      if (user.lockedUntil && new Date(user.lockedUntil) <= now) {
+        await supabase.from("users").update({ pinAttempts: 0, lockedUntil: null }).eq("id", userId);
+      }
+
+      const isValid = await bcrypt.compare(mpin, user.pin);
+
+      if (!isValid) {
+        const newAttempts = (user.pinAttempts ?? 0) + 1;
+        const remaining = MAX_ATTEMPTS - newAttempts;
+
+        if (remaining <= 0) {
+          const lockedUntil = new Date(now.getTime() + LOCKOUT_MINUTES * 60 * 1000).toISOString();
+          await supabase.from("users").update({ pinAttempts: newAttempts, lockedUntil }).eq("id", userId);
+          throw new Error("ACCOUNT_LOCKED");
+        }
+
+        await supabase.from("users").update({ pinAttempts: newAttempts }).eq("id", userId);
+        return { verified: false, remainingAttempts: remaining };
+      }
+
+      await supabase.from("users").update({ pinAttempts: 0, lockedUntil: null }).eq("id", userId);
+      return { verified: true, remainingAttempts: MAX_ATTEMPTS };
     } catch (error) {
       if (!isDatabaseUnavailable(error)) throw error;
 
@@ -370,7 +423,144 @@ export class AuthService {
         throw new Error("MPIN not set up for this user");
       }
 
-      return bcrypt.compare(mpin, user.pin);
+      const now = new Date();
+
+      if (user.lockedUntil && new Date(user.lockedUntil) > now) {
+        throw new Error("ACCOUNT_LOCKED");
+      }
+
+      if (user.lockedUntil && new Date(user.lockedUntil) <= now) {
+        user.pinAttempts = 0;
+        user.lockedUntil = null;
+      }
+
+      const isValid = await bcrypt.compare(mpin, user.pin);
+
+      if (!isValid) {
+        user.pinAttempts = (user.pinAttempts ?? 0) + 1;
+        const remaining = MAX_ATTEMPTS - user.pinAttempts;
+
+        if (remaining <= 0) {
+          user.lockedUntil = new Date(now.getTime() + LOCKOUT_MINUTES * 60 * 1000).toISOString();
+          user.updatedAt = now.toISOString();
+          await writeLocalStore(store);
+          throw new Error("ACCOUNT_LOCKED");
+        }
+
+        user.updatedAt = now.toISOString();
+        await writeLocalStore(store);
+        return { verified: false, remainingAttempts: remaining };
+      }
+
+      user.pinAttempts = 0;
+      user.lockedUntil = null;
+      user.updatedAt = now.toISOString();
+      await writeLocalStore(store);
+      return { verified: true, remainingAttempts: MAX_ATTEMPTS };
+    }
+  }
+
+  static async sendEmailOtp(userId: string, email: string, userName: string): Promise<void> {
+    const otp = randomInt(100000, 999999).toString();
+    const hashedOtp = await bcrypt.hash(otp, 10);
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+
+    try {
+      const { error: deleteOld } = await supabase
+        .from("otp_verifications")
+        .delete()
+        .eq("email", email)
+        .eq("verified", false);
+
+      if (deleteOld) console.warn("Failed to clear old email OTPs:", deleteOld);
+
+      const { error } = await supabase.from("otp_verifications").insert({
+        email,
+        otp: hashedOtp,
+        expiresAt,
+      });
+
+      if (error) throw error;
+    } catch (error) {
+      if (!isDatabaseUnavailable(error)) throw error;
+
+      const store = await readLocalStore();
+      store.otpVerifications = store.otpVerifications.filter(
+        (o) => o.email !== email || o.verified,
+      );
+      store.otpVerifications.push({
+        id: randomUUID(),
+        email,
+        phone: null,
+        otp: hashedOtp,
+        expiresAt,
+        attempts: 0,
+        verified: false,
+        createdAt: new Date().toISOString(),
+      });
+      await writeLocalStore(store);
+    }
+
+    await sendEmailOTP(email, userName, otp);
+  }
+
+  static async verifyEmailOtp(userId: string, email: string, otp: string): Promise<void> {
+    try {
+      const { data: verification, error } = await supabase
+        .from("otp_verifications")
+        .select("*")
+        .eq("email", email)
+        .eq("verified", false)
+        .gt("expiresAt", new Date().toISOString())
+        .order("createdAt", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error || !verification) {
+        throw new Error("Invalid or expired OTP");
+      }
+
+      const isValid = await bcrypt.compare(otp, verification.otp);
+      if (!isValid) {
+        throw new Error("Invalid or expired OTP");
+      }
+
+      await supabase.from("otp_verifications").update({ verified: true }).eq("id", verification.id);
+
+      const { error: updateError } = await supabase
+        .from("users")
+        .update({
+          emailVerified: true,
+          emailVerificationCode: null,
+          emailVerificationExpiresAt: null,
+        })
+        .eq("id", userId);
+
+      if (updateError) throw updateError;
+    } catch (error) {
+      if (!isDatabaseUnavailable(error)) throw error;
+
+      const store = await readLocalStore();
+      const verification = store.otpVerifications.find(
+        (o) => o.email === email && !o.verified && new Date(o.expiresAt) > new Date(),
+      );
+
+      if (!verification) throw new Error("Invalid or expired OTP");
+
+      const isValid = await bcrypt.compare(otp, verification.otp);
+      if (!isValid) throw new Error("Invalid or expired OTP");
+
+      verification.verified = true;
+
+      const user = store.users.find((u) => u.id === userId);
+      if (user) {
+        user.emailVerified = true;
+        user.emailVerificationCode = null;
+        user.emailVerificationExpiresAt = null;
+        user.updatedAt = new Date().toISOString();
+      }
+
+      await writeLocalStore(store);
     }
   }
 

@@ -12,6 +12,8 @@ import {
   setMpinSchema,
   verifyMpinSchema,
   changePasswordSchema,
+  sendEmailOtpSchema,
+  verifyEmailOtpSchema,
 } from "./auth.validator";
 
 const router = Router();
@@ -28,5 +30,8 @@ router.post("/set-mpin", protect as any, validate(setMpinSchema), AuthController
 router.post("/verify-mpin", protect as any, validate(verifyMpinSchema), AuthController.verifyMpin as any);
 router.get("/me", protect as any, AuthController.me as any);
 router.put("/change-password", protect as any, validate(changePasswordSchema), AuthController.changePassword as any);
+
+router.post("/send-email-otp", protect as any, validate(sendEmailOtpSchema), AuthController.sendEmailOtp as any);
+router.post("/verify-email-otp", protect as any, validate(verifyEmailOtpSchema), AuthController.verifyEmailOtp as any);
 
 export default router;

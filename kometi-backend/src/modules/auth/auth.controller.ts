@@ -84,13 +84,57 @@ export class AuthController {
       const userId = req.user?.id;
       if (!userId) throw new Error("Unauthorized");
 
-      const isValid = await AuthService.verifyMpin(userId, mpin);
-      if (!isValid) {
-        res.status(400).json({ success: false, error: "Invalid MPIN" });
+      const result = await AuthService.verifyMpin(userId, mpin);
+
+      if (!result.verified) {
+        res.status(400).json({
+          success: false,
+          error: `Invalid MPIN. ${result.remainingAttempts} attempt(s) remaining.`,
+          data: { verified: false, remainingAttempts: result.remainingAttempts },
+        });
         return;
       }
 
-      res.status(200).json({ success: true, data: { verified: true }, message: "MPIN verified successfully" });
+      res.status(200).json({
+        success: true,
+        data: { verified: true, remainingAttempts: result.remainingAttempts },
+        message: "MPIN verified successfully",
+      });
+    } catch (err: any) {
+      if (err.message === "ACCOUNT_LOCKED") {
+        res.status(429).json({
+          success: false,
+          error: "Too many failed attempts. Please try again after 10 minutes.",
+          data: { verified: false, remainingAttempts: 0, locked: true },
+        });
+        return;
+      }
+      next(err);
+    }
+  }
+
+  static async sendEmailOtp(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { email } = req.body;
+      const userId = req.user?.id;
+      if (!userId) throw new Error("Unauthorized");
+
+      const userName = req.user?.name ?? "User";
+      await AuthService.sendEmailOtp(userId, email, userName);
+      res.status(200).json({ success: true, data: null, message: "OTP sent to email" });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async verifyEmailOtp(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { email, otp } = req.body;
+      const userId = req.user?.id;
+      if (!userId) throw new Error("Unauthorized");
+
+      await AuthService.verifyEmailOtp(userId, email, otp);
+      res.status(200).json({ success: true, data: { verified: true }, message: "Email verified successfully" });
     } catch (err) {
       next(err);
     }

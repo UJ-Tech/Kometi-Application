@@ -22,6 +22,8 @@ export const APP_CONFIG = {
   OTP_EXPIRY_SECONDS:     300,  // 5 min
   OTP_MAX_ATTEMPTS:       3,
   MPIN_LENGTH:            6,
+  MPIN_MAX_ATTEMPTS:      5,
+  MPIN_LOCKOUT_MINUTES:   10,
   ACCESS_TOKEN_KEY:       "monio_access_token",
   REFRESH_TOKEN_KEY:      "monio_refresh_token",
   USER_KEY:               "monio_user",

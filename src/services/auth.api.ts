@@ -8,8 +8,15 @@ export interface LoginPayload      { email: string; phone: string; password: str
 export interface RegisterPayload   { phone: string; name: string; email: string; password: string }
 export interface SetMPINPayload    { mpin: string }
 export interface VerifyMPINPayload { mpin: string }
+export interface SendEmailOTPPayload { email: string }
+export interface VerifyEmailOTPPayload { email: string; otp: string }
 export interface ChangePasswordPayload { currentPassword: string; newPassword: string }
 export interface LogoutPayload { refreshToken?: string | null }
+
+export interface MPINVerifyResponse {
+  verified: boolean;
+  remainingAttempts?: number;
+}
 
 export interface AuthTokens {
   accessToken:  string;
@@ -40,11 +47,17 @@ export const authApi = {
     apiClient.post<ApiResponse<null>>("/auth/set-mpin", payload),
 
   verifyMPIN: (payload: VerifyMPINPayload) =>
-    apiClient.post<ApiResponse<{ verified: boolean }>>("/auth/verify-mpin", payload),
+    apiClient.post<ApiResponse<MPINVerifyResponse>>("/auth/verify-mpin", payload),
 
   getMe: () =>
     apiClient.get<ApiResponse<User>>("/auth/me"),
 
   changePassword: (payload: ChangePasswordPayload) =>
     apiClient.put<ApiResponse<null>>("/auth/change-password", payload),
+
+  sendEmailOTP: (payload: SendEmailOTPPayload) =>
+    apiClient.post<ApiResponse<null>>("/auth/send-email-otp", payload),
+
+  verifyEmailOTP: (payload: VerifyEmailOTPPayload) =>
+    apiClient.post<ApiResponse<{ verified: boolean }>>("/auth/verify-email-otp", payload),
 };

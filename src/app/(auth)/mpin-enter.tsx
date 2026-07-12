@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import OTPInput from "../../components/ui/OTPInput";
 import Button from "../../components/ui/Button";
 import { authApi } from "../../services/auth.api";
@@ -11,6 +12,9 @@ import { useAuthStore } from "../../stores/auth.store";
 import { useBiometrics } from "../../hooks/useBiometrics";
 import { COLORS, FONT_SIZE, SPACING, BORDER_RADIUS } from "../../constants/theme";
 import { useAlertModal } from "../../components/ui/AlertModal";
+
+const LOCKOUT_KEY = "mpin_lockout";
+const LOCKOUT_MINUTES = 10;
 
 export default function MPINEnterScreen() {
   const router  = useRouter();
@@ -22,10 +26,10 @@ export default function MPINEnterScreen() {
 
   const [mpin,      setMPIN]      = useState("");
   const [error,     setError]     = useState("");
-  const [attempts,  setAttempts]  = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-
-  const MAX_ATTEMPTS = 5;
+  const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
+  const [lockedUntil, setLockedUntil] = useState<Date | null>(null);
+  const [lockoutTimer, setLockoutTimer] = useState("");
 
   const handleBiometric = async () => {
     const ok = await authenticate("Verify your identity to continue");
@@ -33,35 +37,77 @@ export default function MPINEnterScreen() {
   };
 
   const biometricOffered = useRef(false);
+
+  const checkLockout = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(LOCKOUT_KEY);
+      if (!stored) return;
+      const data = JSON.parse(stored);
+      const until = new Date(data.lockedUntil);
+      if (until > new Date()) {
+        setLockedUntil(until);
+        setRemainingAttempts(0);
+      } else {
+        await AsyncStorage.removeItem(LOCKOUT_KEY);
+      }
+    } catch {}
+  };
+
   useEffect(() => {
+    checkLockout();
     if (isEnrolled && !biometricOffered.current) {
       biometricOffered.current = true;
       handleBiometric();
     }
   }, [isEnrolled]);
 
+  useEffect(() => {
+    if (!lockedUntil) return;
+    const interval = setInterval(() => {
+      const diff = lockedUntil.getTime() - Date.now();
+      if (diff <= 0) {
+        setLockedUntil(null);
+        setRemainingAttempts(null);
+        setLockoutTimer("");
+        AsyncStorage.removeItem(LOCKOUT_KEY).catch(() => {});
+        return;
+      }
+      const mins = Math.floor(diff / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      setLockoutTimer(`${mins}:${secs.toString().padStart(2, "0")}`);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lockedUntil]);
+
   const handleVerify = async () => {
     if (mpin.length < 6) { setError("Enter your 6-digit MPIN"); return; }
-    if (attempts >= MAX_ATTEMPTS) {
-      await alert("Account Locked", "Too many failed attempts. Please login again.");
-      await logout();
-      router.replace("/(auth)/login");
-      return;
-    }
+    if (lockedUntil) return;
 
     setIsLoading(true);
     setError("");
     try {
       const res = await authApi.verifyMPIN({ mpin });
       if (res.data.data.verified) {
+        await AsyncStorage.removeItem(LOCKOUT_KEY).catch(() => {});
+        setRemainingAttempts(null);
         router.replace("/(app)/dashboard");
-      } else {
-        throw new Error("Incorrect MPIN");
       }
-    } catch {
-      const remaining = MAX_ATTEMPTS - attempts - 1;
-      setAttempts((a) => a + 1);
-      setError(`Incorrect MPIN. ${remaining} attempts remaining.`);
+    } catch (err: any) {
+      const remaining = err.data?.remainingAttempts as number | undefined;
+      const isLocked = err.data?.locked === true;
+
+      if (isLocked || err.status === 429) {
+        const until = new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000);
+        setLockedUntil(until);
+        setRemainingAttempts(0);
+        await AsyncStorage.setItem(LOCKOUT_KEY, JSON.stringify({ lockedUntil: until.toISOString() }));
+        setError(`Too many failed attempts. Try again after ${LOCKOUT_MINUTES} minutes.`);
+      } else if (remaining !== undefined && remaining > 0) {
+        setRemainingAttempts(remaining);
+        setError(`Incorrect MPIN. ${remaining} attempt(s) remaining.`);
+      } else {
+        setError("Incorrect MPIN.");
+      }
       setMPIN("");
     } finally {
       setIsLoading(false);
@@ -119,18 +165,40 @@ export default function MPINEnterScreen() {
         </View>
 
         <View style={{ gap: SPACING[4] }}>
-          <View style={{ gap: SPACING[4] }}>
-            <Text style={{ fontSize: FONT_SIZE.base, color: COLORS.text.secondary, fontWeight: "500", textAlign: "center" }}>
-              Enter your MPIN
-            </Text>
-            <OTPInput
-              value={mpin}
-              onChange={(val) => { setMPIN(val); setError(""); }}
-              error={error}
-            />
-          </View>
+          {lockedUntil ? (
+            <View style={{ alignItems: "center", gap: SPACING[4] }}>
+              <Ionicons name="lock-closed-outline" size={48} color={COLORS.text.muted} />
+              <View style={{ alignItems: "center", gap: SPACING[1] }}>
+                <Text style={{ fontSize: FONT_SIZE.lg, color: COLORS.text.primary, fontWeight: "700" }}>
+                  Account Locked
+                </Text>
+                <Text style={{ fontSize: FONT_SIZE.sm, color: COLORS.text.muted, textAlign: "center" }}>
+                  Too many failed attempts. Try again in
+                </Text>
+              </View>
+              <Text style={{ fontSize: FONT_SIZE["4xl"], fontWeight: "800", color: COLORS.brand[600], fontVariant: ["tabular-nums"] }}>
+                {lockoutTimer}
+              </Text>
+            </View>
+          ) : (
+            <View style={{ gap: SPACING[4] }}>
+              <Text style={{ fontSize: FONT_SIZE.base, color: COLORS.text.secondary, fontWeight: "500", textAlign: "center" }}>
+                Enter your MPIN
+              </Text>
+              <OTPInput
+                value={mpin}
+                onChange={(val) => { setMPIN(val); setError(""); }}
+                error={error}
+              />
+              {remainingAttempts !== null && (
+                <Text style={{ fontSize: FONT_SIZE.sm, color: COLORS.warning.DEFAULT, fontWeight: "500", textAlign: "center" }}>
+                  {remainingAttempts} attempt(s) remaining
+                </Text>
+              )}
+            </View>
+          )}
 
-          {isEnrolled && (
+          {isEnrolled && !lockedUntil && (
             <TouchableOpacity style={{ alignItems: "center", gap: SPACING[2] }} onPress={handleBiometric}>
               <LinearGradient
                 colors={["rgba(79, 70, 229, 0.08)", "rgba(79, 70, 229, 0.04)"]}
@@ -167,7 +235,7 @@ export default function MPINEnterScreen() {
             gradient
             isLoading={isLoading}
             onPress={handleVerify}
-            disabled={mpin.length < 6}
+            disabled={mpin.length < 6 || !!lockedUntil}
           />
 
           <TouchableOpacity onPress={() => router.push("/(auth)/login")}>

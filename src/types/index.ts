@@ -33,6 +33,7 @@ export interface User {
   phone:          string;
   name:           string;
   email?:         string;
+  emailVerified?: boolean;
   isActive:       boolean;
   kycStatus:      KYCStatus;
   profileImageUrl?: string;

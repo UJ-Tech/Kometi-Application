@@ -80,10 +80,12 @@ apiClient.interceptors.response.use(
       }
     }
 
-    // Normalize error
-    const apiError = error.response?.data as { error?: string } | undefined;
+    const apiError = error.response?.data as { error?: string; data?: unknown } | undefined;
     const message  = apiError?.error ?? error.message ?? "Something went wrong";
-    return Promise.reject(new Error(message));
+    const normalized = new Error(message);
+    (normalized as any).status = error.response?.status;
+    (normalized as any).data = apiError?.data;
+    return Promise.reject(normalized);
   },
 );
 
