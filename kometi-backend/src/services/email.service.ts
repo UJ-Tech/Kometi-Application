@@ -17,6 +17,9 @@ if (smtpConfigured) {
       user: env.SMTP_USER,
       pass: env.SMTP_PASS,
     },
+    connectionTimeout: 5_000,
+    greetingTimeout: 5_000,
+    socketTimeout: 10_000,
   });
 }
 
@@ -87,23 +90,25 @@ export async function sendEmailOTP(
   const html = buildOTPEmail(otp, userName);
 
   try {
-    await Promise.race([
-      transporter.sendMail({
-        from: env.EMAIL_FROM,
-        to,
-        subject: "Your OTP for Email Verification - Monio",
-        html,
-      }),
-      new Promise<void>((_, reject) =>
-        setTimeout(() => reject(new Error("Email send timed out")), 10_000),
-      ),
-    ]);
-  } catch (err) {
-    console.error(`[Email OTP] Failed to send to ${to}:`, err);
+    await transporter.sendMail({
+      from: env.EMAIL_FROM,
+      to,
+      subject: "Your OTP for Email Verification - Monio",
+      html,
+    });
+  } catch (err: any) {
+    console.error(`[Email OTP] Failed to send to ${to}:`, err?.message ?? err);
     console.log(`[Email OTP] OTP for ${to}: ${otp}`);
-    throw new Error(
-      "Failed to send verification email. Check that your SMTP credentials are correct " +
-      "(for Gmail with 2FA, use an App Password).",
-    );
+    const detail = err?.message ?? "";
+    if (detail.includes("EAUTH")) {
+      throw new Error("SMTP authentication failed. Check your SMTP_USER and SMTP_PASS (use an App Password for Gmail).");
+    }
+    if (detail.includes("ENOTFOUND")) {
+      throw new Error(`SMTP host not found. Check your SMTP_HOST (current: ${env.SMTP_HOST}).`);
+    }
+    if (detail.includes("ETIMEDOUT") || detail.includes("ESOCKET")) {
+      throw new Error(`SMTP connection timed out. Check your SMTP_HOST and SMTP_PORT (current: ${env.SMTP_HOST}:${env.SMTP_PORT ?? "587"}). Render may block outbound SMTP — try port 465 (SSL) instead of 587.`);
+    }
+    throw new Error(`Failed to send email: ${detail.slice(0, 120)}`);
   }
 }
