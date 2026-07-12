@@ -30,6 +30,7 @@ import Badge from "../../../../components/ui/Badge";
 import Button from "../../../../components/ui/Button";
 import KKMark, { KKMarkWatermark } from "../../../../components/brand/KKMark";
 import { useAlertModal } from "../../../../components/ui/AlertModal";
+import PaymentStatusDashboard from "../../../../components/committees/PaymentStatusDashboard";
 
 export default function CommitteeDetail() {
   const rawId = useLocalSearchParams<{ id: string }>().id;
@@ -886,6 +887,11 @@ export default function CommitteeDetail() {
               })}
             </Card>
           </View>
+        )}
+
+        {/* Payment Status Dashboard */}
+        {committee.status === "ACTIVE" && (
+          <PaymentStatusDashboard committeeId={id} />
         )}
 
         {/* Members */}

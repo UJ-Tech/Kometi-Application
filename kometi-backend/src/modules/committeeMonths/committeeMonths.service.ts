@@ -1813,6 +1813,85 @@ export class CommitteeMonthsService {
     }));
   }
 
+  // ─── 9b. Payment Dashboard (month-wise member payment status for all members) ─
+  static async getPaymentDashboard(committeeId: string) {
+    const [monthsRes, membersRes, obligationsRes] = await Promise.all([
+      supabase
+        .from("committee_months")
+        .select("id, month_number, month_date, status, winner_member_id, winning_bid_amount, resolution_type, total_pool, non_winner_net_payable, winner_net_receivable, payment_deadline")
+        .eq("committee_id", committeeId)
+        .order("month_number", { ascending: true }),
+      supabase
+        .from("committee_members")
+        .select("id, userId, slotNumber, isActive, hasReceivedPayout, user:users(id, name, phone)")
+        .eq("committeeId", committeeId)
+        .eq("isActive", true)
+        .order("slotNumber", { ascending: true }),
+      supabase
+        .from("member_payment_obligations")
+        .select("id, month_id, member_id, user_id, role, contribution_amount, distribution_share, net_amount, direction, interest_charged, due_date, status, paid_at, advanced_by_organiser")
+        .eq("committee_id", committeeId),
+    ]);
+
+    if (monthsRes.error) throw monthsRes.error;
+    if (membersRes.error) throw membersRes.error;
+    if (obligationsRes.error) throw obligationsRes.error;
+
+    const members = (membersRes.data || []).map((m: any) => ({
+      id: m.id,
+      userId: m.userId,
+      slotNumber: m.slotNumber,
+      isActive: m.isActive,
+      hasReceivedPayout: m.hasReceivedPayout,
+      user: m.user ? { id: m.user.id, name: m.user.name, phone: m.user.phone } : null,
+    }));
+
+    const months = (monthsRes.data || []).map((mo: any) => {
+      const monthObligations = (obligationsRes.data || []).filter((o: any) => o.month_id === mo.id);
+      const winnerMember = members.find((mem: any) => mem.id === mo.winner_member_id);
+
+      const memberStatuses = members.map((mem: any) => {
+        const obl = monthObligations.find((o: any) => o.member_id === mem.id);
+        return {
+          memberId: mem.id,
+          userId: mem.userId,
+          name: mem.user?.name || `Slot ${mem.slotNumber}`,
+          slotNumber: mem.slotNumber,
+          role: obl?.role || "non_winner",
+          direction: obl?.direction || null,
+          netAmount: obl ? Number(obl.net_amount) : 0,
+          status: obl?.status || "pending",
+          paidAt: obl?.paid_at || null,
+          advancedByOrganiser: obl?.advanced_by_organiser || false,
+        };
+      });
+
+      return {
+        id: mo.id,
+        monthNumber: mo.month_number,
+        monthDate: mo.month_date,
+        status: mo.status,
+        resolutionType: mo.resolution_type,
+        totalPool: Number(mo.total_pool),
+        winningBidAmount: mo.winning_bid_amount ? Number(mo.winning_bid_amount) : null,
+        winnerMemberId: mo.winner_member_id,
+        winnerName: winnerMember?.user?.name || null,
+        winnerSlot: winnerMember?.slotNumber || null,
+        nonWinnerNetPayable: mo.non_winner_net_payable ? Number(mo.non_winner_net_payable) : 0,
+        winnerNetReceivable: mo.winner_net_receivable ? Number(mo.winner_net_receivable) : 0,
+        paymentDeadline: mo.payment_deadline || null,
+        members: memberStatuses,
+      };
+    });
+
+    return {
+      committeeId,
+      totalMembers: members.length,
+      members,
+      months,
+    };
+  }
+
   // ─── 10. Get Organiser Advances (for organiser dashboard) ─────────────
   static async getOrganiserAdvances(committeeId: string, organiserId: string) {
     const { data: advances, error } = await supabase

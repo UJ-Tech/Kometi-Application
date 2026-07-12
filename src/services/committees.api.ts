@@ -2,7 +2,7 @@
 import apiClient from "./api.client";
 import type {
   ApiResponse, Committee, CommitteeDetail, CommitteeMember,
-  CommitteeStatus, PaginationMeta, JoinRequest,
+  CommitteeStatus, PaginationMeta, JoinRequest, PaymentDashboard,
 } from "../types";
 
 export interface CreateCommitteePayload {
@@ -185,5 +185,10 @@ export const committeesApi = {
     apiClient.post<ApiResponse<any>>(
       `/committees/${committeeId}/members/add-active`,
       { userId }
+    ),
+
+  getPaymentDashboard: (committeeId: string) =>
+    apiClient.get<ApiResponse<PaymentDashboard>>(
+      `/committees/${committeeId}/months/dashboard`
     ),
 };

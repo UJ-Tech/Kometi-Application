@@ -247,6 +247,46 @@ export interface MemberDistribution {
   member?:            CommitteeMember;
 }
 
+// ─── Payment Dashboard ────────────────────────────────────────────────────────
+export type ObligationStatus = "pending" | "paid" | "overdue" | "organiser_advanced";
+
+export interface PaymentDashboardMember {
+  memberId: string;
+  userId: string;
+  name: string;
+  slotNumber: number;
+  role: "winner" | "non_winner";
+  direction: "pay" | "receive" | null;
+  netAmount: number;
+  status: ObligationStatus | null;
+  paidAt: string | null;
+  advancedByOrganiser: boolean;
+}
+
+export interface PaymentDashboardMonth {
+  id: string;
+  monthNumber: number;
+  monthDate: string;
+  status: CommitteeMonthStatus;
+  resolutionType: ResolutionType;
+  totalPool: number;
+  winningBidAmount: number | null;
+  winnerMemberId: string | null;
+  winnerName: string | null;
+  winnerSlot: number | null;
+  nonWinnerNetPayable: number;
+  winnerNetReceivable: number;
+  paymentDeadline: string | null;
+  members: PaymentDashboardMember[];
+}
+
+export interface PaymentDashboard {
+  committeeId: string;
+  totalMembers: number;
+  members: { id: string; userId: string; slotNumber: number; user: { id: string; name: string } | null }[];
+  months: PaymentDashboardMonth[];
+}
+
 // ─── Withdrawals ───────────────────────────────────────────────────────────
 export type WithdrawalStatus = "requested" | "processing" | "completed" | "failed" | "cancelled";
 

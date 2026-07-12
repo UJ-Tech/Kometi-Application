@@ -224,6 +224,22 @@ export class CommitteeMonthsController {
     }
   }
 
+  // GET /api/v1/committees/:id/months/dashboard
+  // Get month-wise member payment status dashboard for all members
+  static async getPaymentDashboard(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      if (!id || id === "undefined") {
+        res.status(400).json({ success: false, message: "Invalid committee ID" });
+        return;
+      }
+      const data = await CommitteeMonthsService.getPaymentDashboard(id);
+      res.status(200).json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   // GET /api/v1/committees/:id/months/overdue
   // Get overdue payment obligations (organiser only)
   static async getOverdueObligations(req: AuthenticatedRequest, res: Response, next: NextFunction) {

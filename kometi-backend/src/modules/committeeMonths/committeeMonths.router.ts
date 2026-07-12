@@ -27,6 +27,13 @@ router.get(
   CommitteeMonthsController.getMemberEarnings as any
 );
 
+// GET /api/v1/committees/:id/months/dashboard
+// Get month-wise member payment status dashboard for all members
+router.get(
+  "/dashboard",
+  CommitteeMonthsController.getPaymentDashboard as any
+);
+
 // GET /api/v1/committees/:id/months/overdue
 // Get overdue payment obligations (organiser only)
 router.get(
