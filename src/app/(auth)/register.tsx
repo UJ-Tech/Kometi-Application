@@ -67,7 +67,7 @@ export default function RegisterScreen() {
       ]);
       setAccessToken(accessToken);
       setUser(user);
-      router.replace("/(auth)/mpin-setup");
+      router.replace("/(auth)/email-verify?returnTo=mpin-setup");
     } catch (e: any) {
       setErrors({ form: e.message ?? "Registration failed. Try again." });
     } finally {

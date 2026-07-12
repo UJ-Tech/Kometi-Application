@@ -119,8 +119,7 @@ export class AuthController {
       const userId = req.user?.id;
       if (!userId) throw new Error("Unauthorized");
 
-      const userName = req.user?.name ?? "User";
-      await AuthService.sendEmailOtp(userId, email, userName);
+      await AuthService.sendEmailOtp(userId, email);
       res.status(200).json({ success: true, data: null, message: "OTP sent to email" });
     } catch (err) {
       next(err);

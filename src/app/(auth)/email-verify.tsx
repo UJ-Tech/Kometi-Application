@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View, Text, KeyboardAvoidingView, Platform, TouchableOpacity,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -20,10 +20,12 @@ const OTP_EXPIRY = APP_CONFIG.OTP_EXPIRY_SECONDS;
 
 export default function EmailVerifyScreen() {
   const router   = useRouter();
+  const params   = useLocalSearchParams<{ returnTo?: string }>();
   const insets   = useSafeAreaInsets();
   const user     = useAuthStore((s) => s.user);
-  const setUser  = useAuthStore((s) => s.setUser);
   const updateProfile = useAuthStore((s) => s.updateProfile);
+
+  const isFromRegistration = !!params.returnTo;
 
   const [email,         setEmail]         = useState(user?.email ?? "");
   const [otp,           setOTP]           = useState("");
@@ -72,7 +74,11 @@ export default function EmailVerifyScreen() {
       if (user) {
         updateProfile({ email: email.trim().toLowerCase() });
       }
-      router.back();
+      if (isFromRegistration) {
+        router.replace(`/(auth)/${params.returnTo}`);
+      } else {
+        router.back();
+      }
     } catch (e: any) {
       setError(e.message ?? "Invalid OTP. Please try again.");
       setOTP("");
@@ -86,7 +92,7 @@ export default function EmailVerifyScreen() {
       style={{ flex: 1, backgroundColor: COLORS.surface.bg }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScreenHeader title="Verify Email" showBack />
+      <ScreenHeader title="Verify Email" showBack={!isFromRegistration} />
 
       <View style={[{ flex: 1, paddingHorizontal: SPACING[6], gap: SPACING[8], paddingTop: SPACING[4] }, { paddingBottom: insets.bottom + SPACING[6] }]}>
         <View style={{ alignItems: "center", gap: SPACING[3] }}>
@@ -112,7 +118,10 @@ export default function EmailVerifyScreen() {
             </Text>
             {step === "email" ? (
               <Text style={{ fontSize: FONT_SIZE.base, color: COLORS.text.secondary, lineHeight: 24, textAlign: "center" }}>
-                We'll send a 6-digit code to your email
+                {isFromRegistration
+                  ? "Verify your email to continue. We'll send a 6-digit code."
+                  : "We'll send a 6-digit code to your email"
+                }
               </Text>
             ) : (
               <Text style={{ fontSize: FONT_SIZE.base, color: COLORS.text.secondary, lineHeight: 24, textAlign: "center" }}>
@@ -136,6 +145,7 @@ export default function EmailVerifyScreen() {
               returnKeyType="done"
               onSubmitEditing={handleSendOtp}
               error={error}
+              editable={!isFromRegistration}
               leftIcon={<Ionicons name="mail-outline" size={18} color={COLORS.text.muted} />}
             />
 

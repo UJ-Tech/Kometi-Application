@@ -460,7 +460,25 @@ export class AuthService {
     }
   }
 
-  static async sendEmailOtp(userId: string, email: string, userName: string): Promise<void> {
+  static async sendEmailOtp(userId: string, email: string): Promise<void> {
+    let userName = "User";
+
+    try {
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("name")
+        .eq("id", userId)
+        .single();
+
+      if (!userError && userData) {
+        userName = userData.name;
+      }
+    } catch {
+      const store = await readLocalStore();
+      const localUser = store.users.find((u) => u.id === userId);
+      if (localUser) userName = localUser.name;
+    }
+
     const otp = randomInt(100000, 999999).toString();
     const hashedOtp = await bcrypt.hash(otp, 10);
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
