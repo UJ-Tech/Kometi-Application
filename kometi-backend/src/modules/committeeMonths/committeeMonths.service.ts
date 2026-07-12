@@ -546,60 +546,6 @@ export class CommitteeMonthsService {
       if (oblErr) throw oblErr;
     }
 
-    // 5a. Auto-settle organiser commission month (month 1) immediately
-    // Organiser receives full pool as commission — no need to wait for member payments
-    if (resolutionType === "organiser_commission") {
-      try {
-        const { data: orgWinnerObl } = await supabase
-          .from("member_payment_obligations")
-          .select("id, member_id, net_amount")
-          .eq("committee_id", committeeId)
-          .eq("month_id", monthId)
-          .eq("role", "winner")
-          .eq("direction", "receive")
-          .single();
-
-        if (orgWinnerObl) {
-          const { data: orgUser } = await supabase
-            .from("committee_members")
-            .select("userId")
-            .eq("id", orgWinnerObl.member_id)
-            .single();
-
-          if (orgUser) {
-            const payoutAmount = Number(orgWinnerObl.net_amount);
-            if (payoutAmount > 0) {
-              await WalletLedgerService.creditWallet({
-                memberId: orgUser.userId,
-                committeeId,
-                amount: payoutAmount,
-                entryType: "bid_payout",
-                referenceType: "member_payment_obligations",
-                referenceId: orgWinnerObl.id,
-                idempotencyKey: `organiser_commission_${committeeId}_${monthId}`,
-                createdBy: "system",
-                notes: `Month 1 organiser commission — full pool credited`,
-              });
-
-              await supabase
-                .from("member_payment_obligations")
-                .update({ status: "paid", paid_at: new Date().toISOString() })
-                .eq("id", orgWinnerObl.id);
-
-              await supabase
-                .from("committee_members")
-                .update({ hasReceivedPayout: true })
-                .eq("id", orgWinnerObl.member_id);
-
-              console.log(`[resolveMonth] Month 1 organiser commission auto-settled: ${payoutAmount} paise`);
-            }
-          }
-        }
-      } catch (settleErr) {
-        console.error(`[resolveMonth] Month 1 auto-settle failed (non-fatal):`, settleErr);
-      }
-    }
-
     // 5b. Post-resolution verification
     const integrity = await this.verifyMonthLedgerIntegrity(committeeId, monthId);
     if (integrity.imbalance !== 0) {
@@ -631,9 +577,7 @@ export class CommitteeMonthsService {
       if (winnerUser) {
         const winnerTitle = `You Won Month #${month.month_number}!`;
         const winnerBody = `Congratulations! You won ${resolutionLabel} for ${committeeName} Month #${month.month_number}. ` +
-          (resolutionType !== "organiser_commission"
-            ? `Your payout of ₹${Math.round(summary.winnerNetReceivable)} will be credited after all members pay.`
-            : `Your commission has been credited to your wallet.`);
+          `Your payout of ₹${Math.round(summary.winnerNetReceivable)} will be credited after all members pay.`;
 
         emitToUser(winnerUser.userId, "notification:new", {
           type: "COMMITTEE_PAYOUT", title: winnerTitle, body: winnerBody,
