@@ -15,7 +15,7 @@ export const APP_CONFIG = {
   // API
   API_BASE_URL:    apiBaseUrl,
   SOCKET_URL:      socketUrl,
-  API_TIMEOUT_MS:  30_000,
+  API_TIMEOUT_MS:  60_000,
 
   // Auth
   OTP_LENGTH:             6,

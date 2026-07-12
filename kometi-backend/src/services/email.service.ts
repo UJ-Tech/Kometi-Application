@@ -86,10 +86,15 @@ export async function sendEmailOTP(
 
   const html = buildOTPEmail(otp, userName);
 
-  await transporter.sendMail({
-    from: env.EMAIL_FROM,
-    to,
-    subject: "Your OTP for Email Verification - Monio",
-    html,
-  });
+  await Promise.race([
+    transporter.sendMail({
+      from: env.EMAIL_FROM,
+      to,
+      subject: "Your OTP for Email Verification - Monio",
+      html,
+    }),
+    new Promise<void>((_, reject) =>
+      setTimeout(() => reject(new Error("Email send timed out")), 10_000),
+    ),
+  ]);
 }
