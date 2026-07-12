@@ -175,7 +175,7 @@ function makeFullMemberList(winnerId = WINNER_ID) {
   const members = [];
   for (let i = 0; i < TOTAL_MEMBERS; i++) {
     const id = i === 0 ? winnerId : `member-${i}`;
-    members.push(makeActiveMember(id, { hasReceivedPayout: id === winnerId }));
+    members.push(makeActiveMember(id));
   }
   return members;
 }

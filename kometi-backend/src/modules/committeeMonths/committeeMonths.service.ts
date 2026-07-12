@@ -412,15 +412,6 @@ export class CommitteeMonthsService {
         throw new Error(`Failed to mark winner's monthly contribution as paid: ${mcErr.message}`);
       }
 
-      // Prevent winner from participating in future months — set immediately on resolution
-      const { error: payoutFlagErr } = await supabase
-        .from("committee_members")
-        .update({ hasReceivedPayout: true })
-        .eq("id", winnerMemberId);
-
-      if (payoutFlagErr) {
-        throw new Error(`Failed to mark winner as hasReceivedPayout: ${payoutFlagErr.message}`);
-      }
     }
 
     // Calculate month summary (now includes nonWinnerNetPayable, winnerNetReceivable)
@@ -767,10 +758,10 @@ export class CommitteeMonthsService {
   }
 
   // ─── 5. Get Member Eligibility ─────────────────────────────────────────────
-  static async getMemberEligibility(_committeeId: string, memberId: string, _monthId: string) {
+  static async getMemberEligibility(committeeId: string, memberId: string, _monthId: string) {
     const { data: member, error: memberErr } = await supabase
       .from("committee_members")
-      .select("id, isActive, hasReceivedPayout")
+      .select("id, isActive")
       .eq("id", memberId)
       .single();
 
@@ -778,10 +769,19 @@ export class CommitteeMonthsService {
       return { canBid: false, reason: "Member not found", hasWonBefore: false, contributionStatus: "unknown" };
     }
     if (!member.isActive) {
-      return { canBid: false, reason: "Member is inactive", hasWonBefore: member.hasReceivedPayout, contributionStatus: "unknown" };
+      return { canBid: false, reason: "Member is inactive", hasWonBefore: false, contributionStatus: "unknown" };
     }
 
-    if (member.hasReceivedPayout) {
+    // Check actual win history: has this member won any completed month?
+    const { data: wonMonths } = await supabase
+      .from("committee_months")
+      .select("id")
+      .eq("committee_id", committeeId)
+      .eq("winner_member_id", memberId)
+      .eq("status", "completed")
+      .limit(1);
+
+    if (wonMonths && wonMonths.length > 0) {
       return { canBid: false, reason: "Member has already won a previous month", hasWonBefore: true, contributionStatus: "unknown" };
     }
 
